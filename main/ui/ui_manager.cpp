@@ -6,43 +6,45 @@
 
 #include "navigation.h"
 
-static lv_updatable_screen_t* screens[] =
+// Screens (extern C from each screen cpp)
+extern lv_updatable_screen_t compassScreen;
+extern lv_updatable_screen_t engineScreen;
+extern lv_updatable_screen_t windScreen;
+extern lv_updatable_screen_t gpsScreen;
+
+// Currently active screen pointer
+static lv_updatable_screen_t* currentScreen = NULL;
+
+void ui_manager_init(void)
 {
-    &engineScreen,
-    &compassScreen,
-    &gpsScreen,
-    &windScreen
-};
+    // Initialize each screen only once
+    if(compassScreen.screen == NULL) init_compassScreen();
+    if(engineScreen.screen  == NULL) init_engineScreen();
+    if(windScreen.screen    == NULL) init_windScreen();
+    if(gpsScreen.screen    == NULL) init_gpsScreen();
 
-lv_updatable_screen_t *activeScreen = nullptr;
-
-void ui_manager_init()
-{
-    init_engineScreen();
-    init_compassScreen();
-    init_gpsScreen();
-    init_windScreen();
-
-    navigation_init(screens, sizeof(screens) / sizeof(screens[0]));
-
-    // Set the initial screen
-    activeScreen = &engineScreen;
-    lv_scr_load(activeScreen->screen);
-
-    // Call the init callback to populate objects
-    if (activeScreen->init_cb) {
-        activeScreen->init_cb(activeScreen->screen);
-    }
+    // Load default screen
+    ui_manager_load_screen(&windScreen);
 }
 
-void ui_manager_update() {
-    if (!activeScreen) return;
+void ui_manager_load_screen(lv_updatable_screen_t* screen)
+{
+    if(screen == NULL || screen->screen == NULL) return;
 
-    // Call LVGL task handler
-    lv_task_handler();
+    currentScreen = screen;
+    lv_scr_load(screen->screen);
+}
 
-    // Call the screen-specific update
-    if (activeScreen->update_cb) {
-        activeScreen->update_cb();
+void ui_manager_update(void)
+{
+    // Call the current screen's update callback
+    if(currentScreen && currentScreen->update_cb) {
+        currentScreen->update_cb();
     }
+
+    // Let LVGL do its processing (timers, animations, input)
+    lv_timer_handler();
+
+    // Small delay to prevent watchdog
+    vTaskDelay(pdMS_TO_TICKS(5));
 }

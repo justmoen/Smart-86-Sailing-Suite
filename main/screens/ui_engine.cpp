@@ -5,7 +5,7 @@
 #include "ui_screens.h"
 
 // LVGL objects
-lv_updatable_screen_t engineScreen;
+lv_updatable_screen_t engineScreen = {0};
 
 lv_obj_t *engine_rpm_meter = nullptr;
 lv_meter_indicator_t *engine_rpm_indic = nullptr;
@@ -160,7 +160,12 @@ void engine_update_cb() {
 
 // Initialize screen struct
 void init_engineScreen() {
-    engineScreen.screen = lv_obj_create(nullptr);
-    engineScreen.init_cb = lv_engine_display;
+
+    if(engineScreen.screen != NULL) return;
+
+    engineScreen.screen = lv_obj_create(NULL);
+
+    lv_engine_display(engineScreen.screen);
+
     engineScreen.update_cb = engine_update_cb;
 }

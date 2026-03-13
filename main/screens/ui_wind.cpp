@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-lv_updatable_screen_t windScreen;
+lv_updatable_screen_t windScreen = {0};
 
 /* LVGL objects */
 static lv_obj_t *wind_display;
@@ -216,10 +216,14 @@ void wind_update_cb(void)
 /* Screen Init                                        */
 /* -------------------------------------------------- */
 
-void init_windScreen(void)
-{
+void init_windScreen() {
+
+    if(windScreen.screen != NULL) return;
+
     windScreen.screen = lv_obj_create(NULL);
-    windScreen.init_cb = lv_wind_display;
+
+    lv_wind_display(windScreen.screen);
+
     windScreen.update_cb = wind_update_cb;
 }
 
