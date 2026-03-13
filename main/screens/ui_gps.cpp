@@ -12,7 +12,7 @@
 extern "C" {
 #endif
 
-lv_updatable_screen_t gpsScreen;
+lv_updatable_screen_t gpsScreen = {0};
 
   static lv_obj_t *gps_time_label;
   static lv_obj_t *gps_cogt_label;
@@ -103,10 +103,14 @@ lv_updatable_screen_t gpsScreen;
     //                     .c_str());
   }
 
-void init_gpsScreen()
-{
+void init_gpsScreen() {
+
+    if(gpsScreen.screen != NULL) return;
+
     gpsScreen.screen = lv_obj_create(NULL);
-    gpsScreen.init_cb = lv_gps_display;
+
+    lv_gps_display(gpsScreen.screen);
+
     gpsScreen.update_cb = gps_update_cb;
 }
 

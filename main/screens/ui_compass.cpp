@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-lv_updatable_screen_t compassScreen;
+lv_updatable_screen_t compassScreen = {0};
 
 /* LVGL objects */
 
@@ -261,10 +261,14 @@ void compass_update_cb(void)
 /* Screen Init                                        */
 /* -------------------------------------------------- */
 
-void init_compassScreen(void)
-{
+void init_compassScreen() {
+
+    if(compassScreen.screen != NULL) return;
+
     compassScreen.screen = lv_obj_create(NULL);
-    compassScreen.init_cb = lv_compass_display;
+
+    lv_compass_display(compassScreen.screen);
+
     compassScreen.update_cb = compass_update_cb;
 }
 
