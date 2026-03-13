@@ -1,10 +1,9 @@
+file(GLOB UI_SRCS "*.cpp")
 file(GLOB SCREEN_SRCS "screens/*.c")
 
 idf_component_register(
     SRCS
-        "ui_manager.cpp"
-        "navigation.cpp"
-        "ui_event_bus.cpp"
+        ${UI_SRCS}
         ${SCREEN_SRCS}
     INCLUDE_DIRS
         "."
