@@ -23,26 +23,29 @@ static lv_updatable_screen_t* screens[] =
     &windScreen
 };
 
-void ui_manager_init(void)
-{
-    // Initialize each screen only once
-    if(compassScreen.screen == NULL) init_compassScreen();
-    if(engineScreen.screen  == NULL) init_engineScreen();
-    if(windScreen.screen    == NULL) init_windScreen();
-    if(gpsScreen.screen    == NULL) init_gpsScreen();
+void ui_manager_load_screen(lv_updatable_screen_t *screen) {
+    if (!screen || !screen->screen) return;
 
+    if (currentScreen && currentScreen->screen) {
+        lv_obj_clean(currentScreen->screen); // remove old content if needed
+    }
+
+    lv_scr_load(screen->screen);
+    currentScreen = screen;
+}
+
+void ui_manager_init(void) {
+    // Initialize all screens first
+    init_engineScreen();
+    init_compassScreen();
+    init_gpsScreen();
+    init_windScreen();
+
+    // Initialize navigation (swipes)
     navigation_init(screens, sizeof(screens) / sizeof(screens[0]));
 
     // Load default screen
-    ui_manager_load_screen(&windScreen);
-}
-
-void ui_manager_load_screen(lv_updatable_screen_t* screen)
-{
-    if(screen == NULL || screen->screen == NULL) return;
-
-    currentScreen = screen;
-    lv_scr_load(screen->screen);
+    ui_manager_load_screen(&engineScreen);
 }
 
 void ui_manager_update(void)

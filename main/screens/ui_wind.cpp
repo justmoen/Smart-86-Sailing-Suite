@@ -160,6 +160,8 @@ void lv_wind_display(lv_obj_t *parent)
 
 void wind_update_cb(void)
 {
+    if (!windScreen.screen) return;
+    if (!wind_label || !spd_w_label || !gws_label || !gwdt_label || !indic_wind || !indic_gwa_wind) return;
     char buf[64];
 
     if (fresh(shipDataModel.environment.wind.apparent_wind_speed.age))

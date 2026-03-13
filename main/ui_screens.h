@@ -7,10 +7,9 @@
 extern "C" {
 #endif
 
-typedef struct lv_updatable_screen_t {
-    lv_obj_t *screen;
-    void (*init_cb)(lv_obj_t *parent);
-    void (*update_cb)();
+typedef struct {
+    lv_obj_t *screen;                  // root LVGL object for this screen
+    void (*update_cb)(void);           // function to refresh dynamic content
 } lv_updatable_screen_t;
 
 #ifdef __cplusplus

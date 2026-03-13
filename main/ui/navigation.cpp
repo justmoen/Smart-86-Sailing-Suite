@@ -6,6 +6,7 @@ extern "C" {
 
 #include "navigation.h"
 #include "ui_event_bus.h"
+#include "ui_manager.h"
 
 #include "bsp/display.h"
 #include "nvs.h"
@@ -106,9 +107,7 @@ void navigation_next_page()
     page++;
     if(page >= pages_count) page = 0;
 
-    nav_screens[page]->init_cb(nav_screens[page]->screen);
-
-    lv_scr_load(nav_screens[page]->screen);
+    ui_manager_load_screen(nav_screens[page]);
 
     ui_event_publish(UI_EVENT_PAGE_CHANGED, &page);
 }
@@ -118,9 +117,7 @@ void navigation_prev_page()
     page--;
     if(page < 0) page = pages_count - 1;
 
-    nav_screens[page]->init_cb(nav_screens[page]->screen);
-
-    lv_scr_load(nav_screens[page]->screen);
+    ui_manager_load_screen(nav_screens[page]);
 
     ui_event_publish(UI_EVENT_PAGE_CHANGED, &page);
 }
@@ -226,8 +223,6 @@ void navigation_init(lv_updatable_screen_t **screens, int count)
 
     for(int i=0;i<count;i++)
         lv_obj_add_event_cb(screens[i]->screen, gesture_event_cb, LV_EVENT_ALL, NULL);
-
-    nav_screens[0]->init_cb(nav_screens[0]->screen);
 }
 
 #ifdef __cplusplus
