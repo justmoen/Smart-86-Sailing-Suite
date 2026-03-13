@@ -228,8 +228,6 @@ void navigation_init(lv_updatable_screen_t **screens, int count)
         lv_obj_add_event_cb(screens[i]->screen, gesture_event_cb, LV_EVENT_ALL, NULL);
 
     nav_screens[0]->init_cb(nav_screens[0]->screen);
-
-    lv_scr_load(nav_screens[0]->screen);
 }
 
 #ifdef __cplusplus

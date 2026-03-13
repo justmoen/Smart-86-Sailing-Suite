@@ -15,6 +15,14 @@ extern lv_updatable_screen_t gpsScreen;
 // Currently active screen pointer
 static lv_updatable_screen_t* currentScreen = NULL;
 
+static lv_updatable_screen_t* screens[] =
+{
+    &engineScreen,
+    &compassScreen,
+    &gpsScreen,
+    &windScreen
+};
+
 void ui_manager_init(void)
 {
     // Initialize each screen only once
@@ -22,6 +30,8 @@ void ui_manager_init(void)
     if(engineScreen.screen  == NULL) init_engineScreen();
     if(windScreen.screen    == NULL) init_windScreen();
     if(gpsScreen.screen    == NULL) init_gpsScreen();
+
+    navigation_init(screens, sizeof(screens) / sizeof(screens[0]));
 
     // Load default screen
     ui_manager_load_screen(&windScreen);
