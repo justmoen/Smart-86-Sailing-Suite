@@ -1,0 +1,11 @@
+{
+    "idf.currentSetup": "/Users/justin.moen/.espressif/v5.5.3/esp-idf",
+    "idf.openOcdConfigs": [
+        "board/esp32p4-builtin.cfg"
+    ],
+    "idf.customExtraVars": {
+        "IDF_TARGET": "esp32p4"
+    },
+    "idf.flashType": "UART",
+    "idf.port": "/dev/tty.usbmodem5AAF2785891"
+}
