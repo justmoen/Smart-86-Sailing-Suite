@@ -78,7 +78,8 @@
                 "${workspaceFolder}/managed_components/waveshare__esp32_p4_wifi6_touch_lcd_4b/include/bsp",
                 "${workspaceFolder}/main/ui",
                 "${workspaceFolder}/managed_components/lvgl__lvgl",
-                "${workspaceFolder}/main"
+                "${workspaceFolder}/main",
+                "${workspaceFolder}/components/arduino/variants/AirM2M_CORE_ESP32C3"
             ],
             "defines": [
                 "ESP_PLATFORM",

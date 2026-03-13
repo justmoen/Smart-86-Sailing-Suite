@@ -35,7 +35,7 @@ static void set_wind_value(void *indic, int32_t v)
 /* UI Creation                                        */
 /* -------------------------------------------------- */
 
-static void lv_wind_display(lv_obj_t *parent)
+void lv_wind_display(lv_obj_t *parent)
 {
     wind_display = lv_meter_create(parent);
     lv_obj_align(wind_display, LV_ALIGN_CENTER, 0, 6);
@@ -158,7 +158,7 @@ static void lv_wind_display(lv_obj_t *parent)
 /* Screen Update                                      */
 /* -------------------------------------------------- */
 
-static void wind_update_cb(void)
+void wind_update_cb(void)
 {
     char buf[64];
 
