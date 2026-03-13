@@ -1,13 +1,8 @@
 #ifndef SHIP_DATA_MODEL_H
 #define SHIP_DATA_MODEL_H
 
-#include <stdint.h>
-#include <time.h>
+#include <ctime>
 #include "esp_timer.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
   typedef enum {
     NA = -1,
@@ -532,8 +527,6 @@ extern "C" {
     struct _notifications_t notification;
   } ship_data_t;
 
-#ifdef __cplusplus
-} /*extern "C"*/
-#endif
+  extern ship_data_t shipDataModel;
 
 #endif

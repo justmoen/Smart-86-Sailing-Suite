@@ -1,12 +1,14 @@
 #include "ui_compass.h"
 #include <navigation.h>
 #include "ui_engine.h"
+#include <cstdio>
+#include <ship_data_util.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-lv_updatable_screen_t compasscreen;
+lv_updatable_screen_t compassScreen;
 
 /* LVGL objects */
 
