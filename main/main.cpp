@@ -31,7 +31,7 @@ static String wifi_password;  // Store the password of the wireless network.
 #include "WMM_Tinier.h"
 WMM_Tinier myDeclination;
 
-// #include "TinyGPSPlus.h"
+#include <TinyGPSPlus.h>
 // TinyGPSPlus gps;
 
 #include "signalk_parse.h"

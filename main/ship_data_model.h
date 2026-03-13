@@ -1,6 +1,8 @@
 #ifndef SHIP_DATA_MODEL_H
 #define SHIP_DATA_MODEL_H
 
+#include <ctime>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

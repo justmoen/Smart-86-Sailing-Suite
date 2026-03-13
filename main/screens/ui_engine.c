@@ -1,20 +1,13 @@
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "ui_engine.h"
 #include <ship_data_util.h>
 #include <navigation.h>
 #include "ui_engine.h"
 
-lv_updatable_screen_t engineScreen;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-void init_engineScreen()
-{
-    engineScreen.screen = lv_obj_create(NULL);
-    engineScreen.init_cb = lv_engine_display;
-    engineScreen.update_cb = engine_update_cb;
-}
+lv_updatable_screen_t engineScreen;
 
 /* LVGL objects */
 
