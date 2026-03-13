@@ -9,7 +9,6 @@ extern "C" {
 
 void ui_manager_init(void);
 void ui_manager_update(void);
-void ui_next_screen(void);
 
 #ifdef __cplusplus
 }

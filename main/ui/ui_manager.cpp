@@ -14,9 +14,7 @@ static lv_updatable_screen_t* screens[] =
     &windScreen
 };
 
-static const int screen_count = sizeof(screens) / sizeof(screens[0]);
-
-static int active_screen = 0;
+lv_updatable_screen_t *activeScreen = nullptr;
 
 void ui_manager_init()
 {
@@ -25,30 +23,24 @@ void ui_manager_init()
     init_gpsScreen();
     init_windScreen();
 
-    for(int i=0;i<screen_count;i++)
-    {
-        if(screens[i]->init_cb)
-            screens[i]->init_cb(screens[i]->screen);
-    }
+    // Set the initial screen
+    activeScreen = &engineScreen;
+    lv_scr_load(activeScreen->screen);
 
-    lv_scr_load(screens[active_screen]->screen);
-}
-
-void ui_manager_update()
-{
-    for(int i=0;i<screen_count;i++)
-    {
-        if(screens[i]->update_cb)
-            screens[i]->update_cb();
+    // Call the init callback to populate objects
+    if (activeScreen->init_cb) {
+        activeScreen->init_cb(activeScreen->screen);
     }
 }
 
-void ui_next_screen()
-{
-    active_screen++;
+void ui_manager_update() {
+    if (!activeScreen) return;
 
-    if(active_screen >= screen_count)
-        active_screen = 0;
+    // Call LVGL task handler
+    lv_task_handler();
 
-    lv_scr_load(screens[active_screen]->screen);
+    // Call the screen-specific update
+    if (activeScreen->update_cb) {
+        activeScreen->update_cb();
+    }
 }
