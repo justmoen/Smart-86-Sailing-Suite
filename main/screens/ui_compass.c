@@ -4,8 +4,16 @@ extern "C" {
 
 #include "ui_compass.h"
 #include <navigation.h>
+#include "ui_engine.h"
 
-lv_updatable_screen_t compassScreen;
+lv_updatable_screen_t compasscreen;
+
+void init_compassScreen()
+{
+    compassScreen.screen = lv_obj_create(NULL);
+    compassScreen.init_cb = lv_compass_display;
+    compassScreen.update_cb = compass_update_cb;
+}
 
 /* LVGL objects */
 

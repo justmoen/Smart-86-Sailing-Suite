@@ -4,13 +4,22 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
 #include <ui_init.h>
 #include <StreamString.h>
 #include <ctime>
 #include <ship_data_util.h>
 #include <navigation.h>
+#include "ui_engine.h"
 
-  lv_updatable_screen_t gpsScreen;
+lv_updatable_screen_t gpsScreen;
+
+void init_gpsScreen()
+{
+    gpsScreen.screen = lv_obj_create(NULL);
+    gpsScreen.init_cb = lv_gps_display;
+    gpsScreen.update_cb = gps_update_cb;
+}
 
   static lv_obj_t *gps_time_label;
   static lv_obj_t *gps_cogt_label;

@@ -5,8 +5,16 @@ extern "C" {
 #include "ui_engine.h"
 #include <ship_data_util.h>
 #include <navigation.h>
+#include "ui_engine.h"
 
 lv_updatable_screen_t engineScreen;
+
+void init_engineScreen()
+{
+    engineScreen.screen = lv_obj_create(NULL);
+    engineScreen.init_cb = lv_engine_display;
+    engineScreen.update_cb = engine_update_cb;
+}
 
 /* LVGL objects */
 

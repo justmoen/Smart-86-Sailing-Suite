@@ -1,10 +1,11 @@
-#pragma once
-
-#include "lvgl.h"
+#ifndef UI_NAVIGATION_H
+#define UI_NAVIGATION_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include "lvgl.h"
 
 typedef struct
 {
@@ -20,4 +21,6 @@ void navigation_prev_page(void);
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif

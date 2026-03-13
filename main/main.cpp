@@ -41,19 +41,9 @@ WMM_Tinier myDeclination;
 
 #include "ui_theme.h"
 #include "ui/navigation.h"
-// #include "ui_screens.h"
-// #include "screens/ui_gps.h"
-#include "screens/ui_compass.h"
-#include "screens/ui_engine.h"
-#include "screens/ui_wind.h"
+#include "ui/ui_manager.h"
 
 #include "ship_data_util.h"
-
-lv_updatable_screen_t* screens[] = {
-  &windScreen,
-  &engineScreen,
-  &compassScreen,
-};
 
 extern "C" void app_main(void)
 {
@@ -74,11 +64,13 @@ extern "C" void app_main(void)
 
     bsp_display_lock(0);
 
-    init_windScreen();
-    init_engineScreen();
-    init_compassScreen();
-    
-    navigation_init(screens, sizeof(screens) / sizeof(screens[0]));
+    ui_manager_init();
+
+    while(true)
+    {
+        ui_manager_update();
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
 
     bsp_display_unlock();
 }

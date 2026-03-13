@@ -6,8 +6,16 @@ extern "C" {
 #include <cstdio>
 #include <ship_data_util.h>
 #include <navigation.h>
+#include "ui_engine.h"
 
 lv_updatable_screen_t windScreen;
+
+void init_windScreen()
+{
+    windScreen.screen = lv_obj_create(NULL);
+    windScreen.init_cb = lv_wind_display;
+    windScreen.update_cb = wind_update_cb;
+}
 
 /* LVGL objects */
 static lv_obj_t *wind_display;
