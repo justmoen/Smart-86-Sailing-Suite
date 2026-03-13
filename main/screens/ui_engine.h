@@ -8,9 +8,6 @@
 extern "C" {
 #endif
 
-// Updatable screen struct (C linkage)
-typedef struct lv_updatable_screen_t lv_updatable_screen_t;
-
 extern lv_updatable_screen_t engineScreen;
 
 // C linkage for init function

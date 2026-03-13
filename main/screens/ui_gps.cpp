@@ -103,6 +103,7 @@ lv_updatable_screen_t gpsScreen = {0};
     //                     .c_str());
   }
 
+// Initialize screen struct
 void init_gpsScreen() {
 
     if(gpsScreen.screen != NULL) return;

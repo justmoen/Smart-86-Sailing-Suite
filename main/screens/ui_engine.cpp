@@ -130,6 +130,9 @@ void lv_engine_display(lv_obj_t *parent) {
 
 // Update callback
 void engine_update_cb() {
+    if (!engineScreen.screen) return;
+
+    if (!engine_rpm_indic || !oil_press_indic || !eng_temp_indic || !eng_sog_label || !eng_alternator_label) return;
     set_engine_rpm_value(engine_rpm_indic,
         (fresh(shipDataModel.propulsion.engines[0].revolutions_RPM.age, 1)
             ? shipDataModel.propulsion.engines[0].revolutions_RPM.rpm / 100

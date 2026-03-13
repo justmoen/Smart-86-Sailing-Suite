@@ -216,9 +216,12 @@ void compass_update_cb(void)
     {
         int rot = 360 - heading;
 
+        if (!scale_compass) return;
         lv_meter_set_scale_range(compass_display, scale_compass, 0, 72, 360, 270 + rot);
+        if (!scale_compass_maj) return;
         lv_meter_set_scale_range(compass_display, scale_compass_maj, 1, 12, 330, 300 + rot);
 
+        if (!rot) return;
         lv_obj_set_style_transform_angle(labelNcont, rot * 10, 0);
         lv_obj_set_style_transform_angle(labelScont, (180 + rot) * 10, 0);
         lv_obj_set_style_transform_angle(labelEcont, (90 + rot) * 10, 0);
@@ -227,12 +230,14 @@ void compass_update_cb(void)
         char buf[32];
 
         snprintf(buf, sizeof(buf), "%d" LV_SYMBOL_DEGREES, heading);
+        if (!compass_l) return;
         lv_label_set_text(compass_l, buf);
 
         if (fresh(shipDataModel.navigation.heading_true.age))
         {
             snprintf(buf, sizeof(buf), "HDT: %d" LV_SYMBOL_DEGREES,
                      (int)shipDataModel.navigation.heading_true.deg);
+            if (!compass_hdt_l) return;
             lv_label_set_text(compass_hdt_l, buf);
         }
 
@@ -240,6 +245,7 @@ void compass_update_cb(void)
         {
             snprintf(buf, sizeof(buf), "COGT: %d" LV_SYMBOL_DEGREES,
                      (int)shipDataModel.navigation.course_over_ground_true.deg);
+            if (!compass_cogt_l) return;
             lv_label_set_text(compass_cogt_l, buf);
         }
 
@@ -247,6 +253,7 @@ void compass_update_cb(void)
         {
             snprintf(buf, sizeof(buf), "Var:\n%.1f" LV_SYMBOL_DEGREES,
                      shipDataModel.navigation.mag_var.deg);
+            if (!compass_mag_var_l) return;
             lv_label_set_text(compass_mag_var_l, buf);
         }
 
@@ -261,6 +268,7 @@ void compass_update_cb(void)
 /* Screen Init                                        */
 /* -------------------------------------------------- */
 
+// Initialize screen struct
 void init_compassScreen() {
 
     if(compassScreen.screen != NULL) return;
