@@ -1,11 +1,8 @@
 #include "ui_manager.h"
-
-extern "C" {
 #include "screens/ui_engine.h"
 #include "screens/ui_compass.h"
 #include "screens/ui_gps.h"
 #include "screens/ui_wind.h"
-}
 
 #include "navigation.h"
 

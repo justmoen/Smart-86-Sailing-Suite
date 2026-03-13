@@ -6,13 +6,7 @@ extern "C" {
 #endif
 
 #include "lvgl.h"
-
-typedef struct
-{
-    lv_obj_t *screen;
-    void (*init_cb)(lv_obj_t *);
-    void (*update_cb)(void);
-} lv_updatable_screen_t;
+#include "ui_screens.h"
 
 void navigation_init(lv_updatable_screen_t **screens, int count);
 
