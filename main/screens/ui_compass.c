@@ -1,19 +1,12 @@
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "ui_compass.h"
 #include <navigation.h>
 #include "ui_engine.h"
 
-lv_updatable_screen_t compasscreen;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-void init_compassScreen()
-{
-    compassScreen.screen = lv_obj_create(NULL);
-    compassScreen.init_cb = lv_compass_display;
-    compassScreen.update_cb = compass_update_cb;
-}
+lv_updatable_screen_t compasscreen;
 
 /* LVGL objects */
 

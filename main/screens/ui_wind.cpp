@@ -1,21 +1,14 @@
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "ui_wind.h"
 #include <cstdio>
 #include <ship_data_util.h>
 #include <navigation.h>
 #include "ui_engine.h"
 
-lv_updatable_screen_t windScreen;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-void init_windScreen()
-{
-    windScreen.screen = lv_obj_create(NULL);
-    windScreen.init_cb = lv_wind_display;
-    windScreen.update_cb = wind_update_cb;
-}
+lv_updatable_screen_t windScreen;
 
 /* LVGL objects */
 static lv_obj_t *wind_display;

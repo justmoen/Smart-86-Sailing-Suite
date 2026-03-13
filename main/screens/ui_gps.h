@@ -1,10 +1,6 @@
 #ifndef UI_GPS_H
 #define UI_GPS_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <ui_init.h>
 #include <StreamString.h>
 #include <ctime>
@@ -12,14 +8,11 @@ extern "C" {
 #include <navigation.h>
 #include "ui_engine.h"
 
-lv_updatable_screen_t gpsScreen;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-void init_gpsScreen()
-{
-    gpsScreen.screen = lv_obj_create(NULL);
-    gpsScreen.init_cb = lv_gps_display;
-    gpsScreen.update_cb = gps_update_cb;
-}
+lv_updatable_screen_t gpsScreen;
 
   static lv_obj_t *gps_time_label;
   static lv_obj_t *gps_cogt_label;
@@ -110,11 +103,12 @@ void init_gpsScreen()
                         .c_str());
   }
 
-  void init_gpsScreen() {
-    gpsScreen.screen = lv_obj_create(NULL);  // Creates a Screen object
+void init_gpsScreen()
+{
+    gpsScreen.screen = lv_obj_create(NULL);
     gpsScreen.init_cb = lv_gps_display;
     gpsScreen.update_cb = gps_update_cb;
-  }
+}
 
 #ifdef __cplusplus
 } /*extern "C"*/
