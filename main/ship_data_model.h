@@ -1,7 +1,9 @@
 #ifndef SHIP_DATA_MODEL_H
 #define SHIP_DATA_MODEL_H
 
-#include <ctime>
+#include <stdint.h>
+#include <time.h>
+#include "esp_timer.h"
 
 #ifdef __cplusplus
 extern "C" {
