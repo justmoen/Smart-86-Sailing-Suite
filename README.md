@@ -7,3 +7,7 @@ The Waveshare ESP32-P4-86-Panel-ETH-2RO has a 4" screen and several useful I/Os.
 The goal of this project is to create an alternative to the more expensive options from Raymarine (i70s) and the equivalents from B&G, Garmin, etc.  There is some potential for customization for boats with alternative propulsion or aftermarket equipment.  I found that the M5 tough display, besides having excellent environment protection, does not have a useful screen size.  With mindful installation of the Smart 86 display, it could work in an outdoor cockpit but is also very useful below decks.
 
 When the project matures, I expect to have some numbered releases available.  If you would like to contribute, please reach out.
+
+TODO shortlist:
+1. Wifi selection at startup
+2. Derive data from signalK paths on network
