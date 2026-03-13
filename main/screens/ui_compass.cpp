@@ -1,8 +1,8 @@
 #include "ui_compass.h"
 #include <navigation.h>
-#include "ui_engine.h"
 #include <cstdio>
 #include <ship_data_util.h>
+#include <ui_init.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,7 +34,7 @@ static uint32_t last_compass_upd = 0;
 /* UI Creation                                        */
 /* -------------------------------------------------- */
 
-static void lv_compass_display(lv_obj_t *parent)
+void lv_compass_display(lv_obj_t *parent)
 {
     compass_display = lv_meter_create(parent);
 
@@ -200,7 +200,7 @@ static void lv_compass_display(lv_obj_t *parent)
 /* Screen Update                                      */
 /* -------------------------------------------------- */
 
-static void compass_update_cb(void)
+void compass_update_cb(void)
 {
     uint32_t now = lv_tick_get();
 

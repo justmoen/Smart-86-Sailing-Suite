@@ -23,6 +23,8 @@ void ui_manager_init()
     init_gpsScreen();
     init_windScreen();
 
+    navigation_init(screens, sizeof(screens) / sizeof(screens[0]));
+
     // Set the initial screen
     activeScreen = &engineScreen;
     lv_scr_load(activeScreen->screen);

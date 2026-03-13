@@ -12,6 +12,8 @@ extern "C" {
 extern lv_updatable_screen_t windScreen;
 
 void init_windScreen(void);
+void lv_wind_display(lv_obj_t *parent);
+void wind_update_cb(void);
 
 #ifdef __cplusplus
 }
