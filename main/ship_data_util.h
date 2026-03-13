@@ -2,8 +2,7 @@
 #define SHIP_DATA_UTIL_H
 
 #include "ship_data_model.h"
-
-static ship_data_t shipDataModel;
+#include "esp_timer.h"
 
 #ifdef __cplusplus
 extern "C" {

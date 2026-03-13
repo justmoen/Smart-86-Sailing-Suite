@@ -25,7 +25,7 @@ static String wifi_ssid;      // Store the name of the wireless network.
 static String wifi_password;  // Store the password of the wireless network.
 
 #include "ship_data_model.h"
-
+ship_data_t shipDataModel;
 #include "ship_data_util.h"
 
 #include "WMM_Tinier.h"
@@ -42,8 +42,6 @@ WMM_Tinier myDeclination;
 #include "ui_theme.h"
 #include "ui/navigation.h"
 #include "ui/ui_manager.h"
-
-#include "ship_data_util.h"
 
 extern "C" void app_main(void)
 {

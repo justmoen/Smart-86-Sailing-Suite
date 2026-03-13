@@ -2,7 +2,6 @@
 #define UI_ENGINE_H
 
 #include <lvgl.h>
-#include "../ship_data_model.h"
 #include <ui_screens.h>
 #include "../ui/ui_init.h"
 #include "navigation.h"
