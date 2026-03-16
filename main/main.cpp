@@ -60,15 +60,13 @@ extern "C" void app_main(void)
     bsp_display_start_with_config(&cfg);
     bsp_display_backlight_on();
 
-    bsp_display_lock(0);
-
     ui_manager_init();
 
     while(true)
     {
+        bsp_display_lock(0);
         ui_manager_update();
+        bsp_display_unlock();
         vTaskDelay(pdMS_TO_TICKS(50));
     }
-
-    bsp_display_unlock();
 }

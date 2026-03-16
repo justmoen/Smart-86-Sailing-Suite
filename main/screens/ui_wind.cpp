@@ -2,13 +2,10 @@
 #include <cstdio>
 #include <ship_data_util.h>
 #include <navigation.h>
-#include "ui_engine.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-lv_updatable_screen_t windScreen = {0};
 
 /* LVGL objects */
 static lv_obj_t *wind_display;
@@ -35,9 +32,9 @@ static void set_wind_value(void *indic, int32_t v)
 /* UI Creation                                        */
 /* -------------------------------------------------- */
 
-void lv_wind_display(lv_obj_t *parent)
+static void lv_wind_display(lv_updatable_screen_t *scr)
 {
-    wind_display = lv_meter_create(parent);
+    wind_display = lv_meter_create(scr->screen);
     lv_obj_align(wind_display, LV_ALIGN_CENTER, 0, 6);
     lv_obj_set_size(wind_display, 680, 680);
 
@@ -113,7 +110,7 @@ void lv_wind_display(lv_obj_t *parent)
 
     /* Labels */
 
-    wind_label = lv_label_create(parent);
+    wind_label = lv_label_create(scr->screen);
     lv_obj_align(wind_label, LV_ALIGN_TOP_LEFT, 5, 2);
 
 #if LV_FONT_MONTSERRAT_30
@@ -123,7 +120,7 @@ void lv_wind_display(lv_obj_t *parent)
     lv_label_set_text_static(wind_label, "AWS: --\nkt");
 
 
-    spd_w_label = lv_label_create(parent);
+    spd_w_label = lv_label_create(scr->screen);
     lv_obj_align(spd_w_label, LV_ALIGN_TOP_RIGHT, -5, 2);
 
 #if LV_FONT_MONTSERRAT_30
@@ -133,7 +130,7 @@ void lv_wind_display(lv_obj_t *parent)
     lv_label_set_text_static(spd_w_label, "SPD: --\nkt");
 
 
-    gws_label = lv_label_create(parent);
+    gws_label = lv_label_create(scr->screen);
     lv_obj_align(gws_label, LV_ALIGN_BOTTOM_LEFT, 5, -2);
 
 #if LV_FONT_MONTSERRAT_30
@@ -143,7 +140,7 @@ void lv_wind_display(lv_obj_t *parent)
     lv_label_set_text_static(gws_label, "GWS:\n-- kt");
 
 
-    gwdt_label = lv_label_create(parent);
+    gwdt_label = lv_label_create(scr->screen);
     lv_obj_align(gwdt_label, LV_ALIGN_BOTTOM_RIGHT, -5, -2);
 
 #if LV_FONT_MONTSERRAT_30
@@ -158,7 +155,7 @@ void lv_wind_display(lv_obj_t *parent)
 /* Screen Update                                      */
 /* -------------------------------------------------- */
 
-void wind_update_cb(void)
+static void wind_update_cb(lv_updatable_screen_t *scr)
 {
     if (!windScreen.screen) return;
     if (!wind_label || !spd_w_label || !gws_label || !gwdt_label || !indic_wind || !indic_gwa_wind) return;
@@ -218,16 +215,12 @@ void wind_update_cb(void)
 /* Screen Init                                        */
 /* -------------------------------------------------- */
 
-void init_windScreen() {
-
-    if(windScreen.screen != NULL) return;
-
-    windScreen.screen = lv_obj_create(NULL);
-
-    lv_wind_display(windScreen.screen);
-
-    windScreen.update_cb = wind_update_cb;
-}
+lv_updatable_screen_t windScreen = {
+    .screen = nullptr,
+    .created = false,
+    .create_cb = lv_wind_display,
+    .update_cb = wind_update_cb
+};
 
 #ifdef __cplusplus
 }

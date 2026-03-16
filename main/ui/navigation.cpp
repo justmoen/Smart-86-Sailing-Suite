@@ -99,30 +99,6 @@ static void overlay_show()
     brightness_timer = lv_timer_create(overlay_hide, 3000, NULL);
 }
 
-
-/* ---------------- Page Navigation ---------------- */
-
-void navigation_next_page()
-{
-    page++;
-    if(page >= pages_count) page = 0;
-
-    ui_manager_load_screen(nav_screens[page]);
-
-    ui_event_publish(UI_EVENT_PAGE_CHANGED, &page);
-}
-
-void navigation_prev_page()
-{
-    page--;
-    if(page < 0) page = pages_count - 1;
-
-    ui_manager_load_screen(nav_screens[page]);
-
-    ui_event_publish(UI_EVENT_PAGE_CHANGED, &page);
-}
-
-
 /* ---------------- Gesture Handling ---------------- */
 
 static bool right_edge(lv_point_t *p)
@@ -131,7 +107,7 @@ static bool right_edge(lv_point_t *p)
     return p->x > w * 0.85;
 }
 
-static void gesture_event_cb(lv_event_t *e)
+void gesture_event_cb(lv_event_t *e)
 {
     lv_event_code_t code = lv_event_get_code(e);
 
@@ -198,18 +174,15 @@ static void gesture_event_cb(lv_event_t *e)
 
         if(dir == LV_DIR_LEFT)
         {
-            navigation_next_page();
-            lv_indev_wait_release(lv_indev_get_act());
+            ui_manager_next();
         }
 
         if(dir == LV_DIR_RIGHT)
         {
-            navigation_prev_page();
-            lv_indev_wait_release(lv_indev_get_act());
+            ui_manager_prev();
         }
     }
 }
-
 
 /* ---------------- Init ---------------- */
 

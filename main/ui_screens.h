@@ -1,19 +1,17 @@
-#ifndef UI_SCREENS_H
-#define UI_SCREENS_H
-
+#pragma once
 #include "lvgl.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef struct {
-    lv_obj_t *screen;                  // root LVGL object for this screen
-    void (*update_cb)(void);           // function to refresh dynamic content
+typedef struct lv_updatable_screen_t {
+    lv_obj_t *screen;
+    bool created;
+    void (*create_cb)(struct lv_updatable_screen_t *);
+    void (*update_cb)(struct lv_updatable_screen_t *);
 } lv_updatable_screen_t;
 
 #ifdef __cplusplus
-} /*extern "C"*/
-#endif
-
+}
 #endif
