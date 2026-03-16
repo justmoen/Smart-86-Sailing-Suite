@@ -10,9 +10,6 @@ extern "C" {
 
 extern lv_updatable_screen_t engineScreen;
 
-// C linkage for init function
-void init_engineScreen(void);
-
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
@@ -35,8 +32,8 @@ extern lv_obj_t *eng_sog_label;
 extern lv_obj_t *eng_alternator_label;
 
 // C++ only functions
-void engine_update_cb();
-void lv_engine_display(lv_obj_t *parent);
+static void engine_update_cb(lv_updatable_screen_t *scr);
+static void lv_engine_display(lv_updatable_screen_t *scr);
 
 #endif // __cplusplus
 

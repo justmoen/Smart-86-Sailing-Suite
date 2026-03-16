@@ -1,5 +1,4 @@
-#ifndef UI_MANAGER_H
-#define UI_MANAGER_H
+#pragma once
 
 #include "ui_screens.h"
 
@@ -7,17 +6,13 @@
 extern "C" {
 #endif
 
-// Initialize UI system
-void ui_manager_init(void);
+void ui_manager_init();
+void ui_manager_update();
 
-// Switch to a specific screen
-void ui_manager_load_screen(lv_updatable_screen_t* screen);
-
-// Periodic update, call from main loop or timer
-void ui_manager_update(void);
+void ui_manager_show(lv_updatable_screen_t *screen);
+void ui_manager_next();
+void ui_manager_prev();
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif

@@ -9,9 +9,8 @@ extern "C" {
 
 extern lv_updatable_screen_t compassScreen;
 
-void init_compassScreen(void);
-void lv_compass_display(lv_obj_t *parent);
-void compass_update_cb(void);
+static void lv_compass_display(lv_updatable_screen_t *scr);
+static void compass_update_cb(lv_updatable_screen_t *scr);
 
 #ifdef __cplusplus
 }

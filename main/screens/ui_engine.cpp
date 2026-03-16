@@ -4,9 +4,6 @@
 #include <ui_init.h>
 #include "ui_screens.h"
 
-// LVGL objects
-lv_updatable_screen_t engineScreen = {0};
-
 lv_obj_t *engine_rpm_meter = nullptr;
 lv_meter_indicator_t *engine_rpm_indic = nullptr;
 
@@ -25,12 +22,12 @@ static void set_engine_rpm_value(void *indic, int32_t v) {
 }
 
 // Display initialization
-void lv_engine_display(lv_obj_t *parent) {
-    engine_rpm_meter = lv_meter_create(parent);
+static void lv_engine_display(lv_updatable_screen_t *scr) {
+    engine_rpm_meter = lv_meter_create(scr->screen);
     lv_obj_center(engine_rpm_meter);
     lv_obj_set_size(engine_rpm_meter, 680, 680);
 
-    lv_obj_t *main_label = lv_label_create(parent);
+    lv_obj_t *main_label = lv_label_create(scr->screen);
     lv_obj_align(main_label, LV_ALIGN_CENTER, 0, 50);
 #if LV_FONT_MONTSERRAT_22
     lv_obj_set_style_text_font(main_label, &lv_font_montserrat_22, 0);
@@ -68,7 +65,7 @@ void lv_engine_display(lv_obj_t *parent) {
     engine_rpm_indic = lv_meter_add_needle_line(engine_rpm_meter, scale, 4, lv_palette_main(LV_PALETTE_GREY), -10);
 
     // Oil pressure
-    oil_press_meter = lv_meter_create(parent);
+    oil_press_meter = lv_meter_create(scr->screen);
     lv_obj_align(oil_press_meter, LV_ALIGN_CENTER, -125, 120);
     lv_obj_set_size(oil_press_meter, 160, 160);
     lv_obj_remove_style(oil_press_meter, NULL, LV_PART_INDICATOR);
@@ -83,7 +80,7 @@ void lv_engine_display(lv_obj_t *parent) {
     oil_press_indic = lv_meter_add_arc(oil_press_meter, oil_press_scale, 3, lv_palette_main(LV_PALETTE_BLUE), 1);
     lv_meter_set_indicator_start_value(oil_press_meter, oil_press_indic, 0);
 
-    lv_obj_t *oil_press_label = lv_label_create(parent);
+    lv_obj_t *oil_press_label = lv_label_create(scr->screen);
     lv_obj_align(oil_press_label, LV_ALIGN_BOTTOM_LEFT, 80, -2);
 #if LV_FONT_MONTSERRAT_32
     lv_obj_set_style_text_font(oil_press_label, &lv_font_montserrat_32, 0);
@@ -91,7 +88,7 @@ void lv_engine_display(lv_obj_t *parent) {
     lv_label_set_text_static(oil_press_label, "psi");
 
     // Engine temp
-    eng_temp_meter = lv_meter_create(parent);
+    eng_temp_meter = lv_meter_create(scr->screen);
     lv_obj_align(eng_temp_meter, LV_ALIGN_CENTER, 125, 120);
     lv_obj_set_size(eng_temp_meter, 160, 160);
     lv_obj_remove_style(eng_temp_meter, NULL, LV_PART_INDICATOR);
@@ -106,21 +103,21 @@ void lv_engine_display(lv_obj_t *parent) {
     eng_temp_indic = lv_meter_add_arc(eng_temp_meter, eng_temp_scale, 3, lv_palette_main(LV_PALETTE_ORANGE), 1);
     lv_meter_set_indicator_start_value(eng_temp_meter, eng_temp_indic, 0);
 
-    lv_obj_t *eng_temp_label = lv_label_create(parent);
+    lv_obj_t *eng_temp_label = lv_label_create(scr->screen);
     lv_obj_align(eng_temp_label, LV_ALIGN_BOTTOM_RIGHT, -80, -2);
 #if LV_FONT_MONTSERRAT_32
     lv_obj_set_style_text_font(eng_temp_label, &lv_font_montserrat_32, 0);
 #endif
     lv_label_set_text_static(eng_temp_label, LV_SYMBOL_DEGREES "C");
 
-    eng_sog_label = lv_label_create(parent);
+    eng_sog_label = lv_label_create(scr->screen);
     lv_obj_align(eng_sog_label, LV_ALIGN_TOP_LEFT, 2, 2);
 #if LV_FONT_MONTSERRAT_30
     lv_obj_set_style_text_font(eng_sog_label, &lv_font_montserrat_30, 0);
 #endif
     lv_label_set_text_static(eng_sog_label, "SOG (kt):\n--");
 
-    eng_alternator_label = lv_label_create(parent);
+    eng_alternator_label = lv_label_create(scr->screen);
     lv_obj_align(eng_alternator_label, LV_ALIGN_TOP_RIGHT, -2, 2);
 #if LV_FONT_MONTSERRAT_30
     lv_obj_set_style_text_font(eng_alternator_label, &lv_font_montserrat_30, 0);
@@ -129,7 +126,7 @@ void lv_engine_display(lv_obj_t *parent) {
 }
 
 // Update callback
-void engine_update_cb() {
+static void engine_update_cb(lv_updatable_screen_t *scr) {
     if (!engineScreen.screen) return;
 
     if (!engine_rpm_indic || !oil_press_indic || !eng_temp_indic || !eng_sog_label || !eng_alternator_label) return;
@@ -161,14 +158,9 @@ void engine_update_cb() {
             : String("--"))).c_str());
 }
 
-// Initialize screen struct
-void init_engineScreen() {
-
-    if(engineScreen.screen != NULL) return;
-
-    engineScreen.screen = lv_obj_create(NULL);
-
-    lv_engine_display(engineScreen.screen);
-
-    engineScreen.update_cb = engine_update_cb;
-}
+lv_updatable_screen_t engineScreen = {
+    .screen = nullptr,
+    .created = false,
+    .create_cb = lv_engine_display,
+    .update_cb = engine_update_cb
+};

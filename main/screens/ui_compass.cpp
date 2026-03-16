@@ -8,8 +8,6 @@
 extern "C" {
 #endif
 
-lv_updatable_screen_t compassScreen = {0};
-
 /* LVGL objects */
 
 static lv_obj_t *compass_display;
@@ -34,9 +32,9 @@ static uint32_t last_compass_upd = 0;
 /* UI Creation                                        */
 /* -------------------------------------------------- */
 
-void lv_compass_display(lv_obj_t *parent)
+static void lv_compass_display(lv_updatable_screen_t *scr)
 {
-    compass_display = lv_meter_create(parent);
+    compass_display = lv_meter_create(scr->screen);
 
     lv_obj_remove_style(compass_display, NULL, LV_PART_MAIN);
     lv_obj_remove_style(compass_display, NULL, LV_PART_INDICATOR);
@@ -58,7 +56,7 @@ void lv_compass_display(lv_obj_t *parent)
 
     /* N label */
 
-    labelNcont = lv_obj_create(parent);
+    labelNcont = lv_obj_create(scr->screen);
     lv_obj_set_size(labelNcont, 42, 42);
     lv_obj_set_style_pad_all(labelNcont, 2, LV_PART_MAIN);
     lv_obj_set_style_bg_color(labelNcont, lv_palette_main(LV_PALETTE_RED), LV_PART_MAIN);
@@ -79,7 +77,7 @@ void lv_compass_display(lv_obj_t *parent)
 
     /* S label */
 
-    labelScont = lv_obj_create(parent);
+    labelScont = lv_obj_create(scr->screen);
     lv_obj_set_size(labelScont, 42, 42);
     lv_obj_set_style_pad_all(labelScont, 2, LV_PART_MAIN);
     lv_obj_set_style_bg_color(labelScont, lv_palette_main(LV_PALETTE_BLUE), LV_PART_MAIN);
@@ -100,7 +98,7 @@ void lv_compass_display(lv_obj_t *parent)
 
     /* E label */
 
-    labelEcont = lv_obj_create(parent);
+    labelEcont = lv_obj_create(scr->screen);
     lv_obj_set_size(labelEcont, 42, 42);
     lv_obj_set_style_pad_all(labelEcont, 2, LV_PART_MAIN);
     lv_obj_align(labelEcont, LV_ALIGN_CENTER, 0, -48);
@@ -120,7 +118,7 @@ void lv_compass_display(lv_obj_t *parent)
 
     /* W label */
 
-    labelWcont = lv_obj_create(parent);
+    labelWcont = lv_obj_create(scr->screen);
     lv_obj_set_size(labelWcont, 42, 42);
     lv_obj_set_style_pad_all(labelWcont, 2, LV_PART_MAIN);
     lv_obj_align(labelWcont, LV_ALIGN_CENTER, 0, -48);
@@ -147,12 +145,12 @@ void lv_compass_display(lv_obj_t *parent)
 
     /* heading marker */
 
-    lv_obj_t *compass_mark_l = lv_label_create(parent);
+    lv_obj_t *compass_mark_l = lv_label_create(scr->screen);
     lv_label_set_text_static(compass_mark_l, LV_SYMBOL_DOWN);
     lv_obj_align(compass_mark_l, LV_ALIGN_CENTER, 0, -100);
 
 
-    compass_l = lv_label_create(parent);
+    compass_l = lv_label_create(scr->screen);
 
 #if LV_FONT_MONTSERRAT_26
     lv_obj_set_style_text_font(compass_l, &lv_font_montserrat_26, 0);
@@ -168,7 +166,7 @@ void lv_compass_display(lv_obj_t *parent)
 
     /* info labels */
 
-    compass_hdt_l = lv_label_create(parent);
+    compass_hdt_l = lv_label_create(scr->screen);
     lv_label_set_text_static(compass_hdt_l, "HDT: --" LV_SYMBOL_DEGREES);
     lv_obj_align(compass_hdt_l, LV_ALIGN_TOP_LEFT, 2, 2);
 
@@ -177,7 +175,7 @@ void lv_compass_display(lv_obj_t *parent)
 #endif
 
 
-    compass_cogt_l = lv_label_create(parent);
+    compass_cogt_l = lv_label_create(scr->screen);
     lv_label_set_text_static(compass_cogt_l, "COGT: --" LV_SYMBOL_DEGREES);
     lv_obj_align(compass_cogt_l, LV_ALIGN_TOP_RIGHT, -2, 2);
 
@@ -186,7 +184,7 @@ void lv_compass_display(lv_obj_t *parent)
 #endif
 
 
-    compass_mag_var_l = lv_label_create(parent);
+    compass_mag_var_l = lv_label_create(scr->screen);
     lv_label_set_text_static(compass_mag_var_l, "Var:\n--" LV_SYMBOL_DEGREES);
     lv_obj_align(compass_mag_var_l, LV_ALIGN_BOTTOM_LEFT, 2, -2);
 
@@ -200,8 +198,9 @@ void lv_compass_display(lv_obj_t *parent)
 /* Screen Update                                      */
 /* -------------------------------------------------- */
 
-void compass_update_cb(void)
+static void compass_update_cb(lv_updatable_screen_t *scr)
 {
+    if (!compass_display) return;
     uint32_t now = lv_tick_get();
 
     if(now - last_compass_upd < 500)
@@ -268,17 +267,12 @@ void compass_update_cb(void)
 /* Screen Init                                        */
 /* -------------------------------------------------- */
 
-// Initialize screen struct
-void init_compassScreen() {
-
-    if(compassScreen.screen != NULL) return;
-
-    compassScreen.screen = lv_obj_create(NULL);
-
-    lv_compass_display(compassScreen.screen);
-
-    compassScreen.update_cb = compass_update_cb;
-}
+lv_updatable_screen_t compassScreen = {
+    .screen = nullptr,
+    .created = false,
+    .create_cb = lv_compass_display,
+    .update_cb = compass_update_cb
+};
 
 #ifdef __cplusplus
 }
