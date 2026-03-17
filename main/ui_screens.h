@@ -1,6 +1,9 @@
 #pragma once
 #include "lvgl.h"
 
+#define LV_HOR_RES_MAX 720
+#define LV_VER_RES_MAX 720
+
 #ifdef __cplusplus
 extern "C" {
 #endif

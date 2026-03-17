@@ -16,19 +16,17 @@
 #include <ArduinoJson.h>
 
 // screen operations
-#include "ui/navigation.h"
+#include "navigation.h"
 
 // wifi setup
 #include <WiFi.h>
-
-static String wifi_ssid;      // Store the name of the wireless network.
-static String wifi_password;  // Store the password of the wireless network.
+#include <Preferences.h>
 
 #include "ship_data_model.h"
 ship_data_t shipDataModel;
 #include "ship_data_util.h"
 
-#include "WMM_Tinier.h"
+#include <WMM_Tinier.h>
 WMM_Tinier myDeclination;
 
 #include <TinyGPSPlus.h>
@@ -40,8 +38,8 @@ WMM_Tinier myDeclination;
 // #include "derived_data.h"
 
 #include "ui_theme.h"
-#include "ui/navigation.h"
-#include "ui/ui_manager.h"
+#include "ui_manager.h"
+#include "ui_settings_wifi.h"
 
 extern "C" void app_main(void)
 {
@@ -60,13 +58,15 @@ extern "C" void app_main(void)
     bsp_display_start_with_config(&cfg);
     bsp_display_backlight_on();
 
-    ui_manager_init();
+    settingUpWiFi([]() {
+        ui_manager_init();
 
-    while(true)
-    {
-        bsp_display_lock(0);
-        ui_manager_update();
-        bsp_display_unlock();
-        vTaskDelay(pdMS_TO_TICKS(50));
-    }
+        while(true)
+        {
+            bsp_display_lock(0);
+            ui_manager_update();
+            bsp_display_unlock();
+            vTaskDelay(pdMS_TO_TICKS(50));
+        }
+    });
 }

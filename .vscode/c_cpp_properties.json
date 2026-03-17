@@ -79,7 +79,10 @@
                 "${workspaceFolder}/main/ui",
                 "${workspaceFolder}/managed_components/lvgl__lvgl",
                 "${workspaceFolder}/main",
-                "${workspaceFolder}/components/arduino/variants/AirM2M_CORE_ESP32C3"
+                "${workspaceFolder}/components/arduino/variants/AirM2M_CORE_ESP32C3",
+                "/Users/justin.moen/.espressif/v5.5.3/esp-idf/components/lwip/port/include",
+                "${workspaceFolder}/managed_components/lvgl__lvgl/src/core",
+                "${workspaceFolder}/managed_components/lvgl__lvgl/src/core"
             ],
             "defines": [
                 "ESP_PLATFORM",

@@ -9,7 +9,8 @@
 static lv_updatable_screen_t* screens[] = {
     &engineScreen,
     &compassScreen,
-    &windScreen
+    &windScreen,
+    &gpsScreen
 };
 
 static const int screen_count =
