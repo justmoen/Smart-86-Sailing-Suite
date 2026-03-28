@@ -1,0 +1,6 @@
+[submodule "arduino-mqtt"]
+	path = arduino-mqtt
+	url = https://github.com/256dpi/arduino-mqtt
+[submodule "ReactESP"]
+	path = ReactESP
+	url = https://github.com/mairas/ReactESP
