@@ -14,4 +14,6 @@ TODO shortlist:
 External dependencies stored in components folder:
 WMM Tinier - https://github.com/DavidArmstrong/WMM_Tinier/tree/main/src
 TinyGPSPlus - https://github.com/mikalhart/TinyGPSPlus
+MQTT - https://github.com/256dpi/arduino-mqtt
+ReactESP - https://github.com/mairas/ReactESP
 Arduino

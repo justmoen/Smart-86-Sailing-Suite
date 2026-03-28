@@ -20,7 +20,7 @@
 
 // wifi setup
 #include <WiFi.h>
-#include <Preferences.h>
+#include <mdns.h>
 
 #include "ship_data_model.h"
 ship_data_t shipDataModel;
@@ -30,16 +30,15 @@ ship_data_t shipDataModel;
 WMM_Tinier myDeclination;
 
 #include <TinyGPSPlus.h>
-// TinyGPSPlus gps;
 
 #include "signalk_parse.h"
 #include "sunriset.h"
 #include "hw_rtc.h"
-// #include "derived_data.h"
 
 #include "ui_theme.h"
 #include "ui_manager.h"
 #include "ui_settings_wifi.h"
+#include "net/net_mdns.h"
 
 extern "C" void app_main(void)
 {
@@ -55,18 +54,27 @@ extern "C" void app_main(void)
             .sw_rotate = false,
         }
     };
+
     bsp_display_start_with_config(&cfg);
     bsp_display_backlight_on();
 
     settingUpWiFi([]() {
-        ui_manager_init();
-
-        while(true)
-        {
-            bsp_display_lock(0);
-            ui_manager_update();
-            bsp_display_unlock();
-            vTaskDelay(pdMS_TO_TICKS(50));
-        }
+        // delayed network discovery
     });
+
+    bsp_display_lock(0);
+    ui_manager_init();
+    bsp_display_unlock();
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    discover_n_config();
+
+    while(true)
+    {
+        bsp_display_lock(0);
+        ui_manager_update();
+        bsp_display_unlock();
+
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
 }

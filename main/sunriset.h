@@ -18,6 +18,8 @@ mgrouch, 2023 - modifications for esp32 Arduino
 #ifndef SUNRISET_H
 #define SUNRISET_H
 
+#include <math.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
