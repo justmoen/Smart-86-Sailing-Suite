@@ -1,3 +1,5 @@
+#include <cstdint>
+#include <ctime>
 #ifndef HW_RTC_H
 #define HW_RTC_H
 

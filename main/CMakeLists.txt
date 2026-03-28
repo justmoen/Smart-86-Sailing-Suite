@@ -3,6 +3,7 @@ file(GLOB UI_SRCS
     "screens/*.c"
     "screens/*.cpp"
     "*.cpp"
+    "net/*.cpp"
     "*.c"
 )
 
@@ -14,4 +15,5 @@ idf_component_register(
         "."
         "ui"
         "screens"
+        "net"
 )

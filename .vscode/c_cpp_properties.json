@@ -82,7 +82,11 @@
                 "${workspaceFolder}/components/arduino/variants/AirM2M_CORE_ESP32C3",
                 "/Users/justin.moen/.espressif/v5.5.3/esp-idf/components/lwip/port/include",
                 "${workspaceFolder}/managed_components/lvgl__lvgl/src/core",
-                "${workspaceFolder}/managed_components/lvgl__lvgl/src/core"
+                "${workspaceFolder}/managed_components/lvgl__lvgl/src/core",
+                "${workspaceFolder}/components/arduino/libraries/Preferences/src",
+                "${workspaceFolder}/main/screens",
+                "${workspaceFolder}/components/arduino/libraries/HTTPClient/src",
+                "${workspaceFolder}/components/arduino/libraries/WiFi/src"
             ],
             "defines": [
                 "ESP_PLATFORM",
