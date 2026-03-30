@@ -1,8 +1,9 @@
 #include "ship_data_util.h"
 #include <cstring>
+#include <Arduino.h>
 
 bool fresh(unsigned long age, unsigned long limit) {
-    return esp_timer_get_time() - age < limit && age != 0;
+    return millis() - age < limit && age != 0;
 }
 
 bool isSet(char *str) {

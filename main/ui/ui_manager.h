@@ -6,6 +6,8 @@
 extern "C" {
 #endif
 
+extern int current_index;
+
 void ui_manager_init();
 void ui_manager_update();
 

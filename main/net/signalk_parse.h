@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 void set_vessel_nav_state(String& val);
-bool signalk_parse(Stream& stream);
+bool signalk_parse(const char* payload, size_t length);
 
 #ifdef __cplusplus
 }

@@ -85,7 +85,7 @@ extern "C" {
     return gps.distanceBetween(pos1.lat.deg, pos1.lon.deg, pos2.lat.deg, pos2.lon.deg);
   }
 
-  static void derive_data() {
+  void derive_data() {
     if (fresh(shipDataModel.navigation.position.lat.age)
         && fresh(shipDataModel.navigation.position.lon.age)) {
       get_rtc_datetime(&RTCdate);

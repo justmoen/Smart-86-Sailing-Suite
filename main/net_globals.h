@@ -2,7 +2,7 @@
 #define NET_GLOBALS_H
 
 #include <ReactESP.h>
-#include <MQTT.h>
+#include <MQTTClient.h>
 
 extern reactesp::ReactESP app;
 

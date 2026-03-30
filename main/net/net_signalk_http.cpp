@@ -6,13 +6,14 @@
 
 extern ship_data_t shipDataModel;
 
+String signalk_http_host = preferences.getString(SK_HTTP_HOST_PREF);
+int signalk_http_port = preferences.getInt(SK_HTTP_PORT_PREF);
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
   void getVesselInfo() {
-    String signalk_http_host = preferences.getString(SK_HTTP_HOST_PREF);
-    int signalk_http_port = preferences.getInt(SK_HTTP_PORT_PREF);
     if (signalk_http_host.length() > 0 && signalk_http_port > 0) {
       String api = String("http://") += signalk_http_host += String(":") += String(signalk_http_port) += "/signalk/v1/api/";
       String resp = httpGETRequest((api + "vessels/self/design/beam/value/").c_str());
