@@ -8,6 +8,8 @@ extern "C" {
 float norm_deg(float deg);
 float norm180_deg(float deg);
 
+void derive_data();
+
 #ifdef __cplusplus
 }
 #endif

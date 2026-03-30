@@ -207,7 +207,7 @@ static void compass_update_cb(lv_updatable_screen_t *scr)
         return;
 
     int16_t heading =
-        fresh(shipDataModel.navigation.heading_mag.age, 1)
+        fresh(shipDataModel.navigation.heading_mag.age)
         ? shipDataModel.navigation.heading_mag.deg
         : 0;
 

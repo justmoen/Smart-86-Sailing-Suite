@@ -1,10 +1,8 @@
 file(GLOB UI_SRCS
     "ui/*.cpp"
-    "screens/*.c"
     "screens/*.cpp"
-    "*.cpp"
     "net/*.cpp"
-    "*.c"
+    "*.cpp"
 )
 
 idf_component_register(
@@ -16,4 +14,16 @@ idf_component_register(
         "ui"
         "screens"
         "net"
+    REQUIRES
+        ReactESP
+        arduino
+        esp-tls
+        mbedtls
+        arduino-mqtt
+        TinyGPSPlus
+        WMM_Tinier
+        nvs_flash
+        waveshare__esp32_p4_wifi6_touch_lcd_4b
+        ArduinoJson
+        WebSockets
 )

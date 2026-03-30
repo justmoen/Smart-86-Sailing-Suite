@@ -131,17 +131,17 @@ static void engine_update_cb(lv_updatable_screen_t *scr) {
 
     if (!engine_rpm_indic || !oil_press_indic || !eng_temp_indic || !eng_sog_label || !eng_alternator_label) return;
     set_engine_rpm_value(engine_rpm_indic,
-        (fresh(shipDataModel.propulsion.engines[0].revolutions_RPM.age, 1)
+        (fresh(shipDataModel.propulsion.engines[0].revolutions_RPM.age)
             ? shipDataModel.propulsion.engines[0].revolutions_RPM.rpm / 100
             : 0));
 
     lv_meter_set_indicator_end_value(oil_press_meter, oil_press_indic,
-        (fresh(shipDataModel.propulsion.engines[0].oil_pressure.age, 1)
+        (fresh(shipDataModel.propulsion.engines[0].oil_pressure.age)
             ? shipDataModel.propulsion.engines[0].oil_pressure.hPa * 0.0145037738
             : 0));
 
     lv_meter_set_indicator_end_value(eng_temp_meter, eng_temp_indic,
-        (fresh(shipDataModel.propulsion.engines[0].temp_deg_C.age, 1)
+        (fresh(shipDataModel.propulsion.engines[0].temp_deg_C.age)
             ? shipDataModel.propulsion.engines[0].temp_deg_C.deg_C
             : 0));
 

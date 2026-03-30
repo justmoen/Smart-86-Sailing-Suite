@@ -7,16 +7,16 @@
 #include "screens/ui_wind.h"
 
 static lv_updatable_screen_t* screens[] = {
+    &windScreen,
     &engineScreen,
     &compassScreen,
-    &windScreen,
     &gpsScreen
 };
 
 static const int screen_count =
     sizeof(screens) / sizeof(screens[0]);
 
-static int current_index = 0;
+int current_index = 0;
 static lv_updatable_screen_t *current_screen = nullptr;
 
 static void create_if_needed(lv_updatable_screen_t *scr)
@@ -71,6 +71,7 @@ void ui_manager_init()
     }
 
     current_index = 0;
+    default_settings();
     ui_manager_show(screens[0]);
 }
 

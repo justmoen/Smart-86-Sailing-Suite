@@ -1,5 +1,7 @@
 #pragma once
 
+#include <HardwareSerial.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -7,7 +9,6 @@ extern "C" {
 #include "navigation.h"
 #include "ui_event_bus.h"
 #include "ui_manager.h"
-
 #include "bsp/display.h"
 #include "nvs.h"
 
@@ -15,8 +16,6 @@ extern "C" {
 #define NVS_KEY_BRIGHTNESS "brightness"
 
 static lv_updatable_screen_t **nav_screens;
-static int pages_count;
-static int page;
 
 static int brightness = 50;
 
@@ -31,15 +30,23 @@ static bool brightness_active = false;
 
 /* ---------------- NVS ---------------- */
 
-static void save_brightness(int value)
+void save_brightness(int value)
 {
     nvs_handle_t handle;
+    esp_err_t err;
 
-    if(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle) == ESP_OK)
+    err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if(err == ESP_OK)
     {
-        nvs_set_i32(handle, NVS_KEY_BRIGHTNESS, value);
-        nvs_commit(handle);
+        err = nvs_set_i32(handle, NVS_KEY_BRIGHTNESS, value);
+        if(err != ESP_OK) { Serial.printf("NVS set failed: %d\n", err); }
+        err = nvs_commit(handle);
+        if(err != ESP_OK) { Serial.printf("NVS commit failed: %d\n", err); }
         nvs_close(handle);
+    }
+    else
+    {
+        Serial.printf("NVS open failed: %d\n", err);
     }
 }
 
@@ -47,13 +54,16 @@ static int load_brightness()
 {
     nvs_handle_t handle;
     int32_t value = 50;
-
-    if(nvs_open(NVS_NAMESPACE, NVS_READONLY, &handle) == ESP_OK)
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &handle);
+    if(err == ESP_OK)
     {
         nvs_get_i32(handle, NVS_KEY_BRIGHTNESS, &value);
         nvs_close(handle);
     }
-
+    else
+    {
+        Serial.printf("NVS read failed: %d\n", err);
+    }
     return value;
 }
 
@@ -160,12 +170,8 @@ void gesture_event_cb(lv_event_t *e)
     if(code == LV_EVENT_RELEASED)
     {
         last_y = -1;
-
-        if(brightness_active)
-        {
-            save_brightness(brightness);
-            brightness_active = false;
-        }
+        save_brightness(brightness);  // save unconditionally
+        brightness_active = false;
     }
 
     if(code == LV_EVENT_GESTURE)
@@ -186,16 +192,10 @@ void gesture_event_cb(lv_event_t *e)
 
 /* ---------------- Init ---------------- */
 
-void navigation_init(lv_updatable_screen_t **screens, int count)
+void default_settings()
 {
-    nav_screens = screens;
-    pages_count = count;
-
     brightness = load_brightness();
     bsp_display_brightness_set(brightness);
-
-    for(int i=0;i<count;i++)
-        lv_obj_add_event_cb(screens[i]->screen, gesture_event_cb, LV_EVENT_ALL, NULL);
 }
 
 #ifdef __cplusplus

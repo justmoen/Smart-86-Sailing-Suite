@@ -13,7 +13,7 @@ extern "C" {
 
 #define NM_TO_METERS 1852.0
 
-  bool fresh(unsigned long age, unsigned long limit = 5000);
+  bool fresh(uint32_t age, uint32_t timeout = 5000);
   bool isSet(char *str);
   bool starts_with(const char* str, const char* pre);
   const char* step_into_path(const char* path);

@@ -1,18 +1,15 @@
 #include "ui_settings_wifi.h"
 #include <WiFi.h>
 #include "ui_keyboard.h"
-
-// config store.
-Preferences preferences;
+#include "net_mdns.h"
 
 String wifi_ssid;      // Store the name of the wireless network.
 String wifi_password;  // Store the password of the wireless network.
+boolean settingMode;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-  boolean settingMode;
 
   boolean restoreConfig() {  // Check whether there is wifi configuration information storage, if there is return 1, if no return 0.
     wifi_ssid = preferences.getString("WIFI_SSID");

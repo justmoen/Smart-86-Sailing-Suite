@@ -8,10 +8,13 @@ extern "C" {
 #include "lvgl.h"
 #include "ui_screens.h"
 
-void navigation_init(lv_updatable_screen_t **screens, int count);
+extern int page;
+
+void default_settings(void);
 void gesture_event_cb(lv_event_t *e);
 void navigation_next_page(void);
 void navigation_prev_page(void);
+void save_brightness(int value);
 
 #ifdef __cplusplus
 }

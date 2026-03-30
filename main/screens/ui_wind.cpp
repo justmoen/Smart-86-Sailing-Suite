@@ -199,15 +199,17 @@ static void wind_update_cb(lv_updatable_screen_t *scr)
 
     set_wind_value(
         indic_wind,
-        fresh(shipDataModel.environment.wind.apparent_wind_angle.age, 1)
-            ? shipDataModel.environment.wind.apparent_wind_angle.deg
-            : 0);
+        fresh(shipDataModel.environment.wind.apparent_wind_angle.age) ? 
+        shipDataModel.environment.wind.apparent_wind_angle.deg
+            : 0
+        );
 
     set_wind_value(
         indic_gwa_wind,
-        fresh(shipDataModel.environment.wind.ground_wind_angle.age, 1)
-            ? shipDataModel.environment.wind.ground_wind_angle.deg
-            : 0);
+        fresh(shipDataModel.environment.wind.ground_wind_angle.age) ? 
+        shipDataModel.environment.wind.ground_wind_angle.deg
+            : 0
+        );
 }
 
 

@@ -9,6 +9,8 @@
 extern "C" {
 #endif
 
+static unsigned long last_touched;
+
 #ifdef __cplusplus
 } /*extern "C"*/
 #endif

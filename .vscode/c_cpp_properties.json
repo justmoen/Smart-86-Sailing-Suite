@@ -86,7 +86,16 @@
                 "${workspaceFolder}/components/arduino/libraries/Preferences/src",
                 "${workspaceFolder}/main/screens",
                 "${workspaceFolder}/components/arduino/libraries/HTTPClient/src",
-                "${workspaceFolder}/components/arduino/libraries/WiFi/src"
+                "${workspaceFolder}/components/arduino/libraries/WiFi/src",
+                "${workspaceFolder}/components/arduino/cores/esp32",
+                "${workspaceFolder}/components/arduino/cores/esp32",
+                "${workspaceFolder}/components/arduino/cores/esp32",
+                "${workspaceFolder}/components/arduino-mqtt",
+                "${workspaceFolder}/components/ReactESP/src",
+                "/Users/justin.moen/.espressif/v5.5.3/esp-idf/components/esp_wifi/include",
+                "/Users/justin.moen/.espressif/v5.5.3/esp-idf/components/esp_netif/include",
+                "/Users/justin.moen/.espressif/v5.5.3/esp-idf/components/esp_eth/include",
+                "${workspaceFolder}/managed_components/lvgl__lvgl/src"
             ],
             "defines": [
                 "ESP_PLATFORM",
