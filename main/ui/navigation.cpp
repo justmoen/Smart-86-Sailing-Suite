@@ -14,6 +14,7 @@ extern "C" {
 
 #define NVS_NAMESPACE "display"
 #define NVS_KEY_BRIGHTNESS "brightness"
+#define NVS_KEY_LAST_SCREEN "last_screen"
 
 static lv_updatable_screen_t **nav_screens;
 
@@ -67,6 +68,31 @@ static int load_brightness()
     return value;
 }
 
+void save_last_screen(int index)
+{
+    nvs_handle_t handle;
+
+    if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle) == ESP_OK)
+    {
+        nvs_set_i32(handle, NVS_KEY_LAST_SCREEN, index);
+        nvs_commit(handle);
+        nvs_close(handle);
+    }
+}
+
+int load_last_screen()
+{
+    nvs_handle_t handle;
+    int32_t value = 0; // default screen
+
+    if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &handle) == ESP_OK)
+    {
+        nvs_get_i32(handle, NVS_KEY_LAST_SCREEN, &value);
+        nvs_close(handle);
+    }
+
+    return value;
+}
 
 /* ---------------- Overlay ---------------- */
 

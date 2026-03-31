@@ -5,12 +5,14 @@
 #include "screens/ui_compass.h"
 #include "screens/ui_gps.h"
 #include "screens/ui_wind.h"
+#include "screens/ui_heel.h"
 
 static lv_updatable_screen_t* screens[] = {
     &windScreen,
     &engineScreen,
     &compassScreen,
-    &gpsScreen
+    &gpsScreen,
+    &heelScreen
 };
 
 static const int screen_count =
@@ -42,6 +44,7 @@ void ui_manager_show(lv_updatable_screen_t *scr)
 
     current_screen = scr;
 
+    save_last_screen(current_index);
     lv_scr_load(scr->screen);
 }
 
@@ -70,9 +73,13 @@ void ui_manager_init()
         screens[i]->screen = nullptr;
     }
 
-    current_index = 0;
+    current_index = load_last_screen();
+
+    if (current_index < 0 || current_index >= screen_count) {
+        current_index = 0;
+    }
     default_settings();
-    ui_manager_show(screens[0]);
+    ui_manager_show(screens[current_index]);
 }
 
 void ui_manager_update()
