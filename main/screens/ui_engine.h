@@ -31,10 +31,6 @@ extern lv_meter_indicator_t *eng_temp_indic;
 extern lv_obj_t *eng_sog_label;
 extern lv_obj_t *eng_alternator_label;
 
-// C++ only functions
-static void engine_update_cb(lv_updatable_screen_t *scr);
-static void lv_engine_display(lv_updatable_screen_t *scr);
-
 #endif // __cplusplus
 
 #endif // UI_ENGINE_H

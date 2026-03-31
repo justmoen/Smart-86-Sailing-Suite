@@ -100,6 +100,19 @@ extern "C" {
                 set_vessel_nav_state(val);
               }
             }
+          } else if (strcmp(t, "attitude.roll") == 0) {
+              if (value.is<float>()) {
+                  shipDataModel.navigation.attitude.heel.deg =
+                      value.as<float>() * 180.0 / PI;
+                  shipDataModel.navigation.attitude.heel.age = millis();
+              }
+          }
+          else if (strcmp(t, "attitude.pitch") == 0) {
+              if (value.is<float>()) {
+                  shipDataModel.navigation.attitude.pitch.deg =
+                      value.as<float>() * 180.0 / PI;
+                  shipDataModel.navigation.attitude.pitch.age = millis();
+              }
           }
         } else if (starts_with(p, "environment.")) {
           const char* t = step_into_token(p);
@@ -177,7 +190,7 @@ extern "C" {
                 shipDataModel.environment.air_outside.illuminance.age = millis();
               }
             }
-          }
+          }  
         } else if (starts_with(p, "steering.")) {
           const char* t = step_into_token(p);
           if (strcmp(t, "rudderAngle") == 0) {

@@ -15,6 +15,8 @@ void gesture_event_cb(lv_event_t *e);
 void navigation_next_page(void);
 void navigation_prev_page(void);
 void save_brightness(int value);
+void save_last_screen(int index);
+int load_last_screen();
 
 #ifdef __cplusplus
 }
