@@ -35,6 +35,7 @@ static uint32_t last_compass_upd = 0;
 static void lv_compass_display(lv_updatable_screen_t *scr)
 {
     compass_display = lv_meter_create(scr->screen);
+    apply_meter_style(compass_display);
 
     lv_obj_remove_style(compass_display, NULL, LV_PART_MAIN);
     lv_obj_remove_style(compass_display, NULL, LV_PART_INDICATOR);
