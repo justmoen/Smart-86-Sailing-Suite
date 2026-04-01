@@ -24,6 +24,7 @@ static void set_engine_rpm_value(void *indic, int32_t v) {
 // Display initialization
 static void lv_engine_display(lv_updatable_screen_t *scr) {
     engine_rpm_meter = lv_meter_create(scr->screen);
+    apply_meter_style(engine_rpm_meter);
     lv_obj_center(engine_rpm_meter);
     lv_obj_set_size(engine_rpm_meter, 680, 680);
 
@@ -32,6 +33,7 @@ static void lv_engine_display(lv_updatable_screen_t *scr) {
 #if LV_FONT_MONTSERRAT_22
     lv_obj_set_style_text_font(main_label, &lv_font_montserrat_22, 0);
 #endif
+    lv_obj_set_style_text_color(main_label, lv_color_black(), 0);
     lv_label_set_text_static(main_label, "RPM\nx100");
 
     // Add scale
@@ -40,7 +42,7 @@ static void lv_engine_display(lv_updatable_screen_t *scr) {
 #if LV_FONT_MONTSERRAT_30
     lv_obj_set_style_text_font(engine_rpm_meter, &lv_font_montserrat_30, LV_PART_TICKS);
 #endif
-    lv_meter_set_scale_major_ticks(engine_rpm_meter, scale, 5, 4, 15, lv_palette_main(LV_PALETTE_GREY), 10);
+    lv_meter_set_scale_major_ticks(engine_rpm_meter, scale, 5, 4, 15, lv_palette_main(LV_PALETTE_GREY), 20);
     lv_meter_set_scale_range(engine_rpm_meter, scale, 0, 60, 240, 150);
 
     // Blue arc and ticks

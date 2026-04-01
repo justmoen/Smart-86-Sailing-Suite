@@ -27,18 +27,41 @@ extern "C" {
   static void lv_heel_display(lv_updatable_screen_t *scr){
     lv_obj_t *parent = scr->screen;
     heel_display = lv_meter_create(parent);
+    apply_meter_style(heel_display);
+    lv_obj_set_style_text_color(
+        heel_display,
+        lv_color_white(),
+        LV_PART_TICKS | LV_STATE_DEFAULT
+    );
+    lv_obj_set_style_text_font(heel_display, &lv_font_montserrat_26, LV_PART_TICKS);
     lv_obj_align(heel_display, LV_ALIGN_CENTER, 0, -40);
     lv_obj_set_size(heel_display, 680, 680);
-    //v_obj_set_style_arc_width(heel_display, 0, LV_PART_MAIN);
     lv_obj_set_style_border_width(heel_display, 0, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(heel_display, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(heel_display, lv_color_black(), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(heel_display, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_bg_color(heel_display, lv_palette_main(LV_PALETTE_ORANGE), LV_PART_INDICATOR);
 
     /*Add a scale first*/
     lv_meter_scale_t *scale = lv_meter_add_scale(heel_display);
     lv_meter_set_scale_range(heel_display, scale, -45, 45, 100, 40);
-    lv_meter_set_scale_ticks(heel_display, scale, 19, 2, 10, lv_palette_main(LV_PALETTE_GREY));
-    lv_meter_set_scale_major_ticks(heel_display, scale, 3, 3, 20, lv_palette_main(LV_PALETTE_GREY), 15);
+    lv_meter_set_scale_ticks(
+        heel_display,
+        scale,
+        19,
+        2,
+        10,
+        lv_palette_lighten(LV_PALETTE_GREY, 2)
+    );
+
+lv_meter_set_scale_major_ticks(
+        heel_display,
+        scale,
+        3,
+        3,
+        20,
+        lv_color_white(),   // brighter majors
+        25
+    );
 
     /*Add a needle line indicator*/
     indic_heel = lv_meter_add_needle_line(heel_display, scale, 7, lv_palette_main(LV_PALETTE_ORANGE), -10);
@@ -73,6 +96,9 @@ extern "C" {
 
     lv_obj_t *main_label = lv_label_create(parent);
     lv_obj_align(main_label, LV_ALIGN_CENTER, 0, -60);
+#if LV_FONT_MONTSERRAT_30
+    lv_obj_set_style_text_font(main_label, &lv_font_montserrat_30, 0);
+#endif
     lv_label_set_text_static(main_label, "HEEL");
   }
 

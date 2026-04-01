@@ -26,6 +26,7 @@ static void create_if_needed(lv_updatable_screen_t *scr)
     if (!scr->created)
     {
         scr->screen = lv_obj_create(NULL);
+        apply_screen_style(scr->screen);
 
         lv_obj_add_event_cb(scr->screen, gesture_event_cb, LV_EVENT_ALL, NULL);
 

@@ -35,6 +35,7 @@ static void set_wind_value(void *indic, int32_t v)
 static void lv_wind_display(lv_updatable_screen_t *scr)
 {
     wind_display = lv_meter_create(scr->screen);
+    apply_meter_style(wind_display);
     lv_obj_align(wind_display, LV_ALIGN_CENTER, 0, 6);
     lv_obj_set_size(wind_display, 680, 680);
 
@@ -48,14 +49,7 @@ static void lv_wind_display(lv_updatable_screen_t *scr)
 
     lv_obj_set_style_text_font(wind_display, &lv_font_montserrat_26, LV_PART_TICKS);
 
-    lv_meter_set_scale_major_ticks(
-        wind_display,
-        scale2,
-        1,
-        3,
-        14,
-        lv_palette_main(LV_PALETTE_GREY),
-        14);
+    lv_meter_set_scale_major_ticks(wind_display, scale2, 1, 3, 14, lv_palette_main(LV_PALETTE_GREY), 20);
 
     lv_meter_set_scale_range(wind_display, scale2, -150, 180, 330, 120);
 
@@ -64,13 +58,7 @@ static void lv_wind_display(lv_updatable_screen_t *scr)
     lv_meter_set_indicator_start_value(wind_display, indic_wind, -60);
     lv_meter_set_indicator_end_value(wind_display, indic_wind, -20);
 
-    indic_wind = lv_meter_add_scale_lines(
-        wind_display,
-        scale,
-        lv_palette_main(LV_PALETTE_RED),
-        lv_palette_main(LV_PALETTE_RED),
-        false,
-        0);
+    indic_wind = lv_meter_add_scale_lines(wind_display, scale, lv_palette_main(LV_PALETTE_RED), lv_palette_main(LV_PALETTE_RED), false, 0);
 
     lv_meter_set_indicator_start_value(wind_display, indic_wind, -60);
     lv_meter_set_indicator_end_value(wind_display, indic_wind, -20);
@@ -80,32 +68,16 @@ static void lv_wind_display(lv_updatable_screen_t *scr)
     lv_meter_set_indicator_start_value(wind_display, indic_wind, 20);
     lv_meter_set_indicator_end_value(wind_display, indic_wind, 60);
 
-    indic_wind = lv_meter_add_scale_lines(
-        wind_display,
-        scale,
-        lv_palette_main(LV_PALETTE_GREEN),
-        lv_palette_main(LV_PALETTE_GREEN),
-        false,
-        0);
+    indic_wind = lv_meter_add_scale_lines(wind_display, scale, lv_palette_main(LV_PALETTE_GREEN), lv_palette_main(LV_PALETTE_GREEN), false, 0);
 
     lv_meter_set_indicator_start_value(wind_display, indic_wind, 20);
     lv_meter_set_indicator_end_value(wind_display, indic_wind, 60);
 
     /* apparent wind needle */
-    indic_wind = lv_meter_add_needle_line(
-        wind_display,
-        scale,
-        10,
-        lv_palette_main(LV_PALETTE_GREY),
-        -10);
+    indic_wind = lv_meter_add_needle_line(wind_display, scale, 10, lv_palette_main(LV_PALETTE_GREY), 10);
 
     /* ground wind needle */
-    indic_gwa_wind = lv_meter_add_needle_line(
-        wind_display,
-        scale,
-        10,
-        lv_palette_main(LV_PALETTE_ORANGE),
-        -48);
+    indic_gwa_wind = lv_meter_add_needle_line(wind_display, scale, 10, lv_palette_main(LV_PALETTE_ORANGE), -48);
 
 
     /* Labels */
