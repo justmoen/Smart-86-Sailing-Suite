@@ -9,7 +9,7 @@ The goal of this project is to create an alternative to the more expensive optio
 When the project matures, I expect to have some numbered releases available.  If you would like to contribute, please reach out.
 
 TODO shortlist:
-1. Derive data from signalK paths on network
+1. Unit of measure settings (meters vs feet, etc.)
 
 External dependencies stored in components folder:
 WMM Tinier - https://github.com/DavidArmstrong/WMM_Tinier/tree/main/src
