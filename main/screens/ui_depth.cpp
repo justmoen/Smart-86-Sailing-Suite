@@ -75,22 +75,43 @@ static void lv_depth_display(lv_updatable_screen_t *scr)
 static void depth_update_cb(lv_updatable_screen_t *scr)
 {
     lv_label_set_text(dbt_label,
+        #ifdef CONVERT_TO_FEET
         (String("DBT (ft):          ")
          += (fresh(shipDataModel.environment.depth.below_transducer.age)
               ? String(shipDataModel.environment.depth.below_transducer.m * _GPS_FEET_PER_METER, 1)
-              : String("--"))).c_str());
+              : String("--"))).c_str()
+        #else
+        (String("DBT (m):          ")
+         += (fresh(shipDataModel.environment.depth.below_transducer.age)
+              ? String(shipDataModel.environment.depth.below_transducer.m, 1)
+              : String("--"))).c_str()
+        #endif
+    );
 
     lv_label_set_text(dbk_label,
+        #ifdef CONVERT_TO_FEET
         (String("DBK (ft):          ")
          += (fresh(shipDataModel.environment.depth.below_keel.age)
               ? String(shipDataModel.environment.depth.below_keel.m * _GPS_FEET_PER_METER, 1)
               : String("--"))).c_str());
+        #else
+        (String("DBK (m):          ")
+         += (fresh(shipDataModel.environment.depth.below_keel.age)
+              ? String(shipDataModel.environment.depth.below_keel.m, 1)
+              : String("--"))).c_str());
+        #endif
 
     lv_label_set_text(dbs_label,
+        #ifdef CONVERT_TO_FEET
         (String("DBS (ft):          ")
          += (fresh(shipDataModel.environment.depth.below_surface.age)
               ? String(shipDataModel.environment.depth.below_surface.m * _GPS_FEET_PER_METER, 1)
+        #else
+        (String("DBS (m):          ")
+         += (fresh(shipDataModel.environment.depth.below_surface.age)
+              ? String(shipDataModel.environment.depth.below_surface.m, 1)
               : String("--"))).c_str());
+        #endif
 
     lv_label_set_text(d_heel_label,
         (String("Heel:                 ")

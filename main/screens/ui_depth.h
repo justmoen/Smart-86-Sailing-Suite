@@ -1,6 +1,8 @@
 #ifndef UI_DEPTH_H
 #define UI_DEPTH_H
 
+// #define CONVERT_TO_FEET
+
 #ifdef __cplusplus
 extern "C" {
 #endif
