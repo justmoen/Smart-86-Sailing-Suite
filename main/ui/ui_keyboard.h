@@ -91,6 +91,7 @@ extern "C" {
     lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_TEXT_LOWER, btnm_mapplus[0], ctrl_map);
     lv_obj_set_height(kb, (LV_VER_RES / 2) + 5);
     lv_obj_set_width(kb, LV_HOR_RES_MAX - 4);
+    lv_obj_set_style_text_font(kb, &lv_font_montserrat_32, LV_PART_ITEMS);
     lv_obj_remove_event_cb(kb, lv_keyboard_def_event_cb);
     lv_obj_add_event_cb(kb, kb_event_cb, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(kb, lv_keyboard_def_event_cb, LV_EVENT_VALUE_CHANGED, NULL);

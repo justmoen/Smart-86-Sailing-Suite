@@ -1,18 +1,26 @@
 #include "navigation.h"
 
 #include "ui_manager.h"
-#include "screens/ui_engine.h"
-#include "screens/ui_compass.h"
-#include "screens/ui_gps.h"
 #include "screens/ui_wind.h"
+#include "screens/ui_engine.h"
+#include "screens/ui_depth.h"
+#include "screens/ui_speed.h"
+// #include "screens/ui_compass.h"
+// #include "screens/ui_gps.h"
+#include "screens/ui_tanks.h"
 #include "screens/ui_heel.h"
+#include "screens/ui_reboot.h"
 
 static lv_updatable_screen_t* screens[] = {
     &windScreen,
     &engineScreen,
-    &compassScreen,
-    &gpsScreen,
-    &heelScreen
+    &depthScreen,
+    &speedScreen,
+    // &compassScreen, // needs work
+    // &gpsScreen, // needs work
+    &tanksScreen,
+    &heelScreen,
+    &rebootScreen
 };
 
 static const int screen_count =

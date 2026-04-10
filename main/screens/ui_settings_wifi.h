@@ -24,6 +24,7 @@ extern "C" {
   void lv_list_wifi(lv_obj_t *parent, int num);
   boolean checkConnection();
   void settingUpWiFi(void (*on_connected)());
+  void btnResetWiFiSettings_event(lv_event_t *event);
 
 #ifdef __cplusplus
 } /*extern "C"*/

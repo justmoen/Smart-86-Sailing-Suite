@@ -73,72 +73,70 @@ extern "C" void app_main()
     bsp_display_backlight_on();
 
     settingUpWiFi([]() {
-        // delayed network discovery
-    });
-
-    bsp_display_lock(0);
-    ui_manager_init();
-    bsp_display_unlock();
-
-    vTaskDelay(pdMS_TO_TICKS(2000));
-    app.onRepeat(2000, []() {
-        static bool connected = false;
-
-        if (!connected) {
-            bool found = discover_n_config();
-
-            if (found) {
-                String host = preferences.getString(SK_TCP_HOST_PREF);
-                int port = preferences.getInt(SK_TCP_PORT_PREF);
-
-                ESP_LOGI("WS", "Starting WS after discovery: %s:%d",
-                        host.c_str(), port);
-
-                signalk_ws_begin(host.c_str(), port);
-                connected = true;
-            }
-        }
-    });
-
-    app.onDelay(4000, []() {
-      getVesselInfo();
-    });
-
-    
-    #define GO_SLEEP_TIMEOUT 1800000ul  // 30 minutes of inactivity before sleeping
-    unsigned long last_ui_upd = 0;
-
-    while(true) {
-        app.tick();
-        signalk_ws_loop();
-
         bsp_display_lock(0);
-        ui_manager_update();
+        ui_manager_init();
         bsp_display_unlock();
-        vTaskDelay(pdMS_TO_TICKS(50));
 
-        // if (!settingMode) {
-        // if (last_touched > 0 && millis() - last_touched > GO_SLEEP_TIMEOUT) {
-            // disconnect_clients();
-            // save_page(current_index);
-            // deep_sleep_with_touch_wakeup();
-        // } else {
-            // if (victron_mqtt_began) {
-            //     victron_mqtt_client_loop(mqttClient);
-            // }
-            if ((millis() - last_ui_upd > 300) 
-                // || (screens[page] == &clockScreen && millis() - last_ui_upd > 200)
-            ) {  // throttle expensive UI updates, and calculations
-                derive_data();
-                last_ui_upd = millis();
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        app.onRepeat(2000, []() {
+            static bool connected = false;
+
+            if (!connected) {
+                bool found = discover_n_config();
+
+                if (found) {
+                    String host = preferences.getString(SK_TCP_HOST_PREF);
+                    int port = preferences.getInt(SK_TCP_PORT_PREF);
+
+                    ESP_LOGI("WS", "Starting WS after discovery: %s:%d",
+                            host.c_str(), port);
+
+                    signalk_ws_begin(host.c_str(), port);
+                    connected = true;
+                }
             }
-        // #ifdef ENABLE_SCREEN_SERVER
-        //     // (not for production)
-        //     if (detected) {
-        //         screenServer0();
-        //     }
-        // #endif
+        });
+
+        app.onDelay(4000, []() {
+        getVesselInfo();
+        });
+
+        
+        #define GO_SLEEP_TIMEOUT 1800000ul  // 30 minutes of inactivity before sleeping
+        unsigned long last_ui_upd = 0;
+
+        while(true) {
+            app.tick();
+            signalk_ws_loop();
+
+            bsp_display_lock(0);
+            ui_manager_update();
+            bsp_display_unlock();
+            vTaskDelay(pdMS_TO_TICKS(50));
+
+            // if (!settingMode) {
+                // if (last_touched > 0 && millis() - last_touched > GO_SLEEP_TIMEOUT) {
+                    // disconnect_clients();
+                    // save_page(current_index);
+                    // deep_sleep_with_touch_wakeup();
+                // } else {
+                    // if (victron_mqtt_began) {
+                    //     victron_mqtt_client_loop(mqttClient);
+                    // }
+                    if ((millis() - last_ui_upd > 300) 
+                        // || (screens[page] == &clockScreen && millis() - last_ui_upd > 200)
+                    ) {  // throttle expensive UI updates, and calculations
+                        derive_data();
+                        last_ui_upd = millis();
+                    }
+                // #ifdef ENABLE_SCREEN_SERVER
+                //     // (not for production)
+                //     if (detected) {
+                //         screenServer0();
+                //     }
+                // #endif
+                // }
             // }
-        // }
-    }  
+        }  
+    });
 }

@@ -19,7 +19,7 @@ void disconnect_clients() {
     if (skClient.c.connected()) skClient.c.stop();
     if (pypClient.c.connected()) pypClient.c.stop();
     if (nmea0183Client.c.connected()) nmea0183Client.c.stop();
-    if (mqttNetClient.connected()) mqttNetClient.stop();
+    // if (mqttNetClient.connected()) mqttNetClient.stop();
 }
 
 void ESP_restart() {
