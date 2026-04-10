@@ -21,7 +21,7 @@ extern "C" {
     return wifi_ssid.length() > 0;
   }
 
-  static void btnResetWiFiSettings_event(lv_event_t *event) {
+  void btnResetWiFiSettings_event(lv_event_t *event) {
     preferences.remove("WIFI_SSID");
     preferences.remove("WIFI_PASSWD");
     ESP.restart();
@@ -58,6 +58,7 @@ extern "C" {
   static void lv_msgbox(const char *txt) {
     static const char *btns[] PROGMEM = { "Reboot", "" };
     lv_obj_t *mbox = lv_msgbox_create(NULL, "", "Password submitted", btns, true);
+    lv_obj_set_style_text_font(mbox, &lv_font_montserrat_28, LV_PART_MAIN);
     lv_obj_add_event_cb(mbox, event_msgbox_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_center(mbox);
   }
@@ -86,6 +87,7 @@ extern "C" {
     /*Create the password box*/
     lv_obj_set_style_pad_all(cont, 2, LV_PART_MAIN);
     lv_obj_t *pwd_ta = lv_textarea_create(cont);
+    lv_obj_set_style_text_font(pwd_ta, &lv_font_montserrat_28, LV_PART_MAIN);
     lv_textarea_set_text(pwd_ta, "");
     //lv_textarea_set_password_mode(pwd_ta, true);
     lv_textarea_set_one_line(pwd_ta, true);
@@ -104,6 +106,7 @@ extern "C" {
 
   void lv_connect_wifi_win(int i) {
     lv_obj_t *win = lv_win_create(lv_scr_act(), 28);
+    lv_obj_set_style_text_font(win, &lv_font_montserrat_28, LV_PART_MAIN);
     lv_win_add_title(win, (String(" Wi-Fi Password: ") += String(WiFi.SSID(i)).substring(0, 9) += "...").c_str());
     lv_obj_t *btn = lv_win_add_btn(win, LV_SYMBOL_CLOSE, 28);
     lv_obj_add_event_cb(btn, lv_win_close_event_cb, LV_EVENT_PRESSED, win);
@@ -128,6 +131,7 @@ extern "C" {
     list_wifi = lv_list_create(parent);
     lv_obj_set_size(list_wifi, 680, 680);
     lv_obj_center(list_wifi);
+    lv_obj_set_style_text_font(list_wifi, &lv_font_montserrat_28, LV_PART_MAIN);
 
     /*Add buttons to the list*/
     lv_obj_t *btn;
@@ -138,6 +142,7 @@ extern "C" {
       btn = lv_list_add_btn(list_wifi, (String(LV_SYMBOL_WIFI) += String("  ") += String(dBm_to_percents(WiFi.RSSI(i))) += "%").c_str(),
                             (((WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? String(LV_SYMBOL_EYE_OPEN " ") : String("")) += WiFi.SSID(i)).c_str());
 
+      lv_obj_set_style_text_font(btn, &lv_font_montserrat_28, LV_PART_MAIN);
       lv_obj_add_event_cb(btn, event_handler_wifi, LV_EVENT_LONG_PRESSED, (void *)i);
     }
   }

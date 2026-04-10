@@ -96,7 +96,9 @@
                 "/Users/justin.moen/.espressif/v5.5.3/esp-idf/components/esp_netif/include",
                 "/Users/justin.moen/.espressif/v5.5.3/esp-idf/components/esp_eth/include",
                 "${workspaceFolder}/managed_components/lvgl__lvgl/src",
-                "${workspaceFolder}/managed_components/lvgl__lvgl/src/hal"
+                "${workspaceFolder}/managed_components/lvgl__lvgl/src/hal",
+                "${workspaceFolder}/components/arduino/libraries/Network/src",
+                "${workspaceFolder}/components/TinyGPSPlus"
             ],
             "defines": [
                 "ESP_PLATFORM",
