@@ -208,31 +208,21 @@ void depth_process_deferred_chart_updates()
         if (point_count > 1) {
             // Depth chart: max depth bottom, 0 surface top, 10% margin above max depth
             // Negative depths: find min (greatest magnitude depth)
-            float min_depth = 0.0f;
+            float max_depth = 0.0f;
             for (int i = 0; i < point_count; i++) {
-                if (points[i].value < min_depth) min_depth = points[i].value;
+                max_depth = std::max(max_depth, points[i].value);
             }
             
-            float greatest_depth = -min_depth;  // Positive magnitude
-            
-            // Dynamic scaling
             static float chart_bottom = 20.0f;
-            if (greatest_depth > chart_bottom) {
-                chart_bottom = greatest_depth * 1.02f;  // Expand 10%
+            if (max_depth > chart_bottom) {
+                chart_bottom = max_depth * 1.05f;  // +5% margin
             } else {
-                chart_bottom *= 0.98f;  // Shrink slowly
+                chart_bottom *= 0.95f;  // Shrink 5%
             }
             if (chart_bottom < 20.0f) chart_bottom = 20.0f;
             
-            float margin = chart_bottom * 0.05f;
-            lv_chart_set_range(depth_chart, LV_CHART_AXIS_PRIMARY_Y, 0, (int)(chart_bottom + margin));
-
-
-
-
-
-
-
+            lv_chart_set_range(depth_chart, LV_CHART_AXIS_PRIMARY_Y, 0, (int)chart_bottom);
+            Serial.printf("Depth: max=%.1f bottom=%.1f range=0-%d\n", max_depth, chart_bottom, (int)chart_bottom);
         }
     }
 }
