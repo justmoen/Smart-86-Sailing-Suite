@@ -9,26 +9,28 @@ ChartDataHistory::ChartDataHistory(const char* key, int default_duration_min, in
       duration_minutes(default_duration_min) {
     
     // Calculate point interval based on duration and point count
-    // Ensures that all data points fit within the specified duration
     if (point_count > 0) {
-        point_interval_ms = (duration_minutes * 60000) / point_count;
-        // Ensure minimum interval of 100ms to avoid excessive sampling
+        point_interval_ms = (duration_minutes * 60000LL) / point_count;
         if (point_interval_ms < 100) {
             point_interval_ms = 100;
         }
     } else {
-        point_interval_ms = 6000;  // Fallback to 6 seconds
+        point_interval_ms = 2000;  // 2s fallback for smooth scrolling
     }
     
-    // Load saved duration
+#ifdef CONFIG_LOG_DEFAULT_LEVEL_INFO
+    Serial.printf("ChartHistory(%s,%dmin,%dpts): interval=%ums\n", key, duration_minutes, point_count, (unsigned)point_interval_ms);
+#endif
+    
+    // Load saved duration from NVS
     Preferences prefs;
     prefs.begin(namespace_key.c_str(), true);
     duration_minutes = prefs.getInt("duration", default_duration_min);
     prefs.end();
     
-    // Recalculate interval if duration was loaded from NVS
+    // Recalculate after load
     if (point_count > 0) {
-        point_interval_ms = (duration_minutes * 60000) / point_count;
+        point_interval_ms = (duration_minutes * 60000LL) / point_count;
         if (point_interval_ms < 100) {
             point_interval_ms = 100;
         }
@@ -40,14 +42,19 @@ ChartDataHistory::ChartDataHistory(const char* key, int default_duration_min, in
 void ChartDataHistory::add_point(float value) {
     uint32_t now = millis();
     
-    // Check if enough time has passed (using calculated interval based on duration and point count)
     if (now - last_sample_ms < point_interval_ms) {
+#ifdef CONFIG_LOG_DEFAULT_LEVEL_INFO
+        static uint32_t last_log = 0;
+        if (millis() - last_log > 30000) {
+            Serial.printf("Chart %s throttle skip (need %ums, have %ums)\n", namespace_key.c_str(), point_interval_ms, now - last_sample_ms);
+            last_log = millis();
+        }
+#endif
         return;
     }
     
     last_sample_ms = now;
     
-    // Add point in circular buffer
     data[write_index].value = value;
     data[write_index].timestamp_ms = now - start_time_ms;
     
@@ -59,25 +66,20 @@ void ChartDataHistory::add_point(float value) {
 
 void ChartDataHistory::get_points(ChartDataPoint* out_buffer, int& out_count, int max_points) {
     uint32_t now = millis();
-    uint32_t window_ms = duration_minutes * 60 * 1000;  // Convert to milliseconds
+    uint32_t window_ms = (uint32_t)duration_minutes * 60 * 1000;
     uint32_t cutoff_time = (now - start_time_ms) - window_ms;
     
     out_count = 0;
     
-    // Iterate backwards from write_index
     for (int i = 0; i < total_points && out_count < max_points; i++) {
         int idx = (write_index - 1 - i + CHART_MAX_POINTS) % CHART_MAX_POINTS;
-        
-        // Skip old points outside time window
         if (data[idx].timestamp_ms < cutoff_time) {
             break;
         }
-        
-        out_buffer[out_count] = data[idx];
-        out_count++;
+        out_buffer[out_count++] = data[idx];
     }
     
-    // Reverse to chronological order
+    // Reverse to chronological
     for (int i = 0; i < out_count / 2; i++) {
         ChartDataPoint temp = out_buffer[i];
         out_buffer[i] = out_buffer[out_count - 1 - i];
@@ -100,12 +102,10 @@ void ChartDataHistory::load_from_nv() {
     total_points = prefs.getInt("count", 0);
     write_index = prefs.getInt("writeIdx", 0);
     
-    // Load point data
-    size_t expected_size = sizeof(ChartDataPoint);
     if (prefs.isKey("data")) {
         size_t read = prefs.getBytes("data", (uint8_t*)data, sizeof(data));
         if (read != sizeof(data)) {
-            total_points = 0;  // Corrupted data
+            total_points = 0;
         }
     }
     
@@ -138,3 +138,5 @@ void ChartDataHistory::set_duration_minutes(int minutes) {
     prefs.putInt("duration", minutes);
     prefs.end();
 }
+
+
