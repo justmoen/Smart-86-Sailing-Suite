@@ -4,10 +4,35 @@
 #include <TinyGPSPlus.h>
 #include <ship_data_util.h>
 #include "signalk_path_config.h"
+#include <ship_data_model.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+// Extract lowercase {fluid} from tanks.{fluid}.{index}.currentLevel
+static String get_fluid_from_path(const String& path) {
+  int tanks_pos = path.indexOf("tanks.");
+  if (tanks_pos == -1) return "";
+  int fluid_start = tanks_pos + 6;
+  int fluid_end = path.indexOf('.', fluid_start);
+  if (fluid_end == -1) return "";
+  String fluid = path.substring(fluid_start, fluid_end);
+  fluid.toLowerCase();
+  return fluid;
+}
+
+// Map lowercase fluid keyword to fluid_type_e
+static fluid_type_e string_to_fluid_type(const String& fluid_lower) {
+  if (fluid_lower == "fuel") return fluid_type_e::FUEL;
+  if (fluid_lower == "fresh_water" || fluid_lower == "fresh") return fluid_type_e::FRESH_WATER;
+  if (fluid_lower == "waste_water" || fluid_lower == "grey_water" || fluid_lower == "grey") return fluid_type_e::WASTE_WATER;
+  if (fluid_lower == "black_water" || fluid_lower == "black") return fluid_type_e::BLACK_WATER;
+  if (fluid_lower == "lubrication" || fluid_lower == "lube") return fluid_type_e::LUBRICATION;
+  if (fluid_lower == "live_well" || fluid_lower == "livewell") return fluid_type_e::LIVE_WELL;
+  if (fluid_lower == "gas") return fluid_type_e::GAS;
+  return fluid_type_e::FLUID_TYPE_NA;
+}
 
   void set_vessel_nav_state(String& val) {
     if (val == "moored") {
@@ -212,6 +237,20 @@ extern "C" {
                   }
                 }
               }
+            }
+          }
+        } else if (starts_with(p, "tanks.")) {
+          // Tank parsing: tanks.{fluid}.{index}.currentLevel → model.tank[index].percent_of_full & fluid_type from {fluid}
+          const auto& config = get_signalk_path_config();
+          for (int i = 0; i < MAX_TANKS; i++) {
+            if (path == config.tank_paths[i] && value.is<float>()) {
+              shipDataModel.tanks.tank[i].percent_of_full.pct = value.as<float>() * 100.0f;
+              shipDataModel.tanks.tank[i].percent_of_full.age = millis();
+              // Extract {fluid} keyword, map to enum
+              String fluid_lower = get_fluid_from_path(path);
+              shipDataModel.tanks.tank[i].fluid_type = string_to_fluid_type(fluid_lower);
+              found = true;
+              break;
             }
           }
         }
