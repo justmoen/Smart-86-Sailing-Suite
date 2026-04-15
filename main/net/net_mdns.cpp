@@ -60,13 +60,7 @@ static bool mdns_lookup(const char* service, const char* proto,
         return false;
     }
 
-    // 🔍 DEBUG: print everything we get
     for (mdns_result_t *r = results; r; r = r->next) {
-        ESP_LOGI(TAG, "---- RESULT ----");
-        ESP_LOGI(TAG, "Instance: %s", r->instance_name ? r->instance_name : "NULL");
-        ESP_LOGI(TAG, "Hostname: %s", r->hostname ? r->hostname : "NULL");
-        ESP_LOGI(TAG, "Port: %d", r->port);
-
         for (mdns_ip_addr_t *a = r->addr; a; a = a->next) {
             if (a->addr.type == ESP_IPADDR_TYPE_V4) {
                 char ip_str[16];
@@ -110,8 +104,10 @@ bool discover_n_config(void)
     int port;
 
     if (mdns_lookup("_signalk-ws", "_tcp", ip, port)) {
+        preferences.begin("signalk", false);  // Open in read-write mode
         preferences.putString(SK_TCP_HOST_PREF, ip.c_str());
         preferences.putInt(SK_TCP_PORT_PREF, port);
+        preferences.end();
 
         saved = true;
 

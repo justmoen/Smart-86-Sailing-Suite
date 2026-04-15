@@ -10,27 +10,12 @@ extern "C" {
 
 extern lv_updatable_screen_t engineScreen;
 
+// Factory function to create N engine screens dynamically
+void create_engine_screens(lv_updatable_screen_t **out_screens, int *out_count);
+int get_engine_screen_count();
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
 
-// C++ declarations
-#ifdef __cplusplus
-#include <Arduino.h>
-
-// LVGL objects (defined in cpp)
-extern lv_obj_t *engine_rpm_meter;
-extern lv_meter_indicator_t *engine_rpm_indic;
-
-extern lv_obj_t *oil_press_meter;
-extern lv_meter_indicator_t *oil_press_indic;
-
-extern lv_obj_t *eng_temp_meter;
-extern lv_meter_indicator_t *eng_temp_indic;
-
-extern lv_obj_t *eng_sog_label;
-extern lv_obj_t *eng_alternator_label;
-
-#endif // __cplusplus
-
-#endif // UI_ENGINE_H
+#endif /*UI_ENGINE_H*/

@@ -13,6 +13,7 @@ typedef struct lv_updatable_screen_t {
     bool created;
     void (*create_cb)(struct lv_updatable_screen_t *);
     void (*update_cb)(struct lv_updatable_screen_t *);
+    void *user_data;  // Optional context data (e.g., engine_id, tank_id, etc.)
 } lv_updatable_screen_t;
 
 #ifdef __cplusplus

@@ -8,6 +8,7 @@ extern "C" {
 #include <ui_screens.h>
 
 extern lv_updatable_screen_t speedScreen;
+void speed_process_deferred_chart_updates(void);
 
 #ifdef __cplusplus
 } /*extern "C"*/

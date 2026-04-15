@@ -12,8 +12,11 @@ extern "C" {
 #endif
 
   boolean restoreConfig() {  // Check whether there is wifi configuration information storage, if there is return 1, if no return 0.
-    wifi_ssid = preferences.getString("WIFI_SSID");
-    wifi_password = preferences.getString("WIFI_PASSWD");
+    preferences.begin("wifi-config", true);  // Open in read-only mode
+    wifi_ssid = preferences.getString("WIFI_SSID", "");
+    wifi_password = preferences.getString("WIFI_PASSWD", "");
+    preferences.end();
+    
     WiFi.setMinSecurity(WIFI_AUTH_WEP);
     WiFi.setAutoReconnect(true);
     WiFi.mode(WIFI_STA);
@@ -22,8 +25,10 @@ extern "C" {
   }
 
   void btnResetWiFiSettings_event(lv_event_t *event) {
+    preferences.begin("wifi-config", false);  // Open in read-write mode
     preferences.remove("WIFI_SSID");
     preferences.remove("WIFI_PASSWD");
+    preferences.end();
     ESP.restart();
   }
 
@@ -58,7 +63,26 @@ extern "C" {
   static void lv_msgbox(const char *txt) {
     static const char *btns[] PROGMEM = { "Reboot", "" };
     lv_obj_t *mbox = lv_msgbox_create(NULL, "", "Password submitted", btns, true);
-    lv_obj_set_style_text_font(mbox, &lv_font_montserrat_28, LV_PART_MAIN);
+    
+    // Set messagebox size to prevent text wrapping
+    lv_obj_set_size(mbox, 500, 250);
+    lv_obj_set_style_text_font(mbox, &lv_font_montserrat_22, LV_PART_MAIN);
+    
+    // Dark mode for messagebox
+    lv_obj_set_style_bg_color(mbox, lv_color_hex(0x1e1e1e), LV_PART_MAIN);
+    lv_obj_set_style_text_color(mbox, lv_color_hex(0xffffff), LV_PART_MAIN);
+    lv_obj_set_style_border_color(mbox, lv_color_hex(0x404040), LV_PART_MAIN);
+    
+    // Style messagebox buttons
+    uint32_t btn_count = 0;
+    lv_obj_t * btn_obj;
+    while((btn_obj = lv_msgbox_get_btns(mbox)) && (btn_obj = lv_obj_get_child(btn_obj, btn_count++))) {
+        lv_obj_set_style_bg_color(btn_obj, lv_color_hex(0x2a2a2a), LV_PART_MAIN);
+        lv_obj_set_style_text_color(btn_obj, lv_color_hex(0xffffff), LV_PART_MAIN);
+        lv_obj_set_style_text_font(btn_obj, &lv_font_montserrat_20, LV_PART_MAIN);
+        lv_obj_set_style_pad_all(btn_obj, 12, LV_PART_MAIN);  // 10% expansion via padding
+    }
+    
     lv_obj_add_event_cb(mbox, event_msgbox_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_center(mbox);
   }
@@ -75,10 +99,12 @@ extern "C" {
       screenServer0();
 #endif
     } else if (code == LV_EVENT_READY) {
+      preferences.begin("wifi-config", false);  // Open in read-write mode
       preferences.remove("WIFI_SSID");
       preferences.remove("WIFI_PASSWD");
       preferences.putString("WIFI_SSID", WiFi.SSID(i));
       preferences.putString("WIFI_PASSWD", lv_textarea_get_text(ta));
+      preferences.end();
       lv_msgbox(lv_textarea_get_text(ta));
     }
   }
@@ -86,6 +112,11 @@ extern "C" {
   void lv_password_textarea(int i, lv_obj_t *cont) {
     /*Create the password box*/
     lv_obj_set_style_pad_all(cont, 2, LV_PART_MAIN);
+    
+    // Dark mode for container
+    lv_obj_set_style_bg_color(cont, lv_color_hex(0x1e1e1e), LV_PART_MAIN);
+    lv_obj_set_style_border_color(cont, lv_color_hex(0x404040), LV_PART_MAIN);
+    
     lv_obj_t *pwd_ta = lv_textarea_create(cont);
     lv_obj_set_style_text_font(pwd_ta, &lv_font_montserrat_28, LV_PART_MAIN);
     lv_textarea_set_text(pwd_ta, "");
@@ -93,6 +124,12 @@ extern "C" {
     lv_textarea_set_one_line(pwd_ta, true);
     lv_obj_set_width(pwd_ta, 230);
     lv_obj_align(pwd_ta, LV_ALIGN_TOP_LEFT, 2, 2);
+    
+    // Dark mode for textarea
+    lv_obj_set_style_bg_color(pwd_ta, lv_color_hex(0x2a2a2a), LV_PART_MAIN);
+    lv_obj_set_style_text_color(pwd_ta, lv_color_hex(0xffffff), LV_PART_MAIN);
+    lv_obj_set_style_border_color(pwd_ta, lv_color_hex(0x404040), LV_PART_MAIN);
+    
     lv_obj_add_event_cb(pwd_ta, ta_password_event_cb, LV_EVENT_ALL, (void *)i);
 
     /*Create a keyboard*/
@@ -107,10 +144,19 @@ extern "C" {
   void lv_connect_wifi_win(int i) {
     lv_obj_t *win = lv_win_create(lv_scr_act(), 28);
     lv_obj_set_style_text_font(win, &lv_font_montserrat_28, LV_PART_MAIN);
+    
+    // Dark mode for window
+    lv_obj_set_style_bg_color(win, lv_color_hex(0x1e1e1e), LV_PART_MAIN);
+    lv_obj_set_style_text_color(win, lv_color_hex(0xffffff), LV_PART_MAIN);
+    lv_obj_set_style_border_color(win, lv_color_hex(0x404040), LV_PART_MAIN);
+    
     lv_win_add_title(win, (String(" Wi-Fi Password: ") += String(WiFi.SSID(i)).substring(0, 9) += "...").c_str());
     lv_obj_t *btn = lv_win_add_btn(win, LV_SYMBOL_CLOSE, 28);
+    lv_obj_set_style_bg_color(btn, lv_color_hex(0xff4444), LV_PART_MAIN);
+    lv_obj_set_style_text_color(btn, lv_color_hex(0xffffff), LV_PART_MAIN);
     lv_obj_add_event_cb(btn, lv_win_close_event_cb, LV_EVENT_PRESSED, win);
-    lv_obj_t *cont = lv_win_get_content(win); /*Content can be added here*/
+    lv_obj_t *cont = lv_win_get_content(win);
+    lv_obj_set_style_bg_color(cont, lv_color_hex(0x1e1e1e), LV_PART_MAIN);
     lv_password_textarea(i, cont);
   }
 
@@ -132,17 +178,30 @@ extern "C" {
     lv_obj_set_size(list_wifi, 680, 680);
     lv_obj_center(list_wifi);
     lv_obj_set_style_text_font(list_wifi, &lv_font_montserrat_28, LV_PART_MAIN);
+    
+    // Dark mode styling
+    lv_obj_set_style_bg_color(list_wifi, lv_color_hex(0x1e1e1e), LV_PART_MAIN);
+    lv_obj_set_style_text_color(list_wifi, lv_color_hex(0xffffff), LV_PART_MAIN);
+    lv_obj_set_style_border_color(list_wifi, lv_color_hex(0x404040), LV_PART_MAIN);
 
     /*Add buttons to the list*/
     lv_obj_t *btn;
 
     lv_list_add_text(list_wifi, "Wi-Fi Networks");
+    lv_obj_t *text_label = lv_obj_get_child(list_wifi, 0);
+    if (text_label) {
+      lv_obj_set_style_text_color(text_label, lv_color_hex(0xaaaaaa), LV_PART_MAIN);
+    }
 
     for (int i = 0; i < num; ++i) {
       btn = lv_list_add_btn(list_wifi, (String(LV_SYMBOL_WIFI) += String("  ") += String(dBm_to_percents(WiFi.RSSI(i))) += "%").c_str(),
                             (((WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? String(LV_SYMBOL_EYE_OPEN " ") : String("")) += WiFi.SSID(i)).c_str());
 
       lv_obj_set_style_text_font(btn, &lv_font_montserrat_28, LV_PART_MAIN);
+      lv_obj_set_style_bg_color(btn, lv_color_hex(0x2a2a2a), LV_PART_MAIN);
+      lv_obj_set_style_text_color(btn, lv_color_hex(0xffffff), LV_PART_MAIN);
+      lv_obj_set_style_bg_color(btn, lv_color_hex(0x404040), LV_PART_MAIN | LV_STATE_PRESSED);
+      lv_obj_set_style_border_color(btn, lv_color_hex(0x404040), LV_PART_MAIN);
       lv_obj_add_event_cb(btn, event_handler_wifi, LV_EVENT_LONG_PRESSED, (void *)i);
     }
   }

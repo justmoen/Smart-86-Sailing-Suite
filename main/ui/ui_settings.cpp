@@ -20,7 +20,6 @@ extern "C" {
   static void btnRotateScreen_event(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_CLICKED) {
-      preferences.end();
       preferences.begin("scr-cfg", false);
       bool rotate = preferences.getBool("ROTATE");
       if (rotate) {
@@ -34,7 +33,6 @@ extern "C" {
   }
 
   void save_page(int page) {
-    preferences.end();
     preferences.begin("scr-cfg", false);
     preferences.putInt("PAGE", page);
     preferences.end();
@@ -42,7 +40,7 @@ extern "C" {
 
   static int restore_page() {
     preferences.begin("scr-cfg", false);
-    int page = preferences.getInt("PAGE");
+    int page = preferences.getInt("PAGE", 0);  // Default to page 0
     preferences.end();
     return page;
   }

@@ -103,23 +103,47 @@ extern "C" {
           || shipDataModel.navigation.position_before.lon.age == 0) {
         shipDataModel.navigation.position_before = shipDataModel.navigation.position;
       }
-      if (shipDataModel.navigation.position.lat.age - shipDataModel.navigation.position_before.lat.age > 5000
-          && shipDataModel.navigation.position.lon.age - shipDataModel.navigation.position_before.lon.age > 5000
-          && shipDataModel.navigation.position_before.lat.age > 0
-          && shipDataModel.navigation.position_before.lon.age > 0) {
-        unsigned long period_msec =
-          ((shipDataModel.navigation.position.lat.age - shipDataModel.navigation.position_before.lat.age)
-           + (shipDataModel.navigation.position.lon.age - shipDataModel.navigation.position_before.lon.age))
-          / 2;
-        float spd =
-          distance_m(shipDataModel.navigation.position, shipDataModel.navigation.position_before)
-          / period_msec * 1000.0 / _GPS_MPS_PER_KNOT;
+      
+      // Speed over ground average - use incoming Signal K data if available
+      // This is much more accurate than estimating from position updates
+      if (fresh(shipDataModel.navigation.speed_over_ground.age)) {
+        float spd = shipDataModel.navigation.speed_over_ground.kn;
         if (shipDataModel.navigation.speed_over_ground_avg.age == 0) {
+          // First value: initialize directly
           shipDataModel.navigation.speed_over_ground_avg.kn = spd;
         } else {
-          shipDataModel.navigation.speed_over_ground_avg.kn = (shipDataModel.navigation.speed_over_ground_avg.kn + (3.0 * spd)) / 4.0;
+          // Apply low-pass filter: avg_new = 0.25 * avg_old + 0.75 * spd_new
+          // This heavily weights recent values for responsive averaging
+          shipDataModel.navigation.speed_over_ground_avg.kn = 
+            (shipDataModel.navigation.speed_over_ground_avg.kn * 0.25) + (spd * 0.75);
         }
         shipDataModel.navigation.speed_over_ground_avg.age = millis();
+      }
+      
+      // Fallback: estimate from position if Signal K speed unavailable
+      if (!fresh(shipDataModel.navigation.speed_over_ground.age)) {
+        if (shipDataModel.navigation.position.lat.age - shipDataModel.navigation.position_before.lat.age > 5000
+            && shipDataModel.navigation.position.lon.age - shipDataModel.navigation.position_before.lon.age > 5000
+            && shipDataModel.navigation.position_before.lat.age > 0
+            && shipDataModel.navigation.position_before.lon.age > 0) {
+          unsigned long period_msec =
+            ((shipDataModel.navigation.position.lat.age - shipDataModel.navigation.position_before.lat.age)
+             + (shipDataModel.navigation.position.lon.age - shipDataModel.navigation.position_before.lon.age))
+            / 2;
+          if (period_msec > 1000) {  // Only calculate if period is valid (> 1 second)
+            float spd =
+              (distance_m(shipDataModel.navigation.position, shipDataModel.navigation.position_before) * 1000.0)
+              / period_msec / _GPS_MPS_PER_KNOT;
+            if (shipDataModel.navigation.speed_over_ground_avg.age == 0) {
+              shipDataModel.navigation.speed_over_ground_avg.kn = spd;
+            } else {
+              // Same low-pass filter for consistency
+              shipDataModel.navigation.speed_over_ground_avg.kn = 
+                (shipDataModel.navigation.speed_over_ground_avg.kn * 0.25) + (spd * 0.75);
+            }
+            shipDataModel.navigation.speed_over_ground_avg.age = millis();
+          }
+        }
       }
     }
 

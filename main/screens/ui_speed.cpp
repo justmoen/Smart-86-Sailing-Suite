@@ -4,6 +4,8 @@
 #include <StreamString.h>
 #include "ui_speed.h"
 #include "ui_init.h"
+#include "chart_data_history.h"
+#include "signalk_path_config.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -15,6 +17,14 @@ static lv_obj_t *spd_label;
 static lv_obj_t *leeway_label;
 static lv_obj_t *s_cogt_label;
 static lv_obj_t *s_hdt_label;
+static lv_obj_t *speed_chart = nullptr;
+static lv_chart_series_t *speed_series = nullptr;
+static ChartDataHistory *speed_history = nullptr;
+
+// Deferred chart update tracking
+static float pending_speed_val = 0;
+static bool pending_chart_add_point = false;
+static int pending_chart_range_update = 0;
 
 /* -------------------------------------------------- */
 /* UI Creation                                        */
@@ -73,6 +83,32 @@ static void lv_speed_display(lv_updatable_screen_t *scr)
     lv_obj_set_style_text_font(s_hdt_label, &lv_font_montserrat_30, 0);
 #endif
     lv_label_set_text_static(s_hdt_label, "HDT:                               --");
+    
+    // Create speed chart in bottom half
+    const auto& config = get_signalk_path_config();
+    speed_chart = lv_chart_create(parent);
+    lv_obj_set_size(speed_chart, 680, 200);
+    lv_obj_align(speed_chart, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_chart_set_type(speed_chart, LV_CHART_TYPE_LINE);
+    // Calculate point count: for 30 minutes default=150 points; scale for configured duration
+    int speed_point_count = (config.speed_chart_duration * 150) / 30;
+    if (speed_point_count > 300) speed_point_count = 300;
+    if (speed_point_count < 50) speed_point_count = 50;
+    lv_chart_set_point_count(speed_chart, speed_point_count);
+    lv_chart_set_range(speed_chart, LV_CHART_AXIS_PRIMARY_Y, 0, 20);
+    lv_chart_set_div_line_count(speed_chart, 5, 5);
+    
+    // Allow gesture events to pass through to screen
+    lv_obj_clear_flag(speed_chart, LV_OBJ_FLAG_CLICKABLE);
+    
+    // Style the chart
+    lv_obj_set_style_text_font(speed_chart, &lv_font_montserrat_14, LV_PART_MAIN);
+    lv_obj_set_style_border_color(speed_chart, lv_color_hex(0xcccccc), LV_PART_MAIN);
+    
+    // Initialize history tracker with calculated point count
+    if (speed_history == nullptr) {
+        speed_history = new ChartDataHistory("speed", config.speed_chart_duration, speed_point_count);
+    }
 }
 
 /* -------------------------------------------------- */
@@ -116,6 +152,60 @@ static void speed_update_cb(lv_updatable_screen_t *scr)
          += (fresh(shipDataModel.navigation.heading_true.age)
               ? String(shipDataModel.navigation.heading_true.deg, 1) + LV_SYMBOL_DEGREES
               : String("--"))).c_str());
+    
+    // Queue chart update for deferred processing (outside display lock)
+    if (speed_history && fresh(shipDataModel.navigation.speed_over_ground.age)) {
+        pending_speed_val = shipDataModel.navigation.speed_over_ground.kn;
+        pending_chart_add_point = true;
+        pending_chart_range_update++;
+    }
+}
+
+/* -------------------------------------------------- */
+/* Deferred Chart Updates (called outside display lock) */
+/* -------------------------------------------------- */
+
+void speed_process_deferred_chart_updates()
+{
+    if (!speed_history || !speed_chart) return;
+    
+    // Add pending point to chart
+    if (pending_chart_add_point) {
+        pending_chart_add_point = false;
+        
+        // Create series once on first data point
+        if (speed_series == nullptr) {
+            speed_series = lv_chart_add_series(speed_chart, lv_palette_main(LV_PALETTE_GREEN), LV_CHART_AXIS_PRIMARY_Y);
+        }
+        
+        // Record in history
+        speed_history->add_point(pending_speed_val);
+        
+        // Add point to chart if series exists
+        if (speed_series != nullptr) {
+            lv_chart_set_next_value(speed_chart, speed_series, (lv_coord_t)pending_speed_val);
+        }
+    }
+    
+    // Update range if needed (every ~1000ms based on counter)
+    if (pending_chart_range_update >= 50) {  // 50 * 20ms = ~1000ms
+        pending_chart_range_update = 0;
+        
+        ChartDataPoint points[150];
+        int point_count = 0;
+        speed_history->get_points(points, point_count, 150);
+        
+        if (point_count > 1) {
+            // Find max for scaling
+            float max_speed = 5;  // Minimum display range
+            for (int i = 0; i < point_count; i++) {
+                if (points[i].value > max_speed) max_speed = points[i].value;
+            }
+            max_speed *= 1.2f;  // Add 20% margin
+            
+            lv_chart_set_range(speed_chart, LV_CHART_AXIS_PRIMARY_Y, 0, (int)max_speed);
+        }
+    }
 }
 
 /* -------------------------------------------------- */

@@ -38,6 +38,9 @@ static void lv_wind_display(lv_updatable_screen_t *scr)
     apply_meter_style(wind_display);
     lv_obj_align(wind_display, LV_ALIGN_CENTER, 0, 6);
     lv_obj_set_size(wind_display, 680, 680);
+    
+    // Allow gesture events to pass through to screen
+    lv_obj_clear_flag(wind_display, LV_OBJ_FLAG_CLICKABLE);
 
     /* scale */
     lv_meter_scale_t *scale = lv_meter_add_scale(wind_display);

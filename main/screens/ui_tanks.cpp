@@ -4,6 +4,7 @@
 #include <StreamString.h>
 #include "ui_tanks.h"
 #include "ui_init.h"
+#include <signalk_path_config.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,11 +19,37 @@ static lv_obj_t *bar_tank_l[MAX_TANKS];
 
 static void lv_tanks_display(lv_updatable_screen_t *scr)
 {
+    const auto& config = get_signalk_path_config();
     lv_obj_t *parent = scr->screen;
+    
+    int num_tanks = config.num_tanks;
+
+    // Calculate tank dimensions based on number of tanks
+    // For 2 tanks: large (280x320), for 4 tanks: medium (200x220), for 6+ tanks: smaller
+    int tank_width, tank_height;
+    if (num_tanks == 1) {
+        tank_width = 320;
+        tank_height = 400;
+    } else if (num_tanks == 2) {
+        tank_width = 280;
+        tank_height = 340;
+    } else if (num_tanks == 3) {
+        tank_width = 240;
+        tank_height = 280;
+    } else if (num_tanks <= 4) {
+        tank_width = 200;
+        tank_height = 240;
+    } else if (num_tanks <= 6) {
+        tank_width = 160;
+        tank_height = 220;
+    } else {
+        tank_width = 140;
+        tank_height = 200;
+    }
 
     for (int i = 0; i < MAX_TANKS; i++) {
         bar_tank[i] = lv_bar_create(parent);
-        lv_obj_set_size(bar_tank[i], 50, 70);
+        lv_obj_set_size(bar_tank[i], tank_width, tank_height);
 
         lv_obj_set_style_bg_color(
             bar_tank[i],
@@ -35,26 +62,104 @@ static void lv_tanks_display(lv_updatable_screen_t *scr)
 
         bar_tank_l[i] = lv_label_create(parent);
         lv_label_set_text_static(bar_tank_l[i], "--");
+        lv_obj_set_width(bar_tank_l[i], 120);
+        lv_label_set_long_mode(bar_tank_l[i], LV_LABEL_LONG_WRAP);
+
+#if LV_FONT_MONTSERRAT_28
+        lv_obj_set_style_text_font(bar_tank_l[i], &lv_font_montserrat_28, 0);
+#endif
+        
+        // Hide tanks that are not configured
+        if (i >= config.num_tanks) {
+            lv_obj_add_flag(bar_tank[i], LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(bar_tank_l[i], LV_OBJ_FLAG_HIDDEN);
+        }
     }
 
-    /* layout */
-    lv_obj_align(bar_tank[0], LV_ALIGN_CENTER, -120, -40);
-    lv_obj_align(bar_tank[1], LV_ALIGN_CENTER, -40, -40);
-    lv_obj_align(bar_tank[2], LV_ALIGN_CENTER, 40, -40);
-    lv_obj_align(bar_tank[3], LV_ALIGN_CENTER, 120, -40);
-    lv_obj_align(bar_tank[4], LV_ALIGN_CENTER, -120, 40);
-    lv_obj_align(bar_tank[5], LV_ALIGN_CENTER, -40, 40);
-    lv_obj_align(bar_tank[6], LV_ALIGN_CENTER, 40, 40);
-    lv_obj_align(bar_tank[7], LV_ALIGN_CENTER, 120, 40);
-
-    lv_obj_align(bar_tank_l[0], LV_ALIGN_CENTER, -120, -100);
-    lv_obj_align(bar_tank_l[1], LV_ALIGN_CENTER, -40, -100);
-    lv_obj_align(bar_tank_l[2], LV_ALIGN_CENTER, 40, -100);
-    lv_obj_align(bar_tank_l[3], LV_ALIGN_CENTER, 120, -100);
-    lv_obj_align(bar_tank_l[4], LV_ALIGN_CENTER, -120, 100);
-    lv_obj_align(bar_tank_l[5], LV_ALIGN_CENTER, -40, 100);
-    lv_obj_align(bar_tank_l[6], LV_ALIGN_CENTER, 40, 100);
-    lv_obj_align(bar_tank_l[7], LV_ALIGN_CENTER, 120, 100);
+    /* Dynamic layout based on number of tanks */
+    
+    // Calculate positions based on number of tanks
+    // Available space: 680x480 (720x720 display with title/margin)
+    // Center at 360x240, usable area approximately ±300 horizontal, ±180 vertical
+    
+    int x_positions[MAX_TANKS];
+    int y_positions[MAX_TANKS];
+    int x_label_offsets[MAX_TANKS];
+    int y_label_offsets[MAX_TANKS];
+    
+    if (num_tanks == 1) {
+        // Single tank centered
+        x_positions[0] = 0; y_positions[0] = 0;
+        x_label_offsets[0] = 0; y_label_offsets[0] = -210;
+    } else if (num_tanks == 2) {
+        // Two tanks side by side
+        x_positions[0] = -180; y_positions[0] = 0;
+        x_positions[1] = 180; y_positions[1] = 0;
+        x_label_offsets[0] = -180; y_label_offsets[0] = -200;
+        x_label_offsets[1] = 180; y_label_offsets[1] = -200;
+    } else if (num_tanks == 3) {
+        // Three tanks: 2 on bottom, 1 on top centered
+        x_positions[0] = 0; y_positions[0] = -100;
+        x_positions[1] = -140; y_positions[1] = 120;
+        x_positions[2] = 140; y_positions[2] = 120;
+        x_label_offsets[0] = 0; y_label_offsets[0] = -220;
+        x_label_offsets[1] = -140; y_label_offsets[1] = 220;
+        x_label_offsets[2] = 140; y_label_offsets[2] = 220;
+    } else if (num_tanks <= 4) {
+        // Four tanks in 2x2 grid
+        x_positions[0] = -130; y_positions[0] = -100;
+        x_positions[1] = 130; y_positions[1] = -100;
+        x_positions[2] = -130; y_positions[2] = 100;
+        x_positions[3] = 130; y_positions[3] = 100;
+        x_label_offsets[0] = -130; y_label_offsets[0] = -180;
+        x_label_offsets[1] = 130; y_label_offsets[1] = -180;
+        x_label_offsets[2] = -130; y_label_offsets[2] = 180;
+        x_label_offsets[3] = 130; y_label_offsets[3] = 180;
+    } else if (num_tanks <= 6) {
+        // Five or six tanks in 3 columns, 2 rows
+        int x_spacing = 160;  // Adjust for 3 columns
+        int y_spacing = 140;
+        
+        // Top row: 3 tanks
+        for (int i = 0; i < 3 && i < num_tanks; i++) {
+            x_positions[i] = (i - 1) * x_spacing;
+            y_positions[i] = -y_spacing / 2;
+            x_label_offsets[i] = x_positions[i];
+            y_label_offsets[i] = y_positions[i] - 160;
+        }
+        // Bottom row: up to 3 tanks
+        for (int i = 3; i < num_tanks && i < 6; i++) {
+            x_positions[i] = (i - 4) * x_spacing;
+            y_positions[i] = y_spacing / 2;
+            x_label_offsets[i] = x_positions[i];
+            y_label_offsets[i] = y_positions[i] + 160;
+        }
+    } else {
+        // Seven or eight tanks in 4 columns, 2 rows (max configuration)
+        int x_spacing = 130;  // Tighter spacing for 4 columns
+        int y_spacing = 140;
+        
+        // Top row: 4 tanks
+        for (int i = 0; i < 4 && i < num_tanks; i++) {
+            x_positions[i] = (i - 1.5) * x_spacing;
+            y_positions[i] = -y_spacing / 2;
+            x_label_offsets[i] = x_positions[i];
+            y_label_offsets[i] = y_positions[i] - 140;
+        }
+        // Bottom row: up to 4 tanks
+        for (int i = 4; i < num_tanks && i < 8; i++) {
+            x_positions[i] = (i - 5.5) * x_spacing;
+            y_positions[i] = y_spacing / 2;
+            x_label_offsets[i] = x_positions[i];
+            y_label_offsets[i] = y_positions[i] + 140;
+        }
+    }
+    
+    // Apply calculated positions to all tanks
+    for (int i = 0; i < MAX_TANKS; i++) {
+        lv_obj_align(bar_tank[i], LV_ALIGN_CENTER, x_positions[i], y_positions[i]);
+        lv_obj_align(bar_tank_l[i], LV_ALIGN_CENTER, x_label_offsets[i], y_label_offsets[i]);
+    }
 }
 
 /* -------------------------------------------------- */
