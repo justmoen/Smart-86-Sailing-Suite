@@ -6,58 +6,8 @@
 
 constexpr const char* kPrefsNamespace = "sk-config";
 
-signalk_path_config_t config = {
-    // Navigation paths
-    .navigation_rate_of_turn = "navigation.rateOfTurn",
-    .navigation_heading_magnetic = "navigation.headingMagnetic",
-    .navigation_position = "navigation.position",
-    .navigation_speed_over_ground = "navigation.speedOverGround",
-    .navigation_speed_through_water = "navigation.speedThroughWater",
-    .navigation_course_over_ground_true = "navigation.courseOverGroundTrue",
-    .navigation_course_rhumbline_cross_track_error = "navigation.courseRhumbline.crossTrackError",
-    .navigation_course_rhumbline_bearing_track_true = "navigation.courseRhumbline.bearingTrackTrue",
-    .navigation_course_rhumbline_next_point_distance = "navigation.courseRhumbline.nextPoint.distance",
-    .navigation_course_rhumbline_next_point_velocity_made_good = "navigation.courseRhumbline.nextPoint.velocityMadeGood",
-    .navigation_state = "navigation.state",
-    .navigation_attitude_roll = "navigation.attitude.roll",
-    .navigation_attitude_pitch = "navigation.attitude.pitch",
+signalk_path_config_t config;  // Global default-initialized, runtime prefs override in load_config_from_preferences()
 
-    // Environment paths
-    .environment_wind_angle_apparent = "environment.wind.angleApparent",
-    .environment_wind_angle_true_ground = "environment.wind.angleTrueGround",
-    .environment_wind_angle_true_water = "environment.wind.angleTrueWater",
-    .environment_wind_speed_apparent = "environment.wind.speedApparent",
-    .environment_wind_speed_over_ground = "environment.wind.speedOverGround",
-    .environment_wind_speed_true = "environment.wind.speedTrue",
-    .environment_depth_below_keel = "environment.depth.belowKeel",
-    .environment_depth_below_transducer = "environment.depth.belowTransducer",
-    .environment_depth_below_surface = "environment.depth.belowSurface",
-    .environment_outside_pressure = "environment.outside.pressure",
-    .environment_outside_humidity = "environment.outside.humidity",
-    .environment_outside_temperature = "environment.outside.temperature",
-    .environment_outside_illuminance = "environment.outside.illuminance",
-
-    // Steering paths
-    .steering_rudder_angle = "steering.rudderAngle",
-
-    // Vessel API paths
-    .vessel_design_beam_api = "vessels.self.design.beam.value",
-    .vessel_design_air_height_api = "vessels.self.design.airHeight.value",
-    .vessel_design_draft_api = "vessels.self.design.draft.value.maximum",
-    .vessel_design_length_api = "vessels.self.design.length.value.overall",
-    .vessel_name_api = "vessels.self.name",
-    .vessel_mmsi_api = "vessels.self.mmsi",
-    .vessel_navigation_state_api = "vessels.self.navigation.state.value",
-
-    // Engine gauge thresholds
-    .engine_oil_pressure_min = 10.0f,
-    .engine_oil_pressure_max = 60.0f,
-    .engine_temp_redline = 100.0f,
-
-    // Chart configuration (in minutes)
-    .depth_chart_duration = 10,
-    .speed_chart_duration = 30,
-};
 
 WebServer web_server(80);
 bool web_server_started = false;
@@ -314,7 +264,7 @@ void save_all_config_to_preferences() {
 // Export config to JSON
 void export_config_to_json(JsonDocument& doc) {
     // Navigation
-    JsonObject nav = doc.createNestedObject("navigation");
+    JsonObject nav = doc["navigation"].to<JsonObject>();
     nav["rateOfTurn"] = config.navigation_rate_of_turn;
     nav["headingMagnetic"] = config.navigation_heading_magnetic;
     nav["position"] = config.navigation_position;
@@ -330,8 +280,8 @@ void export_config_to_json(JsonDocument& doc) {
     nav["attitudePitch"] = config.navigation_attitude_pitch;
 
     // Environment
-    JsonObject env = doc.createNestedObject("environment");
-    JsonObject wind = env.createNestedObject("wind");
+    JsonObject env = doc["environment"].to<JsonObject>();
+    JsonObject wind = env["wind"].to<JsonObject>();
     wind["angleApparent"] = config.environment_wind_angle_apparent;
     wind["angleTrueGround"] = config.environment_wind_angle_true_ground;
     wind["angleTrueWater"] = config.environment_wind_angle_true_water;
@@ -339,24 +289,24 @@ void export_config_to_json(JsonDocument& doc) {
     wind["speedOverGround"] = config.environment_wind_speed_over_ground;
     wind["speedTrue"] = config.environment_wind_speed_true;
 
-    JsonObject depth = env.createNestedObject("depth");
+    JsonObject depth = env["depth"].to<JsonObject>();
     depth["belowKeel"] = config.environment_depth_below_keel;
     depth["belowTransducer"] = config.environment_depth_below_transducer;
     depth["belowSurface"] = config.environment_depth_below_surface;
 
-    JsonObject outside = env.createNestedObject("outside");
+    JsonObject outside = env["outside"].to<JsonObject>();
     outside["pressure"] = config.environment_outside_pressure;
     outside["humidity"] = config.environment_outside_humidity;
     outside["temperature"] = config.environment_outside_temperature;
     outside["illuminance"] = config.environment_outside_illuminance;
 
     // Steering
-    JsonObject steering = doc.createNestedObject("steering");
+    JsonObject steering = doc["steering"].to<JsonObject>();
     steering["rudderAngle"] = config.steering_rudder_angle;
 
     // Vessel
-    JsonObject vessel = doc.createNestedObject("vessel");
-    JsonObject design = vessel.createNestedObject("design");
+    JsonObject vessel = doc["vessel"].to<JsonObject>();
+    JsonObject design = vessel["design"].to<JsonObject>();
     design["beamApi"] = config.vessel_design_beam_api;
     design["airHeightApi"] = config.vessel_design_air_height_api;
     design["draftApi"] = config.vessel_design_draft_api;
@@ -366,14 +316,14 @@ void export_config_to_json(JsonDocument& doc) {
     vessel["navigationStateApi"] = config.vessel_navigation_state_api;
 
     // Engine
-    JsonObject engine = doc.createNestedObject("engine");
-    JsonObject oilPressure = engine.createNestedObject("oilPressure");
+    JsonObject engine = doc["engine"].to<JsonObject>();
+    JsonObject oilPressure = engine["oilPressure"].to<JsonObject>();
     oilPressure["minPSI"] = config.engine_oil_pressure_min;
     oilPressure["maxPSI"] = config.engine_oil_pressure_max;
     engine["tempRedlineCelsius"] = config.engine_temp_redline;
 
     // Charts
-    JsonObject charts = doc.createNestedObject("charts");
+    JsonObject charts = doc["charts"].to<JsonObject>();
     charts["depthChartMinutes"] = config.depth_chart_duration;
     charts["speedChartMinutes"] = config.speed_chart_duration;
 }
@@ -1096,7 +1046,7 @@ void handle_save_config() {
     }
     
     // Parse JSON
-    DynamicJsonDocument doc(16384);  // Large buffer for 50+ fields
+    JsonDocument doc;  // Large buffer for 50+ fields (auto-sized)
     DeserializationError error = deserializeJson(doc, body);
     
     if (error) {
@@ -1105,48 +1055,48 @@ void handle_save_config() {
     }
     
     // Load all string fields (Signal K paths only)
-    if (doc.containsKey("nav_rot")) config.navigation_rate_of_turn = doc["nav_rot"].as<String>();
-    if (doc.containsKey("nav_hdg")) config.navigation_heading_magnetic = doc["nav_hdg"].as<String>();
-    if (doc.containsKey("nav_pos")) config.navigation_position = doc["nav_pos"].as<String>();
-    if (doc.containsKey("nav_sog")) config.navigation_speed_over_ground = doc["nav_sog"].as<String>();
-    if (doc.containsKey("nav_stw")) config.navigation_speed_through_water = doc["nav_stw"].as<String>();
-    if (doc.containsKey("nav_cog")) config.navigation_course_over_ground_true = doc["nav_cog"].as<String>();
-    if (doc.containsKey("nav_xte")) config.navigation_course_rhumbline_cross_track_error = doc["nav_xte"].as<String>();
-    if (doc.containsKey("nav_brg")) config.navigation_course_rhumbline_bearing_track_true = doc["nav_brg"].as<String>();
-    if (doc.containsKey("nav_dist")) config.navigation_course_rhumbline_next_point_distance = doc["nav_dist"].as<String>();
-    if (doc.containsKey("nav_vmg")) config.navigation_course_rhumbline_next_point_velocity_made_good = doc["nav_vmg"].as<String>();
-    if (doc.containsKey("nav_state")) config.navigation_state = doc["nav_state"].as<String>();
-    if (doc.containsKey("nav_roll")) config.navigation_attitude_roll = doc["nav_roll"].as<String>();
-    if (doc.containsKey("nav_pitch")) config.navigation_attitude_pitch = doc["nav_pitch"].as<String>();
+    if (!doc["nav_rot"].isNull()) config.navigation_rate_of_turn = doc["nav_rot"].as<String>();
+    if (!doc["nav_hdg"].isNull()) config.navigation_heading_magnetic = doc["nav_hdg"].as<String>();
+    if (!doc["nav_pos"].isNull()) config.navigation_position = doc["nav_pos"].as<String>();
+    if (!doc["nav_sog"].isNull()) config.navigation_speed_over_ground = doc["nav_sog"].as<String>();
+    if (!doc["nav_stw"].isNull()) config.navigation_speed_through_water = doc["nav_stw"].as<String>();
+    if (!doc["nav_cog"].isNull()) config.navigation_course_over_ground_true = doc["nav_cog"].as<String>();
+    if (!doc["nav_xte"].isNull()) config.navigation_course_rhumbline_cross_track_error = doc["nav_xte"].as<String>();
+    if (!doc["nav_brg"].isNull()) config.navigation_course_rhumbline_bearing_track_true = doc["nav_brg"].as<String>();
+    if (!doc["nav_dist"].isNull()) config.navigation_course_rhumbline_next_point_distance = doc["nav_dist"].as<String>();
+    if (!doc["nav_vmg"].isNull()) config.navigation_course_rhumbline_next_point_velocity_made_good = doc["nav_vmg"].as<String>();
+    if (!doc["nav_state"].isNull()) config.navigation_state = doc["nav_state"].as<String>();
+    if (!doc["nav_roll"].isNull()) config.navigation_attitude_roll = doc["nav_roll"].as<String>();
+    if (!doc["nav_pitch"].isNull()) config.navigation_attitude_pitch = doc["nav_pitch"].as<String>();
 
-    if (doc.containsKey("env_waa")) config.environment_wind_angle_apparent = doc["env_waa"].as<String>();
-    if (doc.containsKey("env_watg")) config.environment_wind_angle_true_ground = doc["env_watg"].as<String>();
-    if (doc.containsKey("env_watw")) config.environment_wind_angle_true_water = doc["env_watw"].as<String>();
-    if (doc.containsKey("env_wsa")) config.environment_wind_speed_apparent = doc["env_wsa"].as<String>();
-    if (doc.containsKey("env_wsog")) config.environment_wind_speed_over_ground = doc["env_wsog"].as<String>();
-    if (doc.containsKey("env_wst")) config.environment_wind_speed_true = doc["env_wst"].as<String>();
-    if (doc.containsKey("env_dbk")) config.environment_depth_below_keel = doc["env_dbk"].as<String>();
-    if (doc.containsKey("env_dbt")) config.environment_depth_below_transducer = doc["env_dbt"].as<String>();
-    if (doc.containsKey("env_dbs")) config.environment_depth_below_surface = doc["env_dbs"].as<String>();
-    if (doc.containsKey("env_press")) config.environment_outside_pressure = doc["env_press"].as<String>();
-    if (doc.containsKey("env_humid")) config.environment_outside_humidity = doc["env_humid"].as<String>();
-    if (doc.containsKey("env_temp")) config.environment_outside_temperature = doc["env_temp"].as<String>();
-    if (doc.containsKey("env_illum")) config.environment_outside_illuminance = doc["env_illum"].as<String>();
+    if (!doc["env_waa"].isNull()) config.environment_wind_angle_apparent = doc["env_waa"].as<String>();
+    if (!doc["env_watg"].isNull()) config.environment_wind_angle_true_ground = doc["env_watg"].as<String>();
+    if (!doc["env_watw"].isNull()) config.environment_wind_angle_true_water = doc["env_watw"].as<String>();
+    if (!doc["env_wsa"].isNull()) config.environment_wind_speed_apparent = doc["env_wsa"].as<String>();
+    if (!doc["env_wsog"].isNull()) config.environment_wind_speed_over_ground = doc["env_wsog"].as<String>();
+    if (!doc["env_wst"].isNull()) config.environment_wind_speed_true = doc["env_wst"].as<String>();
+    if (!doc["env_dbk"].isNull()) config.environment_depth_below_keel = doc["env_dbk"].as<String>();
+    if (!doc["env_dbt"].isNull()) config.environment_depth_below_transducer = doc["env_dbt"].as<String>();
+    if (!doc["env_dbs"].isNull()) config.environment_depth_below_surface = doc["env_dbs"].as<String>();
+    if (!doc["env_press"].isNull()) config.environment_outside_pressure = doc["env_press"].as<String>();
+    if (!doc["env_humid"].isNull()) config.environment_outside_humidity = doc["env_humid"].as<String>();
+    if (!doc["env_temp"].isNull()) config.environment_outside_temperature = doc["env_temp"].as<String>();
+    if (!doc["env_illum"].isNull()) config.environment_outside_illuminance = doc["env_illum"].as<String>();
 
-    if (doc.containsKey("steer_rudder")) config.steering_rudder_angle = doc["steer_rudder"].as<String>();
+    if (!doc["steer_rudder"].isNull()) config.steering_rudder_angle = doc["steer_rudder"].as<String>();
 
-    if (doc.containsKey("vessel_beam")) config.vessel_design_beam_api = doc["vessel_beam"].as<String>();
-    if (doc.containsKey("vessel_air")) config.vessel_design_air_height_api = doc["vessel_air"].as<String>();
-    if (doc.containsKey("vessel_draft")) config.vessel_design_draft_api = doc["vessel_draft"].as<String>();
-    if (doc.containsKey("vessel_len")) config.vessel_design_length_api = doc["vessel_len"].as<String>();
-    if (doc.containsKey("vessel_name")) config.vessel_name_api = doc["vessel_name"].as<String>();
-    if (doc.containsKey("vessel_mmsi")) config.vessel_mmsi_api = doc["vessel_mmsi"].as<String>();
-    if (doc.containsKey("vessel_nav")) config.vessel_navigation_state_api = doc["vessel_nav"].as<String>();
+    if (!doc["vessel_beam"].isNull()) config.vessel_design_beam_api = doc["vessel_beam"].as<String>();
+    if (!doc["vessel_air"].isNull()) config.vessel_design_air_height_api = doc["vessel_air"].as<String>();
+    if (!doc["vessel_draft"].isNull()) config.vessel_design_draft_api = doc["vessel_draft"].as<String>();
+    if (!doc["vessel_len"].isNull()) config.vessel_design_length_api = doc["vessel_len"].as<String>();
+    if (!doc["vessel_name"].isNull()) config.vessel_name_api = doc["vessel_name"].as<String>();
+    if (!doc["vessel_mmsi"].isNull()) config.vessel_mmsi_api = doc["vessel_mmsi"].as<String>();
+    if (!doc["vessel_nav"].isNull()) config.vessel_navigation_state_api = doc["vessel_nav"].as<String>();
 
     // Load engine paths (up to 8 engines)
     for (int i = 0; i < 8; i++) {
         String key = String("eng_path_") + i;
-        if (doc.containsKey(key)) {
+        if (!doc[key].isNull()) {
             config.engine_paths[i] = doc[key].as<String>();
         }
     }
@@ -1154,7 +1104,7 @@ void handle_save_config() {
     // Load tank paths (up to 8 tanks)
     for (int i = 0; i < 8; i++) {
         String key = String("tank_path_") + i;
-        if (doc.containsKey(key)) {
+        if (!doc[key].isNull()) {
             config.tank_paths[i] = doc[key].as<String>();
         }
     }
@@ -1176,7 +1126,7 @@ void handle_save_display_config() {
     }
     
     // Parse JSON
-    DynamicJsonDocument doc(2048);
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, body);
     
     if (error) {
@@ -1185,27 +1135,27 @@ void handle_save_display_config() {
     }
 
     // Load display configuration fields
-    if (doc.containsKey("dist_unit")) {
+    if (doc["dist_unit"].is<int>()) {
         config.distance_unit = (doc["dist_unit"].as<int>() == 0) ? DistanceUnit::Meters : DistanceUnit::Feet;
     }
-    if (doc.containsKey("temp_unit")) {
+    if (doc["temp_unit"].is<int>()) {
         config.temperature_unit = (doc["temp_unit"].as<int>() == 0) ? TemperatureUnit::Celsius : TemperatureUnit::Fahrenheit;
     }
-    if (doc.containsKey("num_engines")) {
+    if (doc["num_engines"].is<int>()) {
         config.num_engines = doc["num_engines"].as<int>();
         if (config.num_engines > 8) config.num_engines = 8;
         if (config.num_engines < 1) config.num_engines = 1;
     }
-    if (doc.containsKey("eng_oil_min")) config.engine_oil_pressure_min = doc["eng_oil_min"].as<float>();
-    if (doc.containsKey("eng_oil_max")) config.engine_oil_pressure_max = doc["eng_oil_max"].as<float>();
-    if (doc.containsKey("eng_temp_red")) config.engine_temp_redline = doc["eng_temp_red"].as<float>();
-    if (doc.containsKey("num_tanks")) {
+    if (doc["eng_oil_min"].is<float>()) config.engine_oil_pressure_min = doc["eng_oil_min"].as<float>();
+    if (doc["eng_oil_max"].is<float>()) config.engine_oil_pressure_max = doc["eng_oil_max"].as<float>();
+    if (doc["eng_temp_red"].is<float>()) config.engine_temp_redline = doc["eng_temp_red"].as<float>();
+    if (doc["num_tanks"].is<int>()) {
         config.num_tanks = doc["num_tanks"].as<int>();
         if (config.num_tanks > 8) config.num_tanks = 8;
         if (config.num_tanks < 1) config.num_tanks = 1;
     }
-    if (doc.containsKey("depth_chart_min")) config.depth_chart_duration = doc["depth_chart_min"].as<int>();
-    if (doc.containsKey("speed_chart_min")) config.speed_chart_duration = doc["speed_chart_min"].as<int>();
+    if (doc["depth_chart_min"].is<int>()) config.depth_chart_duration = doc["depth_chart_min"].as<int>();
+    if (doc["speed_chart_min"].is<int>()) config.speed_chart_duration = doc["speed_chart_min"].as<int>();
 
     // Save all to preferences
     save_all_config_to_preferences();
@@ -1214,7 +1164,7 @@ void handle_save_display_config() {
 }
 
 void handle_export_config() {
-    DynamicJsonDocument doc(8192);
+    JsonDocument doc;
     export_config_to_json(doc);
     String json;
     serializeJson(doc, json);
