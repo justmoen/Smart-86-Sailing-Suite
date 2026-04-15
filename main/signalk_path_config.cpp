@@ -730,6 +730,10 @@ void handle_show_signalk_config_page() {
             <div class='tree-item'>
                 <button type='button' class='tree-toggle expanded' onclick='toggleTree(this)'>Tanks</button>
                 <div class='tree-content expanded'>
+                    <div class='info-text'>
+                        Tank paths: tanks.{fluid}.{index}.currentLevel<br>
+                        Fluid keywords (lowercase): fuel, fresh_water/fresh, waste_water/grey_water/grey, black_water/black, lubrication/lube, live_well/livewell, gas
+                    </div>
 )";
     for (int i = 0; i < config.num_tanks; i++) {
         html += "<div class='form-group'>";
