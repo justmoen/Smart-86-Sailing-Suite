@@ -85,15 +85,14 @@ static void lv_speed_display(lv_updatable_screen_t *scr)
     lv_label_set_text_static(s_hdt_label, "HDT:                               --");
     
     // Create speed chart in bottom half
-    const auto& config = get_signalk_path_config();
+
     speed_chart = lv_chart_create(parent);
     lv_obj_set_size(speed_chart, 680, 200);
     lv_obj_align(speed_chart, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_chart_set_type(speed_chart, LV_CHART_TYPE_LINE);
-    // Calculate point count: for 30 minutes default=150 points; scale for configured duration
-    int speed_point_count = (config.speed_chart_duration * 150) / 30;
-    if (speed_point_count > 300) speed_point_count = 300;
-    if (speed_point_count < 50) speed_point_count = 50;
+    const auto& config = get_signalk_path_config();
+    // High-res point count: 30 pts per minute, max 600, min 50
+    int speed_point_count = std::min(600, std::max(50, config.speed_chart_duration * 30));
     lv_chart_set_point_count(speed_chart, speed_point_count);
     lv_chart_set_range(speed_chart, LV_CHART_AXIS_PRIMARY_Y, 0, 20);
     lv_chart_set_div_line_count(speed_chart, 5, 5);
@@ -170,8 +169,10 @@ void speed_process_deferred_chart_updates()
     if (!speed_history || !speed_chart) return;
     
     // Add pending point to chart
-    if (pending_chart_add_point) {
+    static uint32_t last_chart_add = 0;
+    if (pending_chart_add_point && (millis() - last_chart_add > 2000)) {
         pending_chart_add_point = false;
+        last_chart_add = millis();
         
         // Create series once on first data point
         if (speed_series == nullptr) {
@@ -191,9 +192,9 @@ void speed_process_deferred_chart_updates()
     if (pending_chart_range_update >= 50) {  // 50 * 20ms = ~1000ms
         pending_chart_range_update = 0;
         
-        ChartDataPoint points[150];
+        ChartDataPoint points[600];
         int point_count = 0;
-        speed_history->get_points(points, point_count, 150);
+        speed_history->get_points(points, point_count, 600);
         
         if (point_count > 1) {
             // Find max for scaling
