@@ -5,6 +5,8 @@
 #include "ui_depth.h"
 #include "ui_init.h"
 #include <TinyGPSPlus.h>
+#include "chart_data_history.h"
+#include "signalk_path_config.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -15,6 +17,14 @@ static lv_obj_t *dbk_label;
 static lv_obj_t *dbs_label;
 static lv_obj_t *depth_gradient_label;
 static lv_obj_t *d_heel_label;
+static lv_obj_t *depth_chart = nullptr;
+static lv_chart_series_t *depth_series = nullptr;
+static ChartDataHistory *depth_history = nullptr;
+
+// Deferred chart update tracking
+static float pending_depth_val = 0;
+static bool pending_chart_add_point = false;
+static int pending_chart_range_update = 0;
 
 /* -------------------------------------------------- */
 /* UI Creation                                        */
@@ -66,6 +76,32 @@ static void lv_depth_display(lv_updatable_screen_t *scr)
     lv_obj_set_style_text_font(d_heel_label, &lv_font_montserrat_30, LV_PART_MAIN);
 #endif
     lv_label_set_text_static(d_heel_label, "Heel:                 --");
+    
+    // Create depth chart in bottom half
+    const auto& config = get_signalk_path_config();
+    depth_chart = lv_chart_create(parent);
+    lv_obj_set_size(depth_chart, 680, 200);
+    lv_obj_align(depth_chart, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_chart_set_type(depth_chart, LV_CHART_TYPE_LINE);
+    // Calculate point count: for 10 minutes default=100 points; scale for configured duration
+    int depth_point_count = (config.depth_chart_duration * 100) / 10;
+    if (depth_point_count > 300) depth_point_count = 300;
+    if (depth_point_count < 50) depth_point_count = 50;
+    lv_chart_set_point_count(depth_chart, depth_point_count);
+    lv_chart_set_range(depth_chart, LV_CHART_AXIS_PRIMARY_Y, 0, 100);
+    lv_chart_set_div_line_count(depth_chart, 5, 5);
+    
+    // Allow gesture events to pass through to screen
+    lv_obj_clear_flag(depth_chart, LV_OBJ_FLAG_CLICKABLE);
+    
+    // Style the chart
+    lv_obj_set_style_text_font(depth_chart, &lv_font_montserrat_14, LV_PART_MAIN);
+    lv_obj_set_style_border_color(depth_chart, lv_color_hex(0xcccccc), LV_PART_MAIN);
+    
+    // Initialize history tracker with calculated point count
+    if (depth_history == nullptr) {
+        depth_history = new ChartDataHistory("depth", config.depth_chart_duration, depth_point_count);
+    }
 }
 
 /* -------------------------------------------------- */
@@ -74,44 +110,28 @@ static void lv_depth_display(lv_updatable_screen_t *scr)
 
 static void depth_update_cb(lv_updatable_screen_t *scr)
 {
-    lv_label_set_text(dbt_label,
-        #ifdef CONVERT_TO_FEET
-        (String("DBT (ft):          ")
-         += (fresh(shipDataModel.environment.depth.below_transducer.age)
-              ? String(shipDataModel.environment.depth.below_transducer.m * _GPS_FEET_PER_METER, 1)
-              : String("--"))).c_str()
-        #else
-        (String("DBT (m):          ")
-         += (fresh(shipDataModel.environment.depth.below_transducer.age)
-              ? String(shipDataModel.environment.depth.below_transducer.m, 1)
-              : String("--"))).c_str()
-        #endif
-    );
+    const auto& config = get_signalk_path_config();
+    
+    // Helper lambda to format depth values based on unit setting
+    auto format_depth = [&](const char* label_prefix, float depth_m, uint32_t age) -> String {
+        if (!fresh(age)) {
+            return String(label_prefix) + "--";
+        }
+        
+        String label(label_prefix);
+        if (config.distance_unit == DistanceUnit::Meters) {
+            label += String(depth_m, 1) + "m";
+        } else {
+            label += String(depth_m * _GPS_FEET_PER_METER, 1) + "ft";
+        }
+        return label;
+    };
 
-    lv_label_set_text(dbk_label,
-        #ifdef CONVERT_TO_FEET
-        (String("DBK (ft):          ")
-         += (fresh(shipDataModel.environment.depth.below_keel.age)
-              ? String(shipDataModel.environment.depth.below_keel.m * _GPS_FEET_PER_METER, 1)
-              : String("--"))).c_str());
-        #else
-        (String("DBK (m):          ")
-         += (fresh(shipDataModel.environment.depth.below_keel.age)
-              ? String(shipDataModel.environment.depth.below_keel.m, 1)
-              : String("--"))).c_str());
-        #endif
+    lv_label_set_text(dbt_label, format_depth("DBT: ", shipDataModel.environment.depth.below_transducer.m, shipDataModel.environment.depth.below_transducer.age).c_str());
 
-    lv_label_set_text(dbs_label,
-        #ifdef CONVERT_TO_FEET
-        (String("DBS (ft):          ")
-         += (fresh(shipDataModel.environment.depth.below_surface.age)
-              ? String(shipDataModel.environment.depth.below_surface.m * _GPS_FEET_PER_METER, 1)
-        #else
-        (String("DBS (m):          ")
-         += (fresh(shipDataModel.environment.depth.below_surface.age)
-              ? String(shipDataModel.environment.depth.below_surface.m, 1)
-              : String("--"))).c_str());
-        #endif
+    lv_label_set_text(dbk_label, format_depth("DBK: ", shipDataModel.environment.depth.below_keel.m, shipDataModel.environment.depth.below_keel.age).c_str());
+
+    lv_label_set_text(dbs_label, format_depth("DBS: ", shipDataModel.environment.depth.below_surface.m, shipDataModel.environment.depth.below_surface.age).c_str());
 
     lv_label_set_text(d_heel_label,
         (String("Heel:                 ")
@@ -124,6 +144,70 @@ static void depth_update_cb(lv_updatable_screen_t *scr)
          += (fresh(shipDataModel.environment.depth_gradient.age)
               ? String(shipDataModel.environment.depth_gradient.deg, 1) + LV_SYMBOL_DEGREES
               : String("--"))).c_str());
+    
+    // Queue chart update for deferred processing (outside display lock)
+    if (depth_history && fresh(shipDataModel.environment.depth.below_transducer.age)) {
+        float depth_val = shipDataModel.environment.depth.below_transducer.m;
+        if (config.distance_unit == DistanceUnit::Feet) {
+            depth_val *= _GPS_FEET_PER_METER;
+        }
+        pending_depth_val = depth_val;
+        pending_chart_add_point = true;
+        pending_chart_range_update++;
+    }
+}
+
+/* -------------------------------------------------- */
+/* Deferred Chart Updates (called outside display lock) */
+/* -------------------------------------------------- */
+
+void depth_process_deferred_chart_updates()
+{
+    if (!depth_history || !depth_chart) return;
+    
+    // Add pending point to chart
+    if (pending_chart_add_point) {
+        pending_chart_add_point = false;
+        
+        // Create series once on first data point
+        if (depth_series == nullptr) {
+            depth_series = lv_chart_add_series(depth_chart, lv_palette_main(LV_PALETTE_BLUE), LV_CHART_AXIS_PRIMARY_Y);
+        }
+        
+        // Record in history
+        depth_history->add_point(pending_depth_val);
+        
+        // Add point to chart if series exists
+        if (depth_series != nullptr) {
+            lv_chart_set_next_value(depth_chart, depth_series, (lv_coord_t)pending_depth_val);
+        }
+    }
+    
+    // Update range if needed (every ~1000ms based on counter)
+    if (pending_chart_range_update >= 50) {  // 50 * 20ms = ~1000ms
+        pending_chart_range_update = 0;
+        
+        ChartDataPoint points[100];
+        int point_count = 0;
+        depth_history->get_points(points, point_count, 100);
+        
+        if (point_count > 1) {
+            // Find min/max for scaling
+            float min_depth = 1000, max_depth = 0;
+            for (int i = 0; i < point_count; i++) {
+                if (points[i].value < min_depth) min_depth = points[i].value;
+                if (points[i].value > max_depth) max_depth = points[i].value;
+            }
+            
+            // Add margin
+            float range = max_depth - min_depth;
+            if (range < 5) range = 5;
+            min_depth -= range * 0.1f;
+            max_depth += range * 0.1f;
+            
+            lv_chart_set_range(depth_chart, LV_CHART_AXIS_PRIMARY_Y, (int)min_depth, (int)max_depth);
+        }
+    }
 }
 
 /* -------------------------------------------------- */

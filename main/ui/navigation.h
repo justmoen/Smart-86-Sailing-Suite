@@ -17,6 +17,7 @@ void navigation_prev_page(void);
 void save_brightness(int value);
 void save_last_screen(int index);
 int load_last_screen();
+void navigation_process_deferred_brightness(void);
 
 #ifdef __cplusplus
 }

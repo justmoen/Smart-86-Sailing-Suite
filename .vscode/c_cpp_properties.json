@@ -98,7 +98,8 @@
                 "${workspaceFolder}/managed_components/lvgl__lvgl/src",
                 "${workspaceFolder}/managed_components/lvgl__lvgl/src/hal",
                 "${workspaceFolder}/components/arduino/libraries/Network/src",
-                "${workspaceFolder}/components/TinyGPSPlus"
+                "${workspaceFolder}/components/TinyGPSPlus",
+                "/Users/justin.moen/.espressif/v5.5.3/esp-idf/components/http_parser"
             ],
             "defines": [
                 "ESP_PLATFORM",

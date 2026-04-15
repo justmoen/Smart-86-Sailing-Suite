@@ -27,6 +27,7 @@ static lv_timer_t *brightness_timer;
 
 static int last_y = -1;
 static bool brightness_active = false;
+static int pending_brightness = -1;  // -1 means no pending change
 
 
 /* ---------------- NVS ---------------- */
@@ -180,7 +181,8 @@ void gesture_event_cb(lv_event_t *e)
 
             brightness = LV_CLAMP(0, brightness, 100);
 
-            bsp_display_brightness_set(brightness);
+            // Defer brightness change to main loop
+            pending_brightness = brightness;
 
             lv_bar_set_value(brightness_bar, brightness, LV_ANIM_OFF);
 
@@ -222,6 +224,15 @@ void default_settings()
 {
     brightness = load_brightness();
     bsp_display_brightness_set(brightness);
+}
+
+// Process deferred brightness changes (call from main loop outside display lock)
+void navigation_process_deferred_brightness()
+{
+    if (pending_brightness >= 0) {
+        bsp_display_brightness_set(pending_brightness);
+        pending_brightness = -1;
+    }
 }
 
 #ifdef __cplusplus

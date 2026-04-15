@@ -27,7 +27,7 @@ static void lv_reboot_display(lv_updatable_screen_t *scr) {
     lv_obj_set_style_text_font(label1, &lv_font_montserrat_32, LV_PART_MAIN);
     lv_label_set_text_static(label1, "Reboot");
     lv_obj_center(label1);
-    lv_obj_add_event_cb(btn1, btnReboot_event, LV_EVENT_PRESSED, NULL);
+    lv_obj_add_event_cb(btn1, btnReboot_event, LV_EVENT_LONG_PRESSED, NULL);
 
     lv_obj_t *btn2 = lv_btn_create(parent);
     lv_obj_t *label2 = lv_label_create(btn2);
@@ -56,5 +56,7 @@ void init_rebootScreen() {
 lv_updatable_screen_t rebootScreen = {
     .screen = nullptr,
     .created = false,
-    .create_cb = lv_reboot_display
+    .create_cb = lv_reboot_display,
+    .update_cb = nullptr,
+    .user_data = nullptr
 };

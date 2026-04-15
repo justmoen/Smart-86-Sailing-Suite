@@ -51,12 +51,23 @@ WMM_Tinier myDeclination;
 #include "ui_manager.h"
 #include "ui_settings_wifi.h"
 #include "ui/ui_settings.h"
+#include "screens/ui_depth.h"
+#include "screens/ui_speed.h"
 #include "net_signalk_http.h"
+#include "signalk_path_config.h"
 
 extern "C" void app_main()
 {
     initArduino();  // initialize Arduino core
-    ESP_ERROR_CHECK(nvs_flash_init());
+    
+    // Initialize NVS with error recovery
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+      ESP_LOGI("NVS", "NVS partition was truncated and needs to be erased. Erasing now...");
+      ESP_ERROR_CHECK(nvs_flash_erase());
+      ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
 
     bsp_display_cfg_t cfg = {
         .lvgl_port_cfg = ESP_LVGL_PORT_INIT_CONFIG(),
@@ -73,9 +84,10 @@ extern "C" void app_main()
     bsp_display_backlight_on();
 
     settingUpWiFi([]() {
-        bsp_display_lock(0);
+        load_signalk_path_config();
+        signalk_path_config_web_begin();
+
         ui_manager_init();
-        bsp_display_unlock();
 
         vTaskDelay(pdMS_TO_TICKS(2000));
         app.onRepeat(2000, []() {
@@ -85,8 +97,10 @@ extern "C" void app_main()
                 bool found = discover_n_config();
 
                 if (found) {
-                    String host = preferences.getString(SK_TCP_HOST_PREF);
-                    int port = preferences.getInt(SK_TCP_PORT_PREF);
+                    preferences.begin("signalk", true);  // Open in read-only mode
+                    String host = preferences.getString(SK_TCP_HOST_PREF, "");
+                    int port = preferences.getInt(SK_TCP_PORT_PREF, 3000);
+                    preferences.end();
 
                     ESP_LOGI("WS", "Starting WS after discovery: %s:%d",
                             host.c_str(), port);
@@ -108,11 +122,19 @@ extern "C" void app_main()
         while(true) {
             app.tick();
             signalk_ws_loop();
+            signalk_path_config_web_loop();
+
+            // Process deferred operations OUTSIDE display lock
+            navigation_process_deferred_brightness();
+            ui_manager_process_deferred_screen_creation();  // Create screens first
+            ui_manager_process_deferred_screen_load();      // Then load them
+            depth_process_deferred_chart_updates();          // Update depth chart
+            speed_process_deferred_chart_updates();          // Update speed chart
 
             bsp_display_lock(0);
             ui_manager_update();
             bsp_display_unlock();
-            vTaskDelay(pdMS_TO_TICKS(50));
+            vTaskDelay(pdMS_TO_TICKS(20));  // Reduced from 50ms for snappier swipe response
 
             // if (!settingMode) {
                 // if (last_touched > 0 && millis() - last_touched > GO_SLEEP_TIMEOUT) {

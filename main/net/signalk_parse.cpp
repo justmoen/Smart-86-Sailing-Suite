@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include <TinyGPSPlus.h>
 #include <ship_data_util.h>
+#include "signalk_path_config.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,169 +36,150 @@ extern "C" {
     }
     JsonObject obj = doc.as<JsonObject>();
     if (obj != NULL) {
+      const auto& config = get_signalk_path_config();
       auto update_value = [&](String& path, size_t& u_idx, size_t& v_idx, JsonVariant& value) {
         const char* p = path.c_str();
-        if (starts_with(p, "navigation.")) {
-          const char* t = step_into_token(p);
-          if (strcmp(t, "rateOfTurn") == 0) {
-            if (value.is<float>()) {
-              shipDataModel.navigation.rate_of_turn.deg_min = 60 * value.as<float>() * 180 / PI;
-              shipDataModel.navigation.rate_of_turn.age = millis();
-            }
-          } else if (strcmp(t, "headingMagnetic") == 0) {
-            if (value.is<float>()) {
-              shipDataModel.navigation.heading_mag.deg = value.as<float>() * 180.0 / PI;
-              shipDataModel.navigation.heading_mag.age = millis();
-            }
-          } else if (strcmp(t, "position") == 0) {
-            if (value.containsKey("longitude") && value.containsKey("latitude")) {
-              if (value["longitude"].is<float>() && value["latitude"].is<float>()) {
-                shipDataModel.navigation.position.lat.deg = value["latitude"].as<float>();  // SignalK sends degrees for it
-                shipDataModel.navigation.position.lat.age = millis();
-                shipDataModel.navigation.position.lon.deg = value["longitude"].as<float>();  // SignalK sends degrees for it
-                shipDataModel.navigation.position.lon.age = millis();
-              }
-            }
-          } else if (strcmp(t, "speedOverGround") == 0) {
-            if (value.is<float>()) {
-              shipDataModel.navigation.speed_over_ground.kn = value.as<float>() / _GPS_MPS_PER_KNOT;
-              shipDataModel.navigation.speed_over_ground.age = millis();
-            }
-          } else if (strcmp(t, "speedThroughWater") == 0) {
-            if (value.is<float>()) {
-              shipDataModel.navigation.speed_through_water.kn = value.as<float>() / _GPS_MPS_PER_KNOT;
-              shipDataModel.navigation.speed_through_water.age = millis();
-            }
-          } else if (strcmp(t, "courseOverGroundTrue") == 0) {
-            if (value.is<float>()) {
-              shipDataModel.navigation.course_over_ground_true.deg = value.as<float>() * 180.0 / PI;
-              shipDataModel.navigation.course_over_ground_true.age = millis();
-            }
-          } else if (strcmp(t, "courseRhumbline.crossTrackError") == 0) {
-            if (value.is<float>()) {
-              shipDataModel.navigation.course_rhumbline.cross_track_error.m = value.as<float>();
-              shipDataModel.navigation.course_rhumbline.cross_track_error.age = millis();
-            }
-          } else if (strcmp(t, "courseRhumbline.bearingTrackTrue") == 0) {
-            if (value.is<float>()) {
-              shipDataModel.navigation.course_rhumbline.bearing_track_true.deg = value.as<float>() * 180.0 / PI;
-              shipDataModel.navigation.course_rhumbline.bearing_track_true.age = millis();
-            }
-          } else if (strcmp(t, "courseRhumbline.nextPoint.distance") == 0) {
-            if (value.is<float>()) {
-              shipDataModel.navigation.course_rhumbline.next_point.distance.m = value.as<float>();
-              shipDataModel.navigation.course_rhumbline.next_point.distance.age = millis();
-            }
-          } else if (strcmp(t, "courseRhumbline.nextPoint.velocityMadeGood") == 0) {
-            if (value.is<float>()) {
-              shipDataModel.navigation.course_rhumbline.next_point.velocity_made_good.kn = value.as<float>() / _GPS_MPS_PER_KNOT;
-              shipDataModel.navigation.course_rhumbline.next_point.velocity_made_good.age = millis();
-            }
-          } else if (strcmp(t, "state") == 0) {
-            if (value.is<String>()) {
-              String val = value.as<String>();
-              if (val != NULL) {
-                set_vessel_nav_state(val);
-              }
-            }
-          } else if (strcmp(t, "attitude.roll") == 0) {
-              if (value.is<float>()) {
-                  shipDataModel.navigation.attitude.heel.deg =
-                      value.as<float>() * 180.0 / PI;
-                  shipDataModel.navigation.attitude.heel.age = millis();
-              }
+        if (path == config.navigation_rate_of_turn) {
+          if (value.is<float>()) {
+            shipDataModel.navigation.rate_of_turn.deg_min = 60 * value.as<float>() * 180 / PI;
+            shipDataModel.navigation.rate_of_turn.age = millis();
           }
-          else if (strcmp(t, "attitude.pitch") == 0) {
-              if (value.is<float>()) {
-                  shipDataModel.navigation.attitude.pitch.deg =
-                      value.as<float>() * 180.0 / PI;
-                  shipDataModel.navigation.attitude.pitch.age = millis();
-              }
+        } else if (path == config.navigation_heading_magnetic) {
+          if (value.is<float>()) {
+            shipDataModel.navigation.heading_mag.deg = value.as<float>() * 180.0 / PI;
+            shipDataModel.navigation.heading_mag.age = millis();
           }
-        } else if (starts_with(p, "environment.")) {
-          const char* t = step_into_token(p);
-          if (starts_with(t, "wind.")) {
-            const char* w = step_into_token(t);
-            if (strcmp(w, "angleApparent") == 0) {
-              if (value.is<float>()) {
-                shipDataModel.environment.wind.apparent_wind_angle.deg = value.as<float>() * 180.0 / PI;
-                shipDataModel.environment.wind.apparent_wind_angle.age = millis();
-              }
-            } else if (strcmp(w, "angleTrueGround") == 0) {
-              if (value.is<float>()) {
-                shipDataModel.environment.wind.ground_wind_angle.deg = value.as<float>() * 180.0 / PI;
-                shipDataModel.environment.wind.ground_wind_angle.age = millis();
-              }
-            } else if (strcmp(w, "angleTrueWater") == 0) {
-              if (value.is<float>()) {
-                shipDataModel.environment.wind.true_wind_angle.deg = value.as<float>() * 180.0 / PI;
-                shipDataModel.environment.wind.true_wind_angle.age = millis();
-              }
-            } else if (strcmp(w, "speedApparent") == 0) {
-              if (value.is<float>()) {
-                shipDataModel.environment.wind.apparent_wind_speed.kn = value.as<float>() / _GPS_MPS_PER_KNOT;
-                shipDataModel.environment.wind.apparent_wind_speed.age = millis();
-              }
-            } else if (strcmp(w, "speedOverGround") == 0) {
-              if (value.is<float>()) {
-                shipDataModel.environment.wind.ground_wind_speed.kn = value.as<float>() / _GPS_MPS_PER_KNOT;
-                shipDataModel.environment.wind.ground_wind_speed.age = millis();
-              }
-            } else if (strcmp(w, "speedTrue") == 0) {
-              if (value.is<float>()) {
-                shipDataModel.environment.wind.true_wind_speed.kn = value.as<float>() / _GPS_MPS_PER_KNOT;
-                shipDataModel.environment.wind.true_wind_speed.age = millis();
-              }
+        } else if (path == config.navigation_position) {
+          if (value.containsKey("longitude") && value.containsKey("latitude")) {
+            if (value["longitude"].is<float>() && value["latitude"].is<float>()) {
+              shipDataModel.navigation.position.lat.deg = value["latitude"].as<float>();
+              shipDataModel.navigation.position.lat.age = millis();
+              shipDataModel.navigation.position.lon.deg = value["longitude"].as<float>();
+              shipDataModel.navigation.position.lon.age = millis();
             }
-          } else if (starts_with(t, "depth.")) {
-            const char* d = step_into_token(t);
-            if (strcmp(d, "belowKeel") == 0) {
-              if (value.is<float>()) {
-                shipDataModel.environment.depth.below_keel.m = value.as<float>();
-                shipDataModel.environment.depth.below_keel.age = millis();
-              }
-            } else if (strcmp(d, "belowTransducer") == 0) {
-              if (value.is<float>()) {
-                shipDataModel.environment.depth.below_transducer.m = value.as<float>();
-                shipDataModel.environment.depth.below_transducer.age = millis();
-              }
-            } else if (strcmp(d, "belowSurface") == 0) {
-              if (value.is<float>()) {
-                shipDataModel.environment.depth.below_surface.m = value.as<float>();
-                shipDataModel.environment.depth.below_surface.age = millis();
-              }
+          }
+        } else if (path == config.navigation_speed_over_ground) {
+          if (value.is<float>()) {
+            shipDataModel.navigation.speed_over_ground.kn = value.as<float>() / _GPS_MPS_PER_KNOT;
+            shipDataModel.navigation.speed_over_ground.age = millis();
+          }
+        } else if (path == config.navigation_speed_through_water) {
+          if (value.is<float>()) {
+            shipDataModel.navigation.speed_through_water.kn = value.as<float>() / _GPS_MPS_PER_KNOT;
+            shipDataModel.navigation.speed_through_water.age = millis();
+          }
+        } else if (path == config.navigation_course_over_ground_true) {
+          if (value.is<float>()) {
+            shipDataModel.navigation.course_over_ground_true.deg = value.as<float>() * 180.0 / PI;
+            shipDataModel.navigation.course_over_ground_true.age = millis();
+          }
+        } else if (path == config.navigation_course_rhumbline_cross_track_error) {
+          if (value.is<float>()) {
+            shipDataModel.navigation.course_rhumbline.cross_track_error.m = value.as<float>();
+            shipDataModel.navigation.course_rhumbline.cross_track_error.age = millis();
+          }
+        } else if (path == config.navigation_course_rhumbline_bearing_track_true) {
+          if (value.is<float>()) {
+            shipDataModel.navigation.course_rhumbline.bearing_track_true.deg = value.as<float>() * 180.0 / PI;
+            shipDataModel.navigation.course_rhumbline.bearing_track_true.age = millis();
+          }
+        } else if (path == config.navigation_course_rhumbline_next_point_distance) {
+          if (value.is<float>()) {
+            shipDataModel.navigation.course_rhumbline.next_point.distance.m = value.as<float>();
+            shipDataModel.navigation.course_rhumbline.next_point.distance.age = millis();
+          }
+        } else if (path == config.navigation_course_rhumbline_next_point_velocity_made_good) {
+          if (value.is<float>()) {
+            shipDataModel.navigation.course_rhumbline.next_point.velocity_made_good.kn =
+                value.as<float>() / _GPS_MPS_PER_KNOT;
+            shipDataModel.navigation.course_rhumbline.next_point.velocity_made_good.age = millis();
+          }
+        } else if (path == config.navigation_state) {
+          if (value.is<String>()) {
+            String val = value.as<String>();
+            if (val != NULL) {
+              set_vessel_nav_state(val);
             }
-          } else if (starts_with(t, "outside.")) {
-            const char* o = step_into_token(t);
-            if (strcmp(o, "pressure") == 0) {
-              if (value.is<float>()) {
-                shipDataModel.environment.air_outside.pressure.hPa = value.as<float>() / 100.0;
-                shipDataModel.environment.air_outside.pressure.age = millis();
-              }
-            } else if (strcmp(o, "humidity") == 0) {
-              if (value.is<float>()) {
-                shipDataModel.environment.air_outside.humidity_pct.pct = value.as<float>() * 100.0;
-                shipDataModel.environment.air_outside.humidity_pct.age = millis();
-              }
-            } else if (strcmp(o, "temperature") == 0) {
-              if (value.is<float>()) {
-                shipDataModel.environment.air_outside.temp_deg_C.deg_C = value.as<float>() - 273.15;
-                shipDataModel.environment.air_outside.temp_deg_C.age = millis();
-              }
-            } else if (strcmp(o, "illuminance") == 0) {
-              if (value.is<float>()) {
-                shipDataModel.environment.air_outside.illuminance.lux = value.as<float>();
-                shipDataModel.environment.air_outside.illuminance.age = millis();
-              }
-            }
-          }  
-        } else if (starts_with(p, "steering.")) {
-          const char* t = step_into_token(p);
-          if (strcmp(t, "rudderAngle") == 0) {
-            if (value.is<float>()) {
-              shipDataModel.steering.rudder_angle.deg = value.as<float>() * 180.0 / PI;
-              shipDataModel.steering.rudder_angle.age = millis();
-            }
+          }
+        } else if (path == config.navigation_attitude_roll) {
+          if (value.is<float>()) {
+            shipDataModel.navigation.attitude.heel.deg = value.as<float>() * 180.0 / PI;
+            shipDataModel.navigation.attitude.heel.age = millis();
+          }
+        } else if (path == config.navigation_attitude_pitch) {
+          if (value.is<float>()) {
+            shipDataModel.navigation.attitude.pitch.deg = value.as<float>() * 180.0 / PI;
+            shipDataModel.navigation.attitude.pitch.age = millis();
+          }
+        } else if (path == config.environment_wind_angle_apparent) {
+          if (value.is<float>()) {
+            shipDataModel.environment.wind.apparent_wind_angle.deg = value.as<float>() * 180.0 / PI;
+            shipDataModel.environment.wind.apparent_wind_angle.age = millis();
+          }
+        } else if (path == config.environment_wind_angle_true_ground) {
+          if (value.is<float>()) {
+            shipDataModel.environment.wind.ground_wind_angle.deg = value.as<float>() * 180.0 / PI;
+            shipDataModel.environment.wind.ground_wind_angle.age = millis();
+          }
+        } else if (path == config.environment_wind_angle_true_water) {
+          if (value.is<float>()) {
+            shipDataModel.environment.wind.true_wind_angle.deg = value.as<float>() * 180.0 / PI;
+            shipDataModel.environment.wind.true_wind_angle.age = millis();
+          }
+        } else if (path == config.environment_wind_speed_apparent) {
+          if (value.is<float>()) {
+            shipDataModel.environment.wind.apparent_wind_speed.kn = value.as<float>() / _GPS_MPS_PER_KNOT;
+            shipDataModel.environment.wind.apparent_wind_speed.age = millis();
+          }
+        } else if (path == config.environment_wind_speed_over_ground) {
+          if (value.is<float>()) {
+            shipDataModel.environment.wind.ground_wind_speed.kn = value.as<float>() / _GPS_MPS_PER_KNOT;
+            shipDataModel.environment.wind.ground_wind_speed.age = millis();
+          }
+        } else if (path == config.environment_wind_speed_true) {
+          if (value.is<float>()) {
+            shipDataModel.environment.wind.true_wind_speed.kn = value.as<float>() / _GPS_MPS_PER_KNOT;
+            shipDataModel.environment.wind.true_wind_speed.age = millis();
+          }
+        } else if (path == config.environment_depth_below_keel) {
+          if (value.is<float>()) {
+            shipDataModel.environment.depth.below_keel.m = value.as<float>();
+            shipDataModel.environment.depth.below_keel.age = millis();
+          }
+        } else if (path == config.environment_depth_below_transducer) {
+          if (value.is<float>()) {
+            shipDataModel.environment.depth.below_transducer.m = value.as<float>();
+            shipDataModel.environment.depth.below_transducer.age = millis();
+          }
+        } else if (path == config.environment_depth_below_surface) {
+          if (value.is<float>()) {
+            shipDataModel.environment.depth.below_surface.m = value.as<float>();
+            shipDataModel.environment.depth.below_surface.age = millis();
+          }
+        } else if (path == config.environment_outside_pressure) {
+          if (value.is<float>()) {
+            shipDataModel.environment.air_outside.pressure.hPa = value.as<float>() / 100.0;
+            shipDataModel.environment.air_outside.pressure.age = millis();
+          }
+        } else if (path == config.environment_outside_humidity) {
+          if (value.is<float>()) {
+            shipDataModel.environment.air_outside.humidity_pct.pct = value.as<float>() * 100.0;
+            shipDataModel.environment.air_outside.humidity_pct.age = millis();
+          }
+        } else if (path == config.environment_outside_temperature) {
+          if (value.is<float>()) {
+            shipDataModel.environment.air_outside.temp_deg_C.deg_C = value.as<float>() - 273.15;
+            shipDataModel.environment.air_outside.temp_deg_C.age = millis();
+          }
+        } else if (path == config.environment_outside_illuminance) {
+          if (value.is<float>()) {
+            shipDataModel.environment.air_outside.illuminance.lux = value.as<float>();
+            shipDataModel.environment.air_outside.illuminance.age = millis();
+          }
+        } else if (path == config.steering_rudder_angle) {
+          if (value.is<float>()) {
+            shipDataModel.steering.rudder_angle.deg = value.as<float>() * 180.0 / PI;
+            shipDataModel.steering.rudder_angle.age = millis();
           }
         } else if (starts_with(p, "propulsion.")) {
           String engineID = path.substring(11);
