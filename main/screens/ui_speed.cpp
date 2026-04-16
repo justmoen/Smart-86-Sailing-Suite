@@ -21,12 +21,21 @@ static lv_obj_t *s_hdt_label;
 static lv_obj_t *speed_chart = nullptr;
 
 static lv_chart_series_t *speed_series = nullptr;
-static ChartDataHistory *speed_history = nullptr;
+ChartDataHistory *speed_history = nullptr;
 
 // Deferred chart update tracking
 static float pending_speed_val = 0;
 static bool pending_chart_add_point = false;
 static int pending_chart_range_update = 0;
+
+void speed_queue_chart_data(void)
+{
+    if (speed_history && fresh(shipDataModel.navigation.speed_over_ground.age)) {
+        pending_speed_val = shipDataModel.navigation.speed_over_ground.kn;
+        pending_chart_add_point = true;
+        pending_chart_range_update++;
+    }
+}
 
 /* -------------------------------------------------- */
 /* UI Creation                                        */
@@ -39,53 +48,39 @@ static void lv_speed_display(lv_updatable_screen_t *scr)
     header_label = lv_label_create(parent);
     lv_obj_align(header_label, LV_ALIGN_TOP_MID, 0, 20);
     lv_label_set_recolor(header_label, true);
-#if LV_FONT_MONTSERRAT_32
     lv_obj_set_style_text_font(header_label, &lv_font_montserrat_32, LV_PART_MAIN);
-#endif
     lv_label_set_text_static(header_label, "#ffffff Speed #");
 
 
     sog_label = lv_label_create(parent);
-lv_obj_align(sog_label, LV_ALIGN_TOP_LEFT, 10, 80);
-#if LV_FONT_MONTSERRAT_32
+    lv_obj_align(sog_label, LV_ALIGN_TOP_LEFT, 10, 80);
     lv_obj_set_style_text_font(sog_label, &lv_font_montserrat_32, 0);
-#endif
     lv_label_set_text_static(sog_label, "SOG (kt):                       --");
 
 
     sog_avg_label = lv_label_create(parent);
-lv_obj_align(sog_avg_label, LV_ALIGN_TOP_LEFT, 10, 120);
-#if LV_FONT_MONTSERRAT_32
+    lv_obj_align(sog_avg_label, LV_ALIGN_TOP_LEFT, 10, 120);
     lv_obj_set_style_text_font(sog_avg_label, &lv_font_montserrat_32, 0);
-#endif
     lv_label_set_text_static(sog_avg_label, "SOG AVG (kt):             --");
 
     spd_label = lv_label_create(parent);
-lv_obj_align(spd_label, LV_ALIGN_TOP_LEFT, 10, 160);
-#if LV_FONT_MONTSERRAT_32
+    lv_obj_align(spd_label, LV_ALIGN_TOP_LEFT, 10, 160);
     lv_obj_set_style_text_font(spd_label, &lv_font_montserrat_32, 0);
-#endif
     lv_label_set_text_static(spd_label, "SPD (kt):                       --");
 
     leeway_label = lv_label_create(parent);
-lv_obj_align(leeway_label, LV_ALIGN_TOP_LEFT, 10, 200);
-#if LV_FONT_MONTSERRAT_32
+    lv_obj_align(leeway_label, LV_ALIGN_TOP_LEFT, 10, 200);
     lv_obj_set_style_text_font(leeway_label, &lv_font_montserrat_32, 0);
-#endif
     lv_label_set_text_static(leeway_label, "Leeway (est):              --");
 
     s_cogt_label = lv_label_create(parent);
-lv_obj_align(s_cogt_label, LV_ALIGN_TOP_LEFT, 10, 240);
-#if LV_FONT_MONTSERRAT_32
-lv_obj_set_style_text_font(s_cogt_label, &lv_font_montserrat_32, 0);
-#endif
+    lv_obj_align(s_cogt_label, LV_ALIGN_TOP_LEFT, 10, 240);
+    lv_obj_set_style_text_font(s_cogt_label, &lv_font_montserrat_32, 0);
     lv_label_set_text_static(s_cogt_label, "COGT:                            --");
 
     s_hdt_label = lv_label_create(parent);
-lv_obj_align(s_hdt_label, LV_ALIGN_TOP_LEFT, 10, 280);
-#if LV_FONT_MONTSERRAT_32
-lv_obj_set_style_text_font(s_hdt_label, &lv_font_montserrat_32, 0);
-#endif
+    lv_obj_align(s_hdt_label, LV_ALIGN_TOP_LEFT, 10, 280);
+    lv_obj_set_style_text_font(s_hdt_label, &lv_font_montserrat_32, 0);
     lv_label_set_text_static(s_hdt_label, "HDT:                               --");
     
     // Create speed chart in bottom half
@@ -169,12 +164,7 @@ static void speed_update_cb(lv_updatable_screen_t *scr)
               ? String(shipDataModel.navigation.heading_true.deg, 1) + LV_SYMBOL_DEGREES
               : String("--"))).c_str());
     
-    // Queue chart update for deferred processing (outside display lock)
-    if (speed_history && fresh(shipDataModel.navigation.speed_over_ground.age)) {
-        pending_speed_val = shipDataModel.navigation.speed_over_ground.kn;
-        pending_chart_add_point = true;
-        pending_chart_range_update++;
-    }
+
 }
 
 /* -------------------------------------------------- */
