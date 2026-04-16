@@ -8,7 +8,7 @@ The goal of this project is to create an alternative to the more expensive optio
 
 When the project matures, I expect to have some numbered releases available.  If you would like to contribute, please reach out.  I welcome feedback, for example, if some sailors are interested in simplified, large font displays that can be read from the helm to above the companionway.
 
-If you like what I am doing, buy me a coffee so I can keep improving!
+If you like what I am doing, buy me a coffee so I can keep improving! buymeacoffee.com/justmoen
 
 External dependencies stored in components folder:
 WMM Tinier - https://github.com/DavidArmstrong/WMM_Tinier/tree/main/src
