@@ -12,17 +12,35 @@
 extern "C" {
 #endif
 
-static lv_obj_t *dbt_label;
-static lv_obj_t *dbk_label;
-static lv_obj_t *dbs_label;
+static lv_obj_t *header_label;
+static lv_obj_t *depth_value_label;
 static lv_obj_t *depth_gradient_label;
 static lv_obj_t *d_heel_label;
 static lv_obj_t *depth_chart = nullptr;
+
+struct BestDepth {
+    float m;
+    bool valid;
+};
+
+BestDepth get_best_depth() {
+    const ship_data_t& data = shipDataModel;
+    if (fresh(data.environment.depth.below_keel.age)) {
+        return {data.environment.depth.below_keel.m, true};
+    } else if (fresh(data.environment.depth.below_transducer.age)) {
+        return {data.environment.depth.below_transducer.m, true};
+    } else if (fresh(data.environment.depth.below_surface.age)) {
+        return {data.environment.depth.below_surface.m, true};
+    }
+    return {0.0f, false};
+}
+
 static lv_chart_series_t *depth_series = nullptr;
 static ChartDataHistory *depth_history = nullptr;
 
 // Deferred chart update tracking
 static float pending_depth_val = 0;
+
 static bool pending_chart_add_point = false;
 static int pending_chart_range_update = 0;
 
@@ -34,46 +52,35 @@ static void lv_depth_display(lv_updatable_screen_t *scr)
 {
     lv_obj_t *parent = scr->screen;
 
-    lv_obj_t *main_label = lv_label_create(parent);
-    lv_obj_align(main_label, LV_ALIGN_CENTER, 0, -105);
-    lv_label_set_recolor(main_label, true);
-#if LV_FONT_MONTSERRAT_30
-    lv_obj_set_style_text_font(main_label, &lv_font_montserrat_30, LV_PART_MAIN);
-#endif
-    lv_label_set_text_static(main_label, "DEPTH  #0080ff " LV_SYMBOL_DOWNLOAD " #");
+    header_label = lv_label_create(parent);
+    lv_obj_align(header_label, LV_ALIGN_TOP_MID, 0, 20);
 
-    dbt_label = lv_label_create(parent);
-    lv_obj_align(dbt_label, LV_ALIGN_TOP_LEFT, 10, 40);
-#if LV_FONT_MONTSERRAT_30
-    lv_obj_set_style_text_font(dbt_label, &lv_font_montserrat_30, LV_PART_MAIN);
+    lv_label_set_recolor(header_label, true);
+#if LV_FONT_MONTSERRAT_32
+    lv_obj_set_style_text_font(header_label, &lv_font_montserrat_32, LV_PART_MAIN);
 #endif
-    lv_label_set_text_static(dbt_label, "DBT (ft):          --");
+    lv_label_set_text_static(header_label, "#ffffff Depth #");  
 
-    dbk_label = lv_label_create(parent);
-    lv_obj_align(dbk_label, LV_ALIGN_TOP_LEFT, 10, 80);
-#if LV_FONT_MONTSERRAT_30
-    lv_obj_set_style_text_font(dbk_label, &lv_font_montserrat_30, LV_PART_MAIN);
+
+    depth_value_label = lv_label_create(parent);
+    lv_obj_align(depth_value_label, LV_ALIGN_TOP_LEFT, 10, 60);
+#if LV_FONT_MONTSERRAT_32
+    lv_obj_set_style_text_font(depth_value_label, &lv_font_montserrat_32, LV_PART_MAIN);
 #endif
-    lv_label_set_text_static(dbk_label, "DBK (ft):          --");
-
-    dbs_label = lv_label_create(parent);
-    lv_obj_align(dbs_label, LV_ALIGN_TOP_LEFT, 10, 120);
-#if LV_FONT_MONTSERRAT_30
-    lv_obj_set_style_text_font(dbs_label, &lv_font_montserrat_30, LV_PART_MAIN);
-#endif
-    lv_label_set_text_static(dbs_label, "DBS (ft):          --");
-
+    lv_label_set_text_static(depth_value_label, "Depth:          --");  
     depth_gradient_label = lv_label_create(parent);
-    lv_obj_align(depth_gradient_label, LV_ALIGN_TOP_LEFT, 10, 160);
-#if LV_FONT_MONTSERRAT_30
-    lv_obj_set_style_text_font(depth_gradient_label, &lv_font_montserrat_30, LV_PART_MAIN);
+    lv_obj_align(depth_gradient_label, LV_ALIGN_TOP_LEFT, 10, 120);
+
+#if LV_FONT_MONTSERRAT_32
+    lv_obj_set_style_text_font(depth_gradient_label, &lv_font_montserrat_32, LV_PART_MAIN);
 #endif
     lv_label_set_text_static(depth_gradient_label, "Gradient:        --");
 
     d_heel_label = lv_label_create(parent);
-    lv_obj_align(d_heel_label, LV_ALIGN_TOP_LEFT, 10, 200);
-#if LV_FONT_MONTSERRAT_30
-    lv_obj_set_style_text_font(d_heel_label, &lv_font_montserrat_30, LV_PART_MAIN);
+    lv_obj_align(d_heel_label, LV_ALIGN_TOP_LEFT, 10, 160);
+
+#if LV_FONT_MONTSERRAT_32
+    lv_obj_set_style_text_font(d_heel_label, &lv_font_montserrat_32, LV_PART_MAIN);
 #endif
     lv_label_set_text_static(d_heel_label, "Heel:                 --");
     
@@ -93,20 +100,20 @@ static void lv_depth_display(lv_updatable_screen_t *scr)
     // Y-axis label "Depth (m)"
     lv_obj_t * y_label = lv_label_create(depth_chart);
     lv_label_set_text(y_label, "Depth m");
-    lv_obj_set_style_text_font(y_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_font(y_label, &lv_font_montserrat_24, 0);
     lv_obj_align(y_label, LV_ALIGN_LEFT_MID, 5, 0);
     
     // X-axis label "Time"
     lv_obj_t * x_label = lv_label_create(depth_chart);
     lv_label_set_text(x_label, "Time");
-    lv_obj_set_style_text_font(x_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_font(x_label, &lv_font_montserrat_24, 0);
     lv_obj_align(x_label, LV_ALIGN_BOTTOM_MID, 0, 5);
     
     // Allow gesture events to pass through to screen
     lv_obj_clear_flag(depth_chart, LV_OBJ_FLAG_CLICKABLE);
     
     // Style the chart
-    lv_obj_set_style_text_font(depth_chart, &lv_font_montserrat_14, LV_PART_MAIN);
+    lv_obj_set_style_text_font(depth_chart, &lv_font_montserrat_28, LV_PART_MAIN);
     lv_obj_set_style_border_color(depth_chart, lv_color_hex(0xcccccc), LV_PART_MAIN);
     
     // Initialize history tracker with calculated point count
@@ -124,25 +131,24 @@ static void depth_update_cb(lv_updatable_screen_t *scr)
     const auto& config = get_signalk_path_config();
     
     // Helper lambda to format depth values based on unit setting
-    auto format_depth = [&](const char* label_prefix, float depth_m, uint32_t age) -> String {
-        if (!fresh(age)) {
-            return String(label_prefix) + "--";
-        }
-        
-        String label(label_prefix);
-        if ((int)config.distance_unit == 0) {  // Meters
-            label += String(depth_m, 1) + "m";
-        } else {  // Feet
-            label += String(depth_m * _GPS_FEET_PER_METER, 1) + "ft";
-        }
-        return label;
-    };
 
-    lv_label_set_text(dbt_label, format_depth("DBT: ", shipDataModel.environment.depth.below_transducer.m, shipDataModel.environment.depth.below_transducer.age).c_str());
 
-    lv_label_set_text(dbk_label, format_depth("DBK: ", shipDataModel.environment.depth.below_keel.m, shipDataModel.environment.depth.below_keel.age).c_str());
-
-    lv_label_set_text(dbs_label, format_depth("DBS: ", shipDataModel.environment.depth.below_surface.m, shipDataModel.environment.depth.below_surface.age).c_str());
+    BestDepth bd = get_best_depth();
+    String unit_str;
+    if ((int)config.distance_unit == 0) {  // Meters
+        unit_str = "m";
+    } else {  // Feet
+        unit_str = "ft";
+    }
+    String depth_text;
+    if (bd.valid) {
+        float display_val = bd.m;
+        if (unit_str == "ft") display_val *= _GPS_FEET_PER_METER;
+        depth_text = "Depth: " + String(display_val, 1) + unit_str;
+    } else {
+        depth_text = "Depth: --";
+    }
+    lv_label_set_text(depth_value_label, depth_text.c_str());
 
     lv_label_set_text(d_heel_label,
         (String("Heel:                 ")
@@ -157,8 +163,8 @@ static void depth_update_cb(lv_updatable_screen_t *scr)
               : String("--"))).c_str());
     
     // Queue chart update for deferred processing (outside display lock)
-    if (depth_history && fresh(shipDataModel.environment.depth.below_transducer.age)) {
-        float depth_val = shipDataModel.environment.depth.below_transducer.m;
+    if (depth_history && bd.valid) {
+        float depth_val = bd.m;
         if ((int)config.distance_unit == 1) {  // Feet
             depth_val *= _GPS_FEET_PER_METER;
         }
@@ -166,6 +172,7 @@ static void depth_update_cb(lv_updatable_screen_t *scr)
         pending_chart_add_point = true;
         pending_chart_range_update++;
     }
+
 }
 
 /* -------------------------------------------------- */

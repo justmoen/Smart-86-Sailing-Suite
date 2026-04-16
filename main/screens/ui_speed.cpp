@@ -11,6 +11,7 @@
 extern "C" {
 #endif
 
+static lv_obj_t *header_label;
 static lv_obj_t *sog_label;
 static lv_obj_t *sog_avg_label;
 static lv_obj_t *spd_label;
@@ -18,6 +19,7 @@ static lv_obj_t *leeway_label;
 static lv_obj_t *s_cogt_label;
 static lv_obj_t *s_hdt_label;
 static lv_obj_t *speed_chart = nullptr;
+
 static lv_chart_series_t *speed_series = nullptr;
 static ChartDataHistory *speed_history = nullptr;
 
@@ -34,53 +36,55 @@ static void lv_speed_display(lv_updatable_screen_t *scr)
 {
     lv_obj_t *parent = scr->screen;
 
-    lv_obj_t *main_label = lv_label_create(parent);
-    lv_obj_align(main_label, LV_ALIGN_CENTER, 0, -105);
-    lv_label_set_recolor(main_label, true);
-#if LV_FONT_MONTSERRAT_30
-    lv_obj_set_style_text_font(main_label, &lv_font_montserrat_30, LV_PART_MAIN);
+    header_label = lv_label_create(parent);
+    lv_obj_align(header_label, LV_ALIGN_TOP_MID, 0, 20);
+    lv_label_set_recolor(header_label, true);
+#if LV_FONT_MONTSERRAT_32
+    lv_obj_set_style_text_font(header_label, &lv_font_montserrat_32, LV_PART_MAIN);
 #endif
-    lv_label_set_text_static(main_label, "SPEED  #0080ff " LV_SYMBOL_UPLOAD " #");
+    lv_label_set_text_static(header_label, "#ffffff Speed #");
+
 
     sog_label = lv_label_create(parent);
-    lv_obj_align(sog_label, LV_ALIGN_TOP_LEFT, 10, 35);
-#if LV_FONT_MONTSERRAT_30
-    lv_obj_set_style_text_font(sog_label, &lv_font_montserrat_30, 0);
+lv_obj_align(sog_label, LV_ALIGN_TOP_LEFT, 10, 80);
+#if LV_FONT_MONTSERRAT_32
+    lv_obj_set_style_text_font(sog_label, &lv_font_montserrat_32, 0);
 #endif
     lv_label_set_text_static(sog_label, "SOG (kt):                       --");
 
+
     sog_avg_label = lv_label_create(parent);
-    lv_obj_align(sog_avg_label, LV_ALIGN_TOP_LEFT, 10, 70);
-#if LV_FONT_MONTSERRAT_30
-    lv_obj_set_style_text_font(sog_avg_label, &lv_font_montserrat_30, 0);
+lv_obj_align(sog_avg_label, LV_ALIGN_TOP_LEFT, 10, 120);
+#if LV_FONT_MONTSERRAT_32
+    lv_obj_set_style_text_font(sog_avg_label, &lv_font_montserrat_32, 0);
 #endif
     lv_label_set_text_static(sog_avg_label, "SOG AVG (kt):             --");
 
     spd_label = lv_label_create(parent);
-    lv_obj_align(spd_label, LV_ALIGN_TOP_LEFT, 10, 105);
-#if LV_FONT_MONTSERRAT_30
-    lv_obj_set_style_text_font(spd_label, &lv_font_montserrat_30, 0);
+lv_obj_align(spd_label, LV_ALIGN_TOP_LEFT, 10, 160);
+#if LV_FONT_MONTSERRAT_32
+    lv_obj_set_style_text_font(spd_label, &lv_font_montserrat_32, 0);
 #endif
     lv_label_set_text_static(spd_label, "SPD (kt):                       --");
 
     leeway_label = lv_label_create(parent);
-    lv_obj_align(leeway_label, LV_ALIGN_TOP_LEFT, 10, 140);
-#if LV_FONT_MONTSERRAT_30
-    lv_obj_set_style_text_font(leeway_label, &lv_font_montserrat_30, 0);
+lv_obj_align(leeway_label, LV_ALIGN_TOP_LEFT, 10, 200);
+#if LV_FONT_MONTSERRAT_32
+    lv_obj_set_style_text_font(leeway_label, &lv_font_montserrat_32, 0);
 #endif
     lv_label_set_text_static(leeway_label, "Leeway (est):              --");
 
     s_cogt_label = lv_label_create(parent);
-    lv_obj_align(s_cogt_label, LV_ALIGN_TOP_LEFT, 10, 175);
-#if LV_FONT_MONTSERRAT_30
-    lv_obj_set_style_text_font(s_cogt_label, &lv_font_montserrat_30, 0);
+lv_obj_align(s_cogt_label, LV_ALIGN_TOP_LEFT, 10, 240);
+#if LV_FONT_MONTSERRAT_32
+lv_obj_set_style_text_font(s_cogt_label, &lv_font_montserrat_32, 0);
 #endif
     lv_label_set_text_static(s_cogt_label, "COGT:                            --");
 
     s_hdt_label = lv_label_create(parent);
-    lv_obj_align(s_hdt_label, LV_ALIGN_TOP_LEFT, 10, 210);
-#if LV_FONT_MONTSERRAT_30
-    lv_obj_set_style_text_font(s_hdt_label, &lv_font_montserrat_30, 0);
+lv_obj_align(s_hdt_label, LV_ALIGN_TOP_LEFT, 10, 280);
+#if LV_FONT_MONTSERRAT_32
+lv_obj_set_style_text_font(s_hdt_label, &lv_font_montserrat_32, 0);
 #endif
     lv_label_set_text_static(s_hdt_label, "HDT:                               --");
     
@@ -97,11 +101,24 @@ static void lv_speed_display(lv_updatable_screen_t *scr)
     lv_chart_set_range(speed_chart, LV_CHART_AXIS_PRIMARY_Y, 0, 20);
     lv_chart_set_div_line_count(speed_chart, 5, 5);
     
+    // Y-axis label "Speed (kn)"
+    lv_obj_t * y_label = lv_label_create(speed_chart);
+    lv_label_set_text(y_label, "Speed kn");
+    lv_obj_set_style_text_font(y_label, &lv_font_montserrat_24, 0);
+    lv_obj_align(y_label, LV_ALIGN_LEFT_MID, 5, 0);
+    
+    // X-axis label "Time"
+    lv_obj_t * x_label = lv_label_create(speed_chart);
+    lv_label_set_text(x_label, "Time");
+    lv_obj_set_style_text_font(x_label, &lv_font_montserrat_24, 0);
+    lv_obj_align(x_label, LV_ALIGN_BOTTOM_MID, 0, 5);
+    
     // Allow gesture events to pass through to screen
     lv_obj_clear_flag(speed_chart, LV_OBJ_FLAG_CLICKABLE);
+
     
     // Style the chart
-    lv_obj_set_style_text_font(speed_chart, &lv_font_montserrat_14, LV_PART_MAIN);
+    lv_obj_set_style_text_font(speed_chart, &lv_font_montserrat_28, LV_PART_MAIN);
     lv_obj_set_style_border_color(speed_chart, lv_color_hex(0xcccccc), LV_PART_MAIN);
     
     // Initialize history tracker with calculated point count
