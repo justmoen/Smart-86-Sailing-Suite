@@ -85,6 +85,11 @@ extern "C" void app_main()
 
     settingUpWiFi([]() {
         load_signalk_path_config();
+        
+        // Init chart histories on boot for background tracking
+        depth_history = new ChartDataHistory("depth", get_signalk_path_config().depth_chart_duration, 300);
+        speed_history = new ChartDataHistory("speed", get_signalk_path_config().speed_chart_duration, 300);
+        
         signalk_path_config_web_begin();
 
         ui_manager_init();
@@ -128,8 +133,13 @@ extern "C" void app_main()
             navigation_process_deferred_brightness();
             ui_manager_process_deferred_screen_creation();  // Create screens first
             ui_manager_process_deferred_screen_load();      // Then load them
-            depth_process_deferred_chart_updates();          // Update depth chart
-            speed_process_deferred_chart_updates();          // Update speed chart
+            
+            // Queue chart data globally for background collection
+            depth_queue_chart_data();
+            speed_queue_chart_data();
+            
+            depth_process_deferred_chart_updates();          // Update depth chart (history/charts if screen active)
+            speed_process_deferred_chart_updates();          // Update speed chart (history/charts if screen active)
 
             bsp_display_lock(0);
             ui_manager_update();

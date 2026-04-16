@@ -48,9 +48,7 @@ static void lv_compass_display(lv_updatable_screen_t *scr)
 
     scale_compass_maj = lv_meter_add_scale(compass_display);
 
-#if LV_FONT_MONTSERRAT_28
     lv_obj_set_style_text_font(compass_display, &lv_font_montserrat_28, LV_PART_TICKS);
-#endif
 
     lv_meter_set_scale_ticks(compass_display, scale_compass_maj, 12, 2, 15, lv_palette_main(LV_PALETTE_GREY));
 
@@ -65,9 +63,7 @@ static void lv_compass_display(lv_updatable_screen_t *scr)
 
     lv_obj_t *labelN = lv_label_create(labelNcont);
 
-#if LV_FONT_MONTSERRAT_36
-    lv_obj_set_style_text_font(labelN, &lv_font_montserrat_36, 0);
-#endif
+    lv_obj_set_style_text_font(labelN, &lv_font_montserrat_32, 0);
 
     lv_label_set_text_static(labelN, "N");
     lv_obj_center(labelN);
@@ -86,9 +82,7 @@ static void lv_compass_display(lv_updatable_screen_t *scr)
 
     lv_obj_t *labelS = lv_label_create(labelScont);
 
-#if LV_FONT_MONTSERRAT_36
-    lv_obj_set_style_text_font(labelS, &lv_font_montserrat_36, 0);
-#endif
+    lv_obj_set_style_text_font(labelS, &lv_font_montserrat_32, 0);
 
     lv_label_set_text_static(labelS, "S");
     lv_obj_center(labelS);
@@ -106,9 +100,7 @@ static void lv_compass_display(lv_updatable_screen_t *scr)
 
     lv_obj_t *labelE = lv_label_create(labelEcont);
 
-#if LV_FONT_MONTSERRAT_36
-    lv_obj_set_style_text_font(labelE, &lv_font_montserrat_36, 0);
-#endif
+    lv_obj_set_style_text_font(labelE, &lv_font_montserrat_32, 0);
 
     lv_label_set_text_static(labelE, "E");
     lv_obj_center(labelE);
@@ -126,9 +118,7 @@ static void lv_compass_display(lv_updatable_screen_t *scr)
 
     lv_obj_t *labelW = lv_label_create(labelWcont);
 
-#if LV_FONT_MONTSERRAT_36
-    lv_obj_set_style_text_font(labelW, &lv_font_montserrat_36, 0);
-#endif
+    lv_obj_set_style_text_font(labelW, &lv_font_montserrat_32, 0);
 
     lv_label_set_text_static(labelW, "W");
     lv_obj_center(labelW);
@@ -153,9 +143,7 @@ static void lv_compass_display(lv_updatable_screen_t *scr)
 
     compass_l = lv_label_create(scr->screen);
 
-#if LV_FONT_MONTSERRAT_28
     lv_obj_set_style_text_font(compass_l, &lv_font_montserrat_28, 0);
-#endif
 
     lv_label_set_text_static(compass_l, "--" LV_SYMBOL_DEGREES);
     lv_obj_center(compass_l);
@@ -171,27 +159,21 @@ static void lv_compass_display(lv_updatable_screen_t *scr)
     lv_label_set_text_static(compass_hdt_l, "HDT: --" LV_SYMBOL_DEGREES);
     lv_obj_align(compass_hdt_l, LV_ALIGN_TOP_LEFT, 2, 2);
 
-#if LV_FONT_MONTSERRAT_24
     lv_obj_set_style_text_font(compass_hdt_l, &lv_font_montserrat_24, 0);
-#endif
 
 
     compass_cogt_l = lv_label_create(scr->screen);
     lv_label_set_text_static(compass_cogt_l, "COGT: --" LV_SYMBOL_DEGREES);
     lv_obj_align(compass_cogt_l, LV_ALIGN_TOP_RIGHT, -2, 2);
 
-#if LV_FONT_MONTSERRAT_24
     lv_obj_set_style_text_font(compass_cogt_l, &lv_font_montserrat_24, 0);
-#endif
 
 
     compass_mag_var_l = lv_label_create(scr->screen);
     lv_label_set_text_static(compass_mag_var_l, "Var:\n--" LV_SYMBOL_DEGREES);
     lv_obj_align(compass_mag_var_l, LV_ALIGN_BOTTOM_LEFT, 2, -2);
 
-#if LV_FONT_MONTSERRAT_24
     lv_obj_set_style_text_font(compass_mag_var_l, &lv_font_montserrat_24, 0);
-#endif
 }
 
 

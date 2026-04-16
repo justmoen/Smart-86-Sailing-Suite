@@ -53,7 +53,7 @@ extern "C" {
         lv_palette_lighten(LV_PALETTE_GREY, 2)
     );
 
-lv_meter_set_scale_major_ticks(
+    lv_meter_set_scale_major_ticks(
         heel_display,
         scale,
         3,
@@ -68,37 +68,27 @@ lv_meter_set_scale_major_ticks(
 
     pitch_label = lv_label_create(parent);
     lv_obj_align(pitch_label, LV_ALIGN_TOP_LEFT, 5, 5);
-#if LV_FONT_MONTSERRAT_30
     lv_obj_set_style_text_font(pitch_label, &lv_font_montserrat_30, 0);
-#endif
     lv_label_set_text_static(pitch_label, "Pitch:   --");
 
     heel_leeway_label = lv_label_create(parent);
     lv_obj_align(heel_leeway_label, LV_ALIGN_TOP_LEFT, 5, 50);
-#if LV_FONT_MONTSERRAT_30
     lv_obj_set_style_text_font(heel_leeway_label, &lv_font_montserrat_30, 0);
-#endif
     lv_label_set_text_static(heel_leeway_label, "Leeway\n(est):\n--");
 
     heel_drift_label = lv_label_create(parent);
     lv_obj_align(heel_drift_label, LV_ALIGN_TOP_LEFT, 250, 5);
-#if LV_FONT_MONTSERRAT_30
     lv_obj_set_style_text_font(heel_drift_label, &lv_font_montserrat_30, 0);
-#endif
     lv_label_set_text_static(heel_drift_label, "Drift (kt):  --");
 
     heel_set_label = lv_label_create(parent);
     lv_obj_align(heel_set_label, LV_ALIGN_TOP_LEFT, 245, 50);
-#if LV_FONT_MONTSERRAT_30
     lv_obj_set_style_text_font(heel_set_label, &lv_font_montserrat_30, 0);
-#endif
     lv_label_set_text_static(heel_set_label, "Set:\n--");
 
     lv_obj_t *main_label = lv_label_create(parent);
     lv_obj_align(main_label, LV_ALIGN_CENTER, 0, -60);
-#if LV_FONT_MONTSERRAT_30
     lv_obj_set_style_text_font(main_label, &lv_font_montserrat_30, 0);
-#endif
     lv_label_set_text_static(main_label, "HEEL");
   }
 
@@ -133,8 +123,9 @@ lv_meter_set_scale_major_ticks(
     .created = false,
     .create_cb = lv_heel_display,
     .update_cb = heel_update_cb
-};
+  };
 
 #ifdef __cplusplus
 } /*extern "C"*/
 #endif
+
