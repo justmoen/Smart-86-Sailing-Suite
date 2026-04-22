@@ -12,6 +12,7 @@
 #include "screens/ui_heel.h"
 #include "screens/ui_reboot.h"
 #include "ui_manager.h"
+#include "screen_config.h"
 extern int current_index;  // Make accessible for notify_config_changed
 
 // Maximum screens: 1 (wind) + 8 (engines) + 6 (depth/speed/compass/gps/tanks/heel) + 1 (reboot) = 16
@@ -36,23 +37,43 @@ void init_screens_array() {
     
     int idx = 0;
     
-    // Add non-engine screens first
-    screens[idx++] = &windScreen;
+    if (is_screen_enabled("wind")) {
+        screens[idx++] = &windScreen;
+    }
     
     // Create and add engine screens dynamically
     lv_updatable_screen_t* engine_screens[8];
     create_engine_screens(engine_screens, &engine_screen_count);
     for (int i = 0; i < engine_screen_count; i++) {
-        screens[idx++] = engine_screens[i];
+        char id[20];
+        sprintf(id, "engine_%d", i);
+
+        if (is_screen_enabled(id)) {
+            screens[idx++] = engine_screens[i];
+        }
     }
     
     // Add remaining screens
-    screens[idx++] = &depthScreen;
-    screens[idx++] = &speedScreen;
-    screens[idx++] = &compassScreen;
-    screens[idx++] = &gpsScreen;
-    screens[idx++] = &tanksScreen;
-    screens[idx++] = &heelScreen;
+    if (is_screen_enabled("depth"))
+        screens[idx++] = &depthScreen;
+
+    if (is_screen_enabled("speed"))
+        screens[idx++] = &speedScreen;
+
+    if (is_screen_enabled("compass"))
+        screens[idx++] = &compassScreen;
+
+    if (is_screen_enabled("gps"))
+        screens[idx++] = &gpsScreen;
+
+    if (is_screen_enabled("tanks"))
+        screens[idx++] = &tanksScreen;
+
+    if (is_screen_enabled("heel"))
+        screens[idx++] = &heelScreen;
+
+    // always include reboot
+    screens[idx++] = &rebootScreen;
     screens[idx++] = &rebootScreen;
     
     screen_count = idx;
