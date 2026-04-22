@@ -87,5 +87,6 @@ const signalk_path_config_t& get_signalk_path_config();
 void load_signalk_path_config();
 void signalk_path_config_web_begin();
 void signalk_path_config_web_loop();
+void notify_config_changed();
 
 #endif

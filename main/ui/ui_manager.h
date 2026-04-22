@@ -16,6 +16,8 @@ void ui_manager_process_deferred_screen_load();
 void ui_manager_show(lv_updatable_screen_t *screen);
 void ui_manager_next();
 void ui_manager_prev();
+void ui_manager_reinit_screens();
+struct EngineScreenState;
 
 #ifdef __cplusplus
 }
