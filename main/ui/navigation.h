@@ -1,12 +1,12 @@
 #ifndef UI_NAVIGATION_H
 #define UI_NAVIGATION_H
 
+#include "lvgl.h"
+#include "ui_screens.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include "lvgl.h"
-#include "ui_screens.h"
 
 extern int page;
 
