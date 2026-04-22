@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include <WebServer.h>
+#include "screen_config.h"
 
 constexpr const char* kPrefsNamespace = "sk-config";
 
@@ -840,8 +841,13 @@ async function saveConfig() {
     const inputs = document.querySelectorAll('input, select');
     for (let input of inputs) {
         const name = input.name;
-        if (name && input.value.trim() !== originalValues[name]) {
-            changedData[name] = input.value;
+        let changed;
+        changed = input.value.trim() !== originalValues[name];
+
+        if (name && changed) {
+            if (input.value.trim() !== originalValues[name]) {
+                changedData[name] = input.value;
+            }
         }
     }
     if (Object.keys(changedData).length === 0) {
@@ -887,6 +893,7 @@ async function resetConfig() {
         location.reload();
     }
 }
+
 document.addEventListener('DOMContentLoaded', function() {
   console.log('DOM loaded, initializing change tracking');
   window.initChangeTracking();
@@ -1067,7 +1074,50 @@ void handle_show_display_config_page() {
     html += String(config.speed_chart_duration);
     html += R"(' min='5' max='120'></div>
                 <p style='font-size: 0.9em; color: #666;'><strong>The full chart width will display the configured duration of historical data.</strong></p>
-            </div>
+            </div>)";
+
+    html += R"(<div class='section'>
+                <h2>Screens</h2>)";
+
+    for (int i = 0; i < config.num_engines; i++) {
+        char id[20];
+        sprintf(id, "engine_%d", i);
+
+        html += R"(<div>)";
+        html += R"(<input type='checkbox' name='screen_)" + String(id) + R"(' )";
+
+        if (is_screen_enabled(id)) {
+            html += R"(checked)";
+        }
+
+        html += R"(> Engine )";
+        html += String(i + 1);
+        html += R"(</div>)";
+    }
+
+    // Static screens
+    const char* static_screens[] = {
+        "wind", "depth", "speed", "compass", "gps", "tanks", "heel"
+    };
+
+    for (int i = 0; i < 7; i++) {
+        const char* id = static_screens[i];
+
+        html += R"(<div>)";
+        html += R"(<input type='checkbox' name='screen_)" + String(id) + R"(' )";
+
+        if (is_screen_enabled(id)) {
+            html += R"(checked)";
+        }
+
+        html += R"(> )";
+        html += id;
+        html += R"(</div>)";
+    }
+
+    // Reboot (locked)
+    html += R"(<div>
+        </div>
         </form>
         <div class='actions'>
             <a class='back-link' href='/'>← Back to Administration</a>
@@ -1079,17 +1129,25 @@ void handle_show_display_config_page() {
 let originalValues = {};
 let changeCount = 0;
 
+function getValue(input) {
+    if (input.type === 'checkbox') {
+        return input.checked;  // boolean
+    } else if (input.type === 'number') {
+        return parseFloat(input.value);  // number
+    } else if (input.tagName === 'SELECT') {
+        return input.value;  // string (consistent)
+    } else {
+        return input.value.trim();  // string
+    }
+}
+
 function initChangeTracking() {
-  console.log('initChangeTracking called');
   originalValues = {};
   const inputs = document.querySelectorAll('input, select');
-  console.log('Found inputs:', inputs.length);
   inputs.forEach((input, idx) => {
     const name = input.name;
     if (name) {
-      originalValues[name] = input.value.trim();
-      console.log('Input', idx, name, ':', originalValues[name]);
-      input.addEventListener('input', updateSubmitButton);
+      originalValues[name] = getValue(input);
       input.addEventListener('change', updateSubmitButton);
       input.style.borderColor = '#ddd';
     }
@@ -1098,18 +1156,20 @@ function initChangeTracking() {
 }
 
 function hasChanges() {
-  const inputs = document.querySelectorAll('input, select');
-  for (let input of inputs) {
-    const name = input.name;
-    if (name && input.value.trim() !== originalValues[name]) {
-      return true;
+    const inputs = document.querySelectorAll('input, select');
+
+    for (let input of inputs) {
+        const name = input.name;
+        if (!name) continue;
+
+        if (getValue(input) !== originalValues[name]) {
+        return true;
+        }
     }
-  }
-  return false;
+    return false;
 }
 
 function updateSubmitButton() {
-  console.log('updateSubmitButton called');
   const btn = document.getElementById('submitBtn');
   if (!btn) return;
   const has = hasChanges();
@@ -1118,13 +1178,25 @@ function updateSubmitButton() {
   const inputs = document.querySelectorAll('input, select');
   for (let input of inputs) {
     const name = input.name;
-    if (name && input.value.trim() !== originalValues[name]) count++;
+    if (getValue(input) !== originalValues[name]) {
+      count++;
+    }
   }
-  console.log('Change count:', count);
   btn.textContent = has ? `Save ${count} change${count>1?'s':''}` : 'No changes (disabled)';
   inputs.forEach(input => {
     const name = input.name;
-    if (name && input.value.trim() !== originalValues[name]) {
+    if (!name) return;
+
+    let changed;
+    if (input.type === 'checkbox') {
+      changed = input.checked !== originalValues[name];
+    } else if (input.type === 'number') {
+      changed = parseFloat(input.value) !== parseFloat(originalValues[name]);
+    } else {
+      changed = input.value.trim() !== originalValues[name];
+    }
+
+    if (changed) {
       input.style.borderColor = '#4CAF50';
       input.style.boxShadow = '0 0 0 2px rgba(76,175,80,0.2)';
     } else {
@@ -1141,8 +1213,11 @@ async function saveDisplayConfig() {
     const inputs = document.querySelectorAll('input, select');
     for (let input of inputs) {
         const name = input.name;
-        if (name && input.value.trim() !== originalValues[name]) {
-            changedData[name] = input.value;
+        if (name) {
+          const value = getValue(input);
+          if (value !== originalValues[name]) {
+            changedData[name] = value;
+          }
         }
     }
     if (Object.keys(changedData).length === 0) {
@@ -1151,10 +1226,14 @@ async function saveDisplayConfig() {
     }
     
     try {
+        const json = JSON.stringify(changedData);
+
         const response = await fetch('/display-config/save', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(changedData)
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: json
         });
         if (response.ok) {
             alert(`Saved ${Object.keys(changedData).length} changed field${Object.keys(changedData).length > 1 ? 's' : ''} successfully!`);
@@ -1188,10 +1267,11 @@ void handle_save_config() {
     }
     
     // Parse JSON
-    JsonDocument doc;  // Large buffer for 50+ fields (auto-sized)
+    DynamicJsonDocument doc(1024);
+
     DeserializationError error = deserializeJson(doc, body);
-    
     if (error) {
+        ESP_LOGE("HTTP", "JSON parse error: %s", error.c_str());
         web_server.send(400, "text/plain", "Invalid JSON");
         return;
     }
@@ -1260,6 +1340,8 @@ void handle_save_config() {
 void handle_save_display_config() {
     // Read JSON body from POST request
     String body = web_server.arg("plain");
+    ESP_LOGI("HTTP", "Body length: %d", body.length());
+ESP_LOGI("HTTP", "Body: %s", body.c_str());
     
     if (body.length() == 0) {
         web_server.send(400, "text/plain", "Empty request body");
@@ -1267,7 +1349,7 @@ void handle_save_display_config() {
     }
     
     // Parse JSON
-    JsonDocument doc;
+    DynamicJsonDocument doc(1024);
     DeserializationError error = deserializeJson(doc, body);
     
     if (error) {
@@ -1300,6 +1382,29 @@ void handle_save_display_config() {
     if (!doc["depth_chart_min"].isNull()) config.depth_chart_duration = doc["depth_chart_min"].as<int>();
     if (!doc["speed_chart_min"].isNull()) config.speed_chart_duration = doc["speed_chart_min"].as<int>();
 
+    // Handle screen toggles
+    for (int i = 0; i < config.num_engines; i++) {
+        char id[20];
+        sprintf(id, "engine_%d", i);
+
+        String param = "screen_" + String(id);
+
+        bool enabled = doc[param].is<bool>() ? doc[param].as<bool>() : false;
+        set_screen_enabled(id, enabled);
+    }
+
+    // Static screens
+    const char* static_screens[] = {
+        "wind", "depth", "speed", "compass", "gps", "tanks", "heel"
+    };
+
+    for (int i = 0; i < 7; i++) {
+        String param = "screen_" + String(static_screens[i]);
+        bool enabled = doc[param].is<bool>() ? doc[param].as<bool>() : false;
+
+        set_screen_enabled(static_screens[i], enabled);
+    }
+
     // Save all to preferences
     save_all_config_to_preferences();
     load_config_from_preferences();
@@ -1324,7 +1429,7 @@ void handle_reset_config() {
     web_server.send(200, "text/plain", "Configuration reset to defaults");
 }
 
-const signalk_path_config_t& get_signalk_path_config() {
+signalk_path_config_t& get_signalk_path_config() {
     return config;
 }
 

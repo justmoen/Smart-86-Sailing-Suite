@@ -6,7 +6,18 @@
 enum class DistanceUnit { Meters, Feet };
 enum class TemperatureUnit { Celsius, Fahrenheit };
 
+typedef struct {
+    char id[20];
+    bool enabled;
+} screen_enable_config_t;
+
+#define MAX_SCREENS_CONFIG 16
+
 struct signalk_path_config_t {
+
+  int screen_config_count;
+  screen_enable_config_t screens[MAX_SCREENS_CONFIG];
+
   // Navigation paths
   String navigation_rate_of_turn;
   String navigation_heading_magnetic;
@@ -83,7 +94,7 @@ struct signalk_path_config_t {
   TemperatureUnit temperature_unit = TemperatureUnit::Celsius;  // or Fahrenheit
 };
 
-const signalk_path_config_t& get_signalk_path_config();
+signalk_path_config_t& get_signalk_path_config();
 void load_signalk_path_config();
 void signalk_path_config_web_begin();
 void signalk_path_config_web_loop();

@@ -3,6 +3,7 @@
 #include <net_mdns.h>
 #include <Preferences.h>
 #include "keepalive.h"
+#include "screen_config.h"
 
 #ifdef __cplusplus
 extern "C" {
