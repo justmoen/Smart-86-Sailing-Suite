@@ -5,12 +5,11 @@
 #include "net_mdns.h"
 #include "ui_settings_wifi.h"
 #include <WebSocketsClient.h>
+#include <Arduino.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <Arduino.h>
 
 extern String signalk_ws_host;
 extern int signalk_ws_port;

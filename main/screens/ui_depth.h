@@ -2,13 +2,12 @@
 #define UI_DEPTH_H
 
 // #define CONVERT_TO_FEET
+#include <ui_screens.h>
+#include "ui/chart_data_history.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <ui_screens.h>
-#include "ui/chart_data_history.h">
 
 extern lv_updatable_screen_t depthScreen;
 
