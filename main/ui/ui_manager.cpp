@@ -11,6 +11,8 @@
 #include "screens/ui_tanks.h"
 #include "screens/ui_heel.h"
 #include "screens/ui_reboot.h"
+#include "ui_manager.h"
+extern int current_index;  // Make accessible for notify_config_changed
 
 // Maximum screens: 1 (wind) + 8 (engines) + 6 (depth/speed/compass/gps/tanks/heel) + 1 (reboot) = 16
 #define MAX_SCREENS 16
@@ -22,6 +24,7 @@ int current_index = 0;
 static lv_updatable_screen_t *current_screen = nullptr;
 static int pending_screen_index = -1;  // Deferred screen transition
 static int pending_create_screen_index = -1;  // Deferred screen creation
+static int pending_reinit_flag = 0;  // 1 = full reinit requested
 static int pending_load_screen_index = -1;   // Deferred screen load (separate from creation)
 
 // Initialize screens array with proper number of engine screens
@@ -160,6 +163,12 @@ void ui_manager_update()
 // Process deferred screen creation (call from main loop OUTSIDE display lock)
 void ui_manager_process_deferred_screen_creation()
 {
+    if (pending_reinit_flag) {
+        ui_manager_reinit_screens();
+        pending_reinit_flag = 0;
+        return;
+    }
+    
     if (pending_create_screen_index >= 0 && pending_create_screen_index < screen_count) {
         create_if_needed(screens[pending_create_screen_index]);
         pending_create_screen_index = -1;
@@ -189,4 +198,48 @@ void ui_manager_process_deferred_screen_load()
         // Load screen without animation, outside of render lock
         lv_scr_load_anim(next_screen->screen, LV_SCR_LOAD_ANIM_NONE, 0, 0, false);
     }
+}
+
+
+
+void ui_manager_reinit_screens() {
+    // Destroy all existing screens
+    for (int i = 0; i < screen_count; i++) {
+        if (screens[i] && screens[i]->screen) {
+            lv_obj_del(screens[i]->screen);
+            screens[i]->screen = nullptr;
+            screens[i]->created = false;
+        }
+    }
+    
+    // Reset engine static state - skip, states reinited in create_engine_screens
+    
+    // Reset state
+    screen_count = 0;
+    pending_screen_index = -1;
+    pending_create_screen_index = -1;
+    pending_load_screen_index = -1;
+    
+    // Reinitialize screens array with current config
+    init_screens_array();
+    
+    for (int i = 0; i < screen_count; i++) {
+        screens[i]->created = false;
+        screens[i]->screen = nullptr;
+    }
+    
+    // Restore current_index (clamped)
+    if (current_index < 0 || current_index >= screen_count) {
+        current_index = 0;
+    }
+    
+    // Create and show current screen
+    create_if_needed(screens[current_index]);
+    current_screen = screens[current_index];
+    save_last_screen(current_index);
+    lv_scr_load(screens[current_index]->screen);
+}
+
+void notify_config_changed() {
+    pending_reinit_flag = 1;
 }

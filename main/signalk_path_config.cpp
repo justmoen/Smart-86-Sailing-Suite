@@ -50,11 +50,6 @@ float load_float_pref(const char* key, float default_val) {
 
 // Save float to preferences
 void save_float_pref(const char* key, float value) {
-    // Check if value has changed (use epsilon for float comparison)
-    float current = load_float_pref(key, -999999.0f);
-    if (abs(value - current) < 0.0001f) {
-        return;  // No change, skip write
-    }
     Preferences prefs;
     prefs.begin(kPrefsNamespace, false);
     prefs.putFloat(key, value);
@@ -72,11 +67,6 @@ int load_int_pref(const char* key, int default_val) {
 
 // Save int to preferences
 void save_int_pref(const char* key, int value) {
-    // Check if value has changed
-    int current = load_int_pref(key, -999999);
-    if (value == current) {
-        return;  // No change, skip write
-    }
     Preferences prefs;
     prefs.begin(kPrefsNamespace, false);
     prefs.putInt(key, value);
@@ -747,7 +737,7 @@ void handle_show_signalk_config_page() {
         </form>
         <div class='actions'>
             <a class='back-link' href='/'>← Back to Administration</a>
-            <button class='btn-save' onclick='saveConfig()'>Save Configuration</button>
+    <button id='submitBtn' class='btn-save' onclick='saveConfig()' disabled>No changes to save</button>
             <button class='btn-export' onclick='exportConfig()'>Export JSON</button>
             <button class='btn-reset' onclick='if(confirm("Reset all to defaults?")) resetConfig()'>Reset to Defaults</button>
         </div>
@@ -769,24 +759,104 @@ function toggleNested(event) {
     content.classList.toggle('expanded');
 }
 
+window.originalValues = {};
+window.changeCount = 0;
+window.initChangeTracking = function() {
+  console.log('initChangeTracking called');
+  originalValues = {};
+  const inputs = document.querySelectorAll('input, select');
+  console.log('Found inputs:', inputs.length);
+  inputs.forEach((input, idx) => {
+    const name = input.name;
+    if (name) {
+      originalValues[name] = input.value.trim();
+      console.log('Input', idx, name, ':', originalValues[name]);
+      input.addEventListener('input', updateSubmitButton);
+      input.addEventListener('change', updateSubmitButton);
+      // Visual feedback
+      input.style.borderColor = '#ddd';
+    }
+  });
+  updateSubmitButton();
+}
+
+window.hasChanges = function() {
+  const inputs = document.querySelectorAll('input, select');
+  for (let input of inputs) {
+    const name = input.name;
+    if (name && input.value.trim() !== originalValues[name]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+window.updateSubmitButton = function() {
+  console.log('updateSubmitButton called');
+  const btn = document.getElementById('submitBtn');
+  if (!btn) {
+    console.log('No submitBtn found');
+    return;
+  }
+  const has = window.hasChanges();
+  btn.disabled = !has;
+  // Count
+  let count = 0;
+  const inputs = document.querySelectorAll('input, select');
+  for (let input of inputs) {
+    const name = input.name;
+    if (name && input.value.trim() !== originalValues[name]) {
+      count++;
+      console.log('Changed:', name, input.value.trim(), 'vs', originalValues[name]);
+    }
+  }
+  console.log('Change count:', count, 'hasChanges:', has);
+  btn.textContent = has ? `Save ${count} change${count>1?'s':''}` : 'No changes (button disabled)';
+  // Visual: highlight changed inputs
+  inputs.forEach(input => {
+    const name = input.name;
+    if (name && input.value.trim() !== originalValues[name]) {
+      input.style.borderColor = '#4CAF50';
+      input.style.boxShadow = '0 0 0 2px rgba(76,175,80,0.2)';
+    } else {
+      input.style.borderColor = '#ddd';
+      input.style.boxShadow = 'none';
+    }
+  });
+}
+
+window.restoreOriginals = function() {
+  Object.keys(originalValues).forEach(name => {
+    const input = document.querySelector(`[name="${name}"]`);
+    if (input) {
+      input.value = originalValues[name];
+      input.dispatchEvent(new Event('input'));
+    }
+  });
+}
+
 async function saveConfig() {
-    const form = document.getElementById('configForm');
-    const formData = new FormData(form);
-    
-    // Convert FormData to JSON object
-    const jsonData = {};
-    for (const [key, value] of formData.entries()) {
-        jsonData[key] = value;
+    const changedData = {};
+    const inputs = document.querySelectorAll('input, select');
+    for (let input of inputs) {
+        const name = input.name;
+        if (name && input.value.trim() !== originalValues[name]) {
+            changedData[name] = input.value;
+        }
+    }
+    if (Object.keys(changedData).length === 0) {
+        alert('No changes to save!');
+        return;
     }
     
     try {
         const response = await fetch('/signalk-config/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(jsonData)
+            body: JSON.stringify(changedData)
         });
         if (response.ok) {
-            alert('Configuration saved successfully!');
+            alert(`Saved ${Object.keys(changedData).length} changed field${Object.keys(changedData).length > 1 ? 's' : ''} successfully!`);
             location.reload();
         } else {
             const text = await response.text();
@@ -817,10 +887,14 @@ async function resetConfig() {
         location.reload();
     }
 }
-</script>
-</body>
-</html>
-)";
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('DOM loaded, initializing change tracking');
+  window.initChangeTracking();
+});
+ </script>
+ </body>
+ </html>
+ )";
 
     web_server.send(200, "text/html", html);
 }
@@ -997,29 +1071,93 @@ void handle_show_display_config_page() {
         </form>
         <div class='actions'>
             <a class='back-link' href='/'>← Back to Administration</a>
-            <button class='btn-save' onclick='saveDisplayConfig()'>Save Settings</button>
+            <button id='submitBtn' class='btn-save' onclick='saveDisplayConfig()' disabled>No changes to save</button>
         </div>
     </div>
 </div>
 <script>
+let originalValues = {};
+let changeCount = 0;
+
+function initChangeTracking() {
+  console.log('initChangeTracking called');
+  originalValues = {};
+  const inputs = document.querySelectorAll('input, select');
+  console.log('Found inputs:', inputs.length);
+  inputs.forEach((input, idx) => {
+    const name = input.name;
+    if (name) {
+      originalValues[name] = input.value.trim();
+      console.log('Input', idx, name, ':', originalValues[name]);
+      input.addEventListener('input', updateSubmitButton);
+      input.addEventListener('change', updateSubmitButton);
+      input.style.borderColor = '#ddd';
+    }
+  });
+  updateSubmitButton();
+}
+
+function hasChanges() {
+  const inputs = document.querySelectorAll('input, select');
+  for (let input of inputs) {
+    const name = input.name;
+    if (name && input.value.trim() !== originalValues[name]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function updateSubmitButton() {
+  console.log('updateSubmitButton called');
+  const btn = document.getElementById('submitBtn');
+  if (!btn) return;
+  const has = hasChanges();
+  btn.disabled = !has;
+  let count = 0;
+  const inputs = document.querySelectorAll('input, select');
+  for (let input of inputs) {
+    const name = input.name;
+    if (name && input.value.trim() !== originalValues[name]) count++;
+  }
+  console.log('Change count:', count);
+  btn.textContent = has ? `Save ${count} change${count>1?'s':''}` : 'No changes (disabled)';
+  inputs.forEach(input => {
+    const name = input.name;
+    if (name && input.value.trim() !== originalValues[name]) {
+      input.style.borderColor = '#4CAF50';
+      input.style.boxShadow = '0 0 0 2px rgba(76,175,80,0.2)';
+    } else {
+      input.style.borderColor = '#ddd';
+      input.style.boxShadow = 'none';
+    }
+  });
+}
+
+initChangeTracking();
+
 async function saveDisplayConfig() {
-    const form = document.getElementById('displayForm');
-    const formData = new FormData(form);
-    
-    // Convert FormData to JSON object
-    const jsonData = {};
-    for (const [key, value] of formData.entries()) {
-        jsonData[key] = value;
+    const changedData = {};
+    const inputs = document.querySelectorAll('input, select');
+    for (let input of inputs) {
+        const name = input.name;
+        if (name && input.value.trim() !== originalValues[name]) {
+            changedData[name] = input.value;
+        }
+    }
+    if (Object.keys(changedData).length === 0) {
+        alert('No changes to save!');
+        return;
     }
     
     try {
         const response = await fetch('/display-config/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(jsonData)
+            body: JSON.stringify(changedData)
         });
         if (response.ok) {
-            alert('Display settings saved successfully!');
+            alert(`Saved ${Object.keys(changedData).length} changed field${Object.keys(changedData).length > 1 ? 's' : ''} successfully!`);
             location.reload();
         } else {
             const text = await response.text();
@@ -1121,7 +1259,6 @@ void handle_save_config() {
 
 void handle_save_display_config() {
     // Read JSON body from POST request
-    // Get content length from server parameter
     String body = web_server.arg("plain");
     
     if (body.length() == 0) {
@@ -1134,7 +1271,8 @@ void handle_save_display_config() {
     DeserializationError error = deserializeJson(doc, body);
     
     if (error) {
-        web_server.send(400, "text/plain", "Invalid JSON");
+        ESP_LOGE("HTTP", "JSON parse error: %s", error.c_str());
+        web_server.send(400, "text/plain", "Invalid JSON: " + String(error.c_str()));
         return;
     }
 
@@ -1145,24 +1283,26 @@ void handle_save_display_config() {
     if (doc["temp_unit"].is<int>()) {
         config.temperature_unit = (doc["temp_unit"].as<int>() == 0) ? TemperatureUnit::Celsius : TemperatureUnit::Fahrenheit;
     }
-    if (doc["num_engines"].is<int>()) {
-        config.num_engines = doc["num_engines"].as<int>();
+    if (!doc["num_engines"].isNull()) {
+        int new_val = doc["num_engines"].as<int>();
+        config.num_engines = new_val;
         if (config.num_engines > 8) config.num_engines = 8;
         if (config.num_engines < 1) config.num_engines = 1;
     }
-    if (doc["eng_oil_min"].is<float>()) config.engine_oil_pressure_min = doc["eng_oil_min"].as<float>();
-    if (doc["eng_oil_max"].is<float>()) config.engine_oil_pressure_max = doc["eng_oil_max"].as<float>();
-    if (doc["eng_temp_red"].is<float>()) config.engine_temp_redline = doc["eng_temp_red"].as<float>();
-    if (doc["num_tanks"].is<int>()) {
+    if (!doc["eng_oil_min"].isNull())  config.engine_oil_pressure_min = doc["eng_oil_min"].as<float>();
+    if (!doc["eng_oil_max"].isNull()) config.engine_oil_pressure_max = doc["eng_oil_max"].as<float>();
+    if (!doc["eng_temp_red"].isNull()) config.engine_temp_redline = doc["eng_temp_red"].as<float>();
+    if (!doc["num_tanks"].isNull()) {
         config.num_tanks = doc["num_tanks"].as<int>();
         if (config.num_tanks > 8) config.num_tanks = 8;
         if (config.num_tanks < 1) config.num_tanks = 1;
     }
-    if (doc["depth_chart_min"].is<int>()) config.depth_chart_duration = doc["depth_chart_min"].as<int>();
-    if (doc["speed_chart_min"].is<int>()) config.speed_chart_duration = doc["speed_chart_min"].as<int>();
+    if (!doc["depth_chart_min"].isNull()) config.depth_chart_duration = doc["depth_chart_min"].as<int>();
+    if (!doc["speed_chart_min"].isNull()) config.speed_chart_duration = doc["speed_chart_min"].as<int>();
 
     // Save all to preferences
     save_all_config_to_preferences();
+    load_config_from_preferences();
 
     web_server.send(200, "text/plain", "Display settings saved");
 }
