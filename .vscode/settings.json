@@ -7,5 +7,5 @@
         "IDF_TARGET": "esp32p4"
     },
     "idf.flashType": "UART",
-    "idf.port": "/dev/tty.usbmodem5AAF2785891"
+    "idf.port": "/dev/tty.usbmodem5ABA0279241"
 }

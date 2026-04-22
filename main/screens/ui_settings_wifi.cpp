@@ -162,7 +162,7 @@ extern "C" {
 
   static void event_handler_wifi(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_LONG_PRESSED) {
+    if (code == LV_EVENT_CLICKED) {
       int n = (int)lv_event_get_user_data(e);
 #ifdef ENABLE_SCREEN_SERVER
       // (not for production)
@@ -202,7 +202,7 @@ extern "C" {
       lv_obj_set_style_text_color(btn, lv_color_hex(0xffffff), LV_PART_MAIN);
       lv_obj_set_style_bg_color(btn, lv_color_hex(0x404040), LV_PART_MAIN | LV_STATE_PRESSED);
       lv_obj_set_style_border_color(btn, lv_color_hex(0x404040), LV_PART_MAIN);
-      lv_obj_add_event_cb(btn, event_handler_wifi, LV_EVENT_LONG_PRESSED, (void *)i);
+      lv_obj_add_event_cb(btn, event_handler_wifi, LV_EVENT_CLICKED, (void *)i);
     }
   }
 
