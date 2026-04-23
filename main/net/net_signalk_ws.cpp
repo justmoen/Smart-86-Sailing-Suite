@@ -1,11 +1,14 @@
 #include "net_signalk_ws.h"
+#include <WiFi.h>
+#define WEBSOCKETS_NETWORK_TYPE NETWORK_ESP32
+#define WEBSOCKETS_USE_SSL 0
 #include <WebSocketsClient.h>
 #include "signalk_parse.h"
 #include <StreamString.h>
 
 String signalk_ws_host;
 int signalk_ws_port;
-WebSocketsClient webSocket;
+static WebSocketsClient webSocket;
 
 static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length)
 {
@@ -49,4 +52,12 @@ void signalk_ws_begin(const char* host, int port)
 void signalk_ws_loop()
 {
     webSocket.loop();
+}
+
+bool signalk_ws_is_connected() {
+    return webSocket.isConnected();
+}
+
+void signalk_ws_send(const char* msg) {
+    webSocket.sendTXT(msg);
 }
