@@ -74,7 +74,6 @@ void init_screens_array() {
 
     // always include reboot
     screens[idx++] = &rebootScreen;
-    screens[idx++] = &rebootScreen;
     
     screen_count = idx;
 }
@@ -221,8 +220,6 @@ void ui_manager_process_deferred_screen_load()
     }
 }
 
-
-
 void ui_manager_reinit_screens() {
     // Destroy all existing screens
     for (int i = 0; i < screen_count; i++) {
@@ -250,9 +247,7 @@ void ui_manager_reinit_screens() {
     }
     
     // Restore current_index (clamped)
-    if (current_index < 0 || current_index >= screen_count) {
-        current_index = 0;
-    }
+    current_index = 0;
     
     // Create and show current screen
     create_if_needed(screens[current_index]);

@@ -4,6 +4,7 @@
 #include <Preferences.h>
 #include <WebServer.h>
 #include "screen_config.h"
+#include "ui_manager.h"
 
 constexpr const char* kPrefsNamespace = "sk-config";
 
@@ -178,6 +179,26 @@ void load_config_from_preferences() {
     
     int temp_unit = load_int_pref("temp_unit", 0);  // 0=Celsius, 1=Fahrenheit
     config.temperature_unit = (temp_unit == 0) ? TemperatureUnit::Celsius : TemperatureUnit::Fahrenheit;
+
+    Preferences prefs;
+    prefs.begin(kPrefsNamespace, true);
+
+    config.screen_config_count = prefs.getInt("screen_count", 0);
+
+    for (int i = 0; i < config.screen_config_count && i < MAX_SCREENS_CONFIG; i++) {
+        String key_id = "scr_id_" + String(i);
+        String key_en = "scr_en_" + String(i);
+
+        String id = prefs.getString(key_id.c_str(), "");
+        bool enabled = prefs.getBool(key_en.c_str(), true);
+
+        if (id.length() > 0) {
+            strcpy(config.screens[i].id, id.c_str());
+            config.screens[i].enabled = enabled;
+        }
+    }
+
+    prefs.end();
 }
 
 void save_all_config_to_preferences() {
@@ -250,6 +271,23 @@ void save_all_config_to_preferences() {
     // Save unit preferences
     save_int_pref("dist_unit", (int)config.distance_unit);
     save_int_pref("temp_unit", (int)config.temperature_unit);
+
+    Preferences prefs;
+    prefs.begin(kPrefsNamespace, false);
+
+    // Save count
+    prefs.putInt("screen_count", config.screen_config_count);
+
+    // Save entries
+    for (int i = 0; i < config.screen_config_count; i++) {
+        String key_id = "scr_id_" + String(i);
+        String key_en = "scr_en_" + String(i);
+
+        prefs.putString(key_id.c_str(), config.screens[i].id);
+        prefs.putBool(key_en.c_str(), config.screens[i].enabled);
+    }
+
+    prefs.end();
 }
 
 // Export config to JSON
@@ -738,7 +776,7 @@ void handle_show_signalk_config_page() {
         </form>
         <div class='actions'>
             <a class='back-link' href='/'>← Back to Administration</a>
-    <button id='submitBtn' class='btn-save' onclick='saveConfig()' disabled>No changes to save</button>
+            <button type='button' id='submitBtn' class='btn-save' onclick='saveConfig()' disabled>No changes to save</button>
             <button class='btn-export' onclick='exportConfig()'>Export JSON</button>
             <button class='btn-reset' onclick='if(confirm("Reset all to defaults?")) resetConfig()'>Reset to Defaults</button>
         </div>
@@ -1121,7 +1159,7 @@ void handle_show_display_config_page() {
         </form>
         <div class='actions'>
             <a class='back-link' href='/'>← Back to Administration</a>
-            <button id='submitBtn' class='btn-save' onclick='saveDisplayConfig()' disabled>No changes to save</button>
+            <button type='button' id='submitBtn' class='btn-save' onclick='saveDisplayConfig()' disabled>No changes to save</button>
         </div>
     </div>
 </div>
@@ -1267,7 +1305,7 @@ void handle_save_config() {
     }
     
     // Parse JSON
-    DynamicJsonDocument doc(1024);
+    JsonDocument doc;
 
     DeserializationError error = deserializeJson(doc, body);
     if (error) {
@@ -1341,7 +1379,7 @@ void handle_save_display_config() {
     // Read JSON body from POST request
     String body = web_server.arg("plain");
     ESP_LOGI("HTTP", "Body length: %d", body.length());
-ESP_LOGI("HTTP", "Body: %s", body.c_str());
+    ESP_LOGI("HTTP", "Body: %s", body.c_str());
     
     if (body.length() == 0) {
         web_server.send(400, "text/plain", "Empty request body");
@@ -1349,7 +1387,7 @@ ESP_LOGI("HTTP", "Body: %s", body.c_str());
     }
     
     // Parse JSON
-    DynamicJsonDocument doc(1024);
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, body);
     
     if (error) {
@@ -1389,8 +1427,10 @@ ESP_LOGI("HTTP", "Body: %s", body.c_str());
 
         String param = "screen_" + String(id);
 
-        bool enabled = doc[param].is<bool>() ? doc[param].as<bool>() : false;
-        set_screen_enabled(id, enabled);
+        if (doc.containsKey(param)) {
+            bool enabled = doc[param].as<bool>();
+            set_screen_enabled(id, enabled);
+        }
     }
 
     // Static screens
@@ -1400,14 +1440,16 @@ ESP_LOGI("HTTP", "Body: %s", body.c_str());
 
     for (int i = 0; i < 7; i++) {
         String param = "screen_" + String(static_screens[i]);
-        bool enabled = doc[param].is<bool>() ? doc[param].as<bool>() : false;
-
-        set_screen_enabled(static_screens[i], enabled);
+        if (doc.containsKey(param)) {
+            bool enabled = doc[param].as<bool>();
+            set_screen_enabled(static_screens[i], enabled);
+        }
     }
 
     // Save all to preferences
     save_all_config_to_preferences();
     load_config_from_preferences();
+    notify_config_changed();
 
     web_server.send(200, "text/plain", "Display settings saved");
 }

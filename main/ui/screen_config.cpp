@@ -16,7 +16,7 @@ bool is_screen_enabled(const char* id)
         }
     }
 
-    return true;
+    return false;
 }
 
 void set_screen_enabled(const char* id, bool enabled)
