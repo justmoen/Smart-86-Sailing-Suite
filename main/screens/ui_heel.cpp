@@ -17,6 +17,30 @@ extern "C" {
   static lv_obj_t *heel_drift_label;
   static lv_obj_t *heel_set_label;
 
+  static void heel_destroy_cb(lv_updatable_screen_t *scr) {
+    if (heel_display) {
+      lv_obj_del(heel_display);
+      heel_display = nullptr;
+    }
+    if (pitch_label) {
+      lv_obj_del(pitch_label);
+      pitch_label = nullptr;
+    }
+    if (heel_leeway_label) {
+      lv_obj_del(heel_leeway_label);
+      heel_leeway_label = nullptr;
+    }
+    if (heel_drift_label) {
+      lv_obj_del(heel_drift_label);
+      heel_drift_label = nullptr;
+    }
+    if (heel_set_label) {
+      lv_obj_del(heel_set_label);
+      heel_set_label = nullptr;
+    }
+    indic_heel = nullptr;
+  }
+
   static void set_heel_value(void *indic, int32_t v) {
     lv_meter_set_indicator_value(heel_display, (lv_meter_indicator_t *)indic, v);
   }
@@ -118,11 +142,12 @@ extern "C" {
                                  : 0);
   }
 
-  lv_updatable_screen_t heelScreen = {
+lv_updatable_screen_t heelScreen = {
     .screen = nullptr,
     .created = false,
     .create_cb = lv_heel_display,
-    .update_cb = heel_update_cb
+    .update_cb = heel_update_cb,
+    .destroy_cb = heel_destroy_cb
   };
 
 #ifdef __cplusplus

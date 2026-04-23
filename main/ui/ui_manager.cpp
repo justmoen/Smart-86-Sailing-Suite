@@ -100,6 +100,10 @@ void ui_manager_show(lv_updatable_screen_t *scr)
 {
     if (!scr) return;
 
+    if (scr->destroy_cb) {
+        scr->destroy_cb(scr);
+    }
+
     create_if_needed(scr);
 
     current_screen = scr;
@@ -223,6 +227,9 @@ void ui_manager_process_deferred_screen_load()
 void ui_manager_reinit_screens() {
     // Destroy all existing screens
     for (int i = 0; i < screen_count; i++) {
+        if (screens[i] && screens[i]->destroy_cb) {
+            screens[i]->destroy_cb(screens[i]);
+        }
         if (screens[i] && screens[i]->screen) {
             lv_obj_del(screens[i]->screen);
             screens[i]->screen = nullptr;
