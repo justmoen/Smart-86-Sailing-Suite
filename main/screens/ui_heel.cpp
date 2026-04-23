@@ -137,9 +137,16 @@ extern "C" {
                                                ? String(shipDataModel.navigation.set_true.deg, 0)
                                                : String("--"))) += (LV_SYMBOL_DEGREES "t"))
                         .c_str());
-    set_heel_value(indic_heel, fresh(shipDataModel.navigation.attitude.heel.age)
+    static int last_heel = 999;
+
+    int new_val = fresh(shipDataModel.navigation.attitude.heel.age)
                                  ? shipDataModel.navigation.attitude.heel.deg
-                                 : 0);
+                                 : 0;
+
+    if (new_val != last_heel) {
+        set_heel_value(indic_heel, new_val);
+        last_heel = new_val;
+    }
   }
 
 lv_updatable_screen_t heelScreen = {
