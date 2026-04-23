@@ -3,6 +3,7 @@
 
 #include <ReactESP.h>
 #include <MQTTClient.h>
+#include <WiFiClient.h>
 
 extern reactesp::ReactESP app;
 
