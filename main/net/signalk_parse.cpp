@@ -206,11 +206,14 @@ static fluid_type_e string_to_fluid_type(const String& fluid_lower) {
             shipDataModel.steering.rudder_angle.deg = value.as<float>() * 180.0 / PI;
             shipDataModel.steering.rudder_angle.age = millis();
           }
-        } else if (starts_with(p, "propulsion.")) {
+        } else if (starts_with(p, "propulsion.engines.")) {
           String engineID = path.substring(11);
           int idx = engineID.indexOf('.');
           if (idx > 0) {
             engineID = engineID.substring(0, idx);
+            // Normalize to lowercase
+            engineID.toLowerCase();
+            
             if (engineID != NULL) {
               engine_t* eng = lookup_engine(engineID.c_str());
               if (eng != NULL) {
