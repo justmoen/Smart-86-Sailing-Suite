@@ -17,9 +17,15 @@ struct EngineScreenState {
     lv_obj_t *oil_press_meter;
     lv_meter_indicator_t *oil_press_indic;
     lv_obj_t *eng_temp_meter;
-    lv_meter_indicator_t *eng_temp_indic;
+    lv_meter_indicator_t *temp_arc_green;
+    lv_meter_indicator_t *temp_arc_red;
+    lv_meter_indicator_t *temp_needle;
     lv_obj_t *eng_sog_label;
     lv_obj_t *eng_alternator_label;
+    float last_rpm = 0;
+    float last_oil_pressure = 0;
+    float last_temp = 0;
+    float last_alternator = 0;
 };
 
 static EngineScreenState engine_states[MAX_ENGINE_SCREENS] = {};
@@ -131,50 +137,42 @@ static void lv_engine_display(lv_updatable_screen_t *scr) {
     lv_obj_set_style_pad_all(state->eng_temp_meter, 0, LV_PART_MAIN);
     lv_meter_scale_t *eng_temp_scale = lv_meter_add_scale(state->eng_temp_meter);
     lv_meter_set_scale_ticks(state->eng_temp_meter, eng_temp_scale, 13, 2, 7, lv_palette_main(LV_PALETTE_GREY));
-#if LV_FONT_MONTSERRAT_26
     lv_obj_set_style_text_font(state->eng_temp_meter, &lv_font_montserrat_26, LV_PART_TICKS);
-#endif
     lv_meter_set_scale_major_ticks(state->eng_temp_meter, eng_temp_scale, 4, 2, 7, lv_palette_main(LV_PALETTE_GREY), 10);
     lv_meter_set_scale_range(state->eng_temp_meter, eng_temp_scale, 0, 120, 270, 90);
-    
+
     // Green zone (0 to redline)
-    state->eng_temp_indic = lv_meter_add_arc(state->eng_temp_meter, eng_temp_scale, 3, lv_palette_main(LV_PALETTE_GREEN), 1);
-    lv_meter_set_indicator_start_value(state->eng_temp_meter, state->eng_temp_indic, 0);
-    lv_meter_set_indicator_end_value(state->eng_temp_meter, state->eng_temp_indic, config.engine_temp_redline);
+    state->temp_arc_green = lv_meter_add_arc(state->eng_temp_meter, eng_temp_scale, 3, lv_palette_main(LV_PALETTE_GREEN), 1);
+    lv_meter_set_indicator_start_value(state->eng_temp_meter, state->temp_arc_green, 0);
+    lv_meter_set_indicator_end_value(state->eng_temp_meter, state->temp_arc_green, config.engine_temp_redline);
     
     // Red zone (redline to max)
-    lv_meter_indicator_t *temp_red = lv_meter_add_arc(state->eng_temp_meter, eng_temp_scale, 3, lv_palette_main(LV_PALETTE_RED), 1);
-    lv_meter_set_indicator_start_value(state->eng_temp_meter, temp_red, config.engine_temp_redline);
-    lv_meter_set_indicator_end_value(state->eng_temp_meter, temp_red, 120);
+    state->temp_arc_red = lv_meter_add_arc(state->eng_temp_meter, eng_temp_scale, 3, lv_palette_main(LV_PALETTE_RED), 1);
+    lv_meter_set_indicator_start_value(state->eng_temp_meter, state->temp_arc_red, config.engine_temp_redline);
+    lv_meter_set_indicator_end_value(state->eng_temp_meter, state->temp_arc_red, 120);
+
+    state->temp_needle = lv_meter_add_needle_line(state->eng_temp_meter, eng_temp_scale, 3, lv_palette_main(LV_PALETTE_GREY), -10);
 
     lv_obj_t *eng_temp_label = lv_label_create(scr->screen);
     lv_obj_align(eng_temp_label, LV_ALIGN_CENTER, 125, 280);
-#if LV_FONT_MONTSERRAT_32
     lv_obj_set_style_text_font(eng_temp_label, &lv_font_montserrat_32, 0);
-#endif
     lv_obj_set_style_text_color(eng_temp_label, lv_color_black(), 0);
     lv_label_set_text_static(eng_temp_label, LV_SYMBOL_DEGREES "C");
 
     state->eng_sog_label = lv_label_create(scr->screen);
     lv_obj_align(state->eng_sog_label, LV_ALIGN_TOP_LEFT, 2, 2);
-#if LV_FONT_MONTSERRAT_30
     lv_obj_set_style_text_font(state->eng_sog_label, &lv_font_montserrat_30, 0);
-#endif
     lv_label_set_text_static(state->eng_sog_label, "SOG (kt):\n--");
 
     state->eng_alternator_label = lv_label_create(scr->screen);
     lv_obj_align(state->eng_alternator_label, LV_ALIGN_TOP_RIGHT, -2, 2);
-#if LV_FONT_MONTSERRAT_30
     lv_obj_set_style_text_font(state->eng_alternator_label, &lv_font_montserrat_30, 0);
-#endif
     lv_label_set_text_static(state->eng_alternator_label, "ALT (V):\n--");
     
     // Display engine ID in bottom right corner
     lv_obj_t *engine_id_label = lv_label_create(scr->screen);
     lv_obj_align(engine_id_label, LV_ALIGN_BOTTOM_RIGHT, -5, -5);
-#if LV_FONT_MONTSERRAT_20
     lv_obj_set_style_text_font(engine_id_label, &lv_font_montserrat_20, 0);
-#endif
     lv_obj_set_style_text_color(engine_id_label, lv_color_hex(0x999999), 0);
     String engine_id_str = String("E") + (state->engine_id + 1);
     lv_label_set_text(engine_id_label, engine_id_str.c_str());
@@ -185,7 +183,7 @@ static void engine_update_cb(lv_updatable_screen_t *scr) {
     EngineScreenState *state = (EngineScreenState *)scr->user_data;
     if (!state || !scr->screen) return;
 
-    if (!state->engine_rpm_indic || !state->oil_press_indic || !state->eng_temp_indic || 
+    if (!state->engine_rpm_indic || !state->oil_press_indic || !state->temp_arc_green || !state->temp_arc_red || !state->temp_needle || 
         !state->eng_sog_label || !state->eng_alternator_label) return;
     
     int engine_id = state->engine_id;
@@ -194,21 +192,35 @@ static void engine_update_cb(lv_updatable_screen_t *scr) {
     
     // Use configured engine_id
     if (engine_id >= 0 && engine_id < 8) {
-        set_engine_rpm_value(state,
-            (fresh(shipDataModel.propulsion.engines[engine_id].revolutions_RPM.age)
-                ? shipDataModel.propulsion.engines[engine_id].revolutions_RPM.rpm / 100
-                : 0));
+        if (fresh(shipDataModel.propulsion.engines[engine_id].revolutions_RPM.age)) {
+            state->last_rpm = shipDataModel.propulsion.engines[engine_id].revolutions_RPM.rpm / 100;
+        }
+        set_engine_rpm_value(state, state->last_rpm);
+
+        if (fresh(shipDataModel.propulsion.engines[engine_id].alternator_voltage.age)) {
+            state->last_alternator =
+                shipDataModel.propulsion.engines[engine_id].alternator_voltage.volt;
+        }
 
         lv_label_set_text(state->eng_alternator_label,
-            (String("ALT (V):\n    ") +
-             (fresh(shipDataModel.propulsion.engines[engine_id].alternator_voltage.age)
-                ? String(shipDataModel.propulsion.engines[engine_id].alternator_voltage.volt, 1)
-                : String("--"))).c_str());
+            (String("ALT (V):\n    ") + String(state->last_alternator, 1)).c_str());
         
-        float current_oil_pressure = (fresh(shipDataModel.propulsion.engines[engine_id].oil_pressure.age)
-                                      ? shipDataModel.propulsion.engines[engine_id].oil_pressure.hPa * 0.0145037738
-                                      : 0);
-        lv_meter_set_indicator_end_value(state->oil_press_meter, state->oil_press_indic, current_oil_pressure);
+        if (fresh(shipDataModel.propulsion.engines[engine_id].oil_pressure.age)) {
+            state->last_oil_pressure =
+                shipDataModel.propulsion.engines[engine_id].oil_pressure.hPa * 0.0145037738;
+        }
+
+        lv_meter_set_indicator_end_value(
+            state->oil_press_meter,
+            state->oil_press_indic,
+            state->last_oil_pressure
+        );
+
+        if (fresh(shipDataModel.propulsion.engines[engine_id].temp_deg_C.age)) {
+            state->last_temp = shipDataModel.propulsion.engines[engine_id].temp_deg_C.deg_C;
+        }
+
+        lv_meter_set_indicator_value(state->eng_temp_meter, state->temp_needle, state->last_temp);
     }
 }
 
@@ -237,7 +249,9 @@ void create_engine_screens(lv_updatable_screen_t **out_screens, int *out_count) 
         engine_states[i].oil_press_meter = nullptr;
         engine_states[i].oil_press_indic = nullptr;
         engine_states[i].eng_temp_meter = nullptr;
-        engine_states[i].eng_temp_indic = nullptr;
+        engine_states[i].temp_arc_green = nullptr;
+        engine_states[i].temp_arc_red = nullptr;
+        engine_states[i].temp_needle = nullptr;
         engine_states[i].eng_sog_label = nullptr;
         engine_states[i].eng_alternator_label = nullptr;
         
