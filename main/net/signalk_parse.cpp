@@ -64,6 +64,7 @@ static fluid_type_e string_to_fluid_type(const String& fluid_lower) {
       const auto& config = get_signalk_path_config();
       auto update_value = [&](String& path, size_t& u_idx, size_t& v_idx, JsonVariant& value) {
         const char* p = path.c_str();
+        String enginePrefix = "propulsion.engines.";
         if (path == config.navigation_rate_of_turn) {
           if (value.is<float>()) {
             shipDataModel.navigation.rate_of_turn.deg_min = 60 * value.as<float>() * 180 / PI;
@@ -206,40 +207,34 @@ static fluid_type_e string_to_fluid_type(const String& fluid_lower) {
             shipDataModel.steering.rudder_angle.deg = value.as<float>() * 180.0 / PI;
             shipDataModel.steering.rudder_angle.age = millis();
           }
-        } else if (starts_with(p, "propulsion.engines.")) {
-          String engineID = path.substring(11);
-          int idx = engineID.indexOf('.');
-          if (idx > 0) {
-            engineID = engineID.substring(0, idx);
-            // Normalize to lowercase
-            engineID.toLowerCase();
-            
-            if (engineID != NULL) {
-              engine_t* eng = lookup_engine(engineID.c_str());
-              if (eng != NULL) {
-                String prefix = String("propulsion.") + engineID;
-                if (path == (prefix + ".revolutions")) {
-                  if (value.is<float>()) {
-                    eng->revolutions_RPM.rpm = value.as<float>() * 60;
-                    eng->revolutions_RPM.age = millis();
-                  }
-                } else if (path == (prefix + ".temperature")) {
-                  if (value.is<float>()) {
-                    eng->temp_deg_C.deg_C = value.as<float>() - 273.15;
-                    eng->temp_deg_C.age = millis();
-                  }
-                } else if (path == (prefix + ".oilPressure")) {
-                  if (value.is<float>()) {
-                    eng->oil_pressure.hPa = value.as<float>() / 100.0;
-                    eng->oil_pressure.age = millis();
-                  }
-                } else if (path == (prefix + ".alternatorVoltage")) {
-                  if (value.is<float>()) {
-                    eng->alternator_voltage.volt = value.as<float>();
-                    eng->alternator_voltage.age = millis();
-                  }
-                }
-              }
+        } else if (starts_with(p, enginePrefix.c_str())) {
+          String remainder = path.substring(enginePrefix.length());
+          int dotIndex = remainder.indexOf('.');
+          if (dotIndex == -1) return;
+          String engineID = remainder.substring(0, dotIndex);
+          engineID.toLowerCase();
+          engine_t* eng = lookup_engine(engineID.c_str());
+          if (eng == NULL) return;
+          String field = remainder.substring(dotIndex + 1);
+          if (field == "revolutions") {
+            if (value.is<float>()) {
+              eng->revolutions_RPM.rpm = value.as<float>() * 60;
+              eng->revolutions_RPM.age = millis();
+            }
+          } else if (field == "temperature") {
+            if (value.is<float>()) {
+              eng->temp_deg_C.deg_C = value.as<float>() - 273.15;
+              eng->temp_deg_C.age = millis();
+            }
+          } else if (field == "oilPressure") {
+            if (value.is<float>()) {
+              eng->oil_pressure.hPa = value.as<float>() / 100.0;
+              eng->oil_pressure.age = millis();
+            }
+          } else if (field == "alternatorVoltage") {
+            if (value.is<float>()) {
+              eng->alternator_voltage.volt = value.as<float>();
+              eng->alternator_voltage.age = millis();
             }
           }
         } else if (starts_with(p, "tanks.")) {
