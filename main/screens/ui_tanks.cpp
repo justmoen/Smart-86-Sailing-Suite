@@ -71,6 +71,7 @@ static void lv_tanks_display(lv_updatable_screen_t *scr)
         );
 
         lv_obj_set_style_radius(bar_tank[i], 6, LV_PART_MAIN);
+        lv_obj_set_style_radius(bar_tank[i], 0, LV_PART_INDICATOR);
         lv_bar_set_range(bar_tank[i], 0, 100);
 
         bar_tank_l[i] = lv_label_create(parent);

@@ -5,6 +5,8 @@
 
 enum class DistanceUnit { Meters, Feet };
 enum class TemperatureUnit { Celsius, Fahrenheit };
+enum class EngineTopLeftMetric { SOG = 0, ThrottlePercent = 1 };
+enum class EngineTopRightMetric { AlternatorVoltage = 0, BatteryVoltage = 1 };
 
 typedef struct {
     char id[20];
@@ -63,7 +65,7 @@ struct signalk_path_config_t {
   String vessel_navigation_state_api;
 
   // Propulsion/Engine paths (parameterized per engine)
-  String engine_paths[8];  // Up to 8 engines: "propulsion.engines.0.temperature", etc
+  String engine_paths[8];  // Up to 8 engines: e.g. "propulsion.engines.port.temperature"
 
   // Tank paths (parameterized per tank)
   String tank_paths[8];    // Up to 8 tanks: "tanks.fuel.0.currentLevel", etc
@@ -77,6 +79,11 @@ struct signalk_path_config_t {
   int engine_screen_2_id = 1;               // Second engine screen displays engine 1 by default
   
   // Engine gauge thresholds
+  bool engine_oil_pressure_enabled = true;   // Show oil pressure display on engine UI
+  bool engine_top_left_enabled = true;       // Show top-left engine corner metric
+  EngineTopLeftMetric engine_top_left_metric = EngineTopLeftMetric::SOG;
+  bool engine_top_right_enabled = true;      // Show top-right engine corner metric
+  EngineTopRightMetric engine_top_right_metric = EngineTopRightMetric::AlternatorVoltage;
   float engine_oil_pressure_min = 10.0f;    // PSI - min of green zone
   float engine_oil_pressure_max = 60.0f;    // PSI - max of green zone
   float engine_temp_redline = 100.0f;       // Celsius
