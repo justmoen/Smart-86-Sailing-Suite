@@ -1,12 +1,284 @@
 #include "signalk_path_config.h"
 
 #include <ArduinoJson.h>
+#include <HTTPClient.h>
 #include <Preferences.h>
 #include <WebServer.h>
+#include <vector>
+#include <esp_https_ota.h>
+#include <esp_system.h>
+#include "net_mdns.h"
+#include "net_signalk_http.h"
 #include "screen_config.h"
 #include "ui_manager.h"
 
+#ifndef FIRMWARE_VERSION
+#define FIRMWARE_VERSION "3.6.0"
+#endif
+
 constexpr const char* kPrefsNamespace = "sk-config";
+constexpr const char* kGitHubRepo = "justmoen/Smart-86-Sailing-Suite";
+
+String load_string_pref(const char* key, const char* default_val);
+void save_string_pref(const char* key, const String& value);
+static String get_manual_signalk_host() {
+    Preferences prefs;
+    prefs.begin("signalk", true);
+    String value = prefs.getString(SK_MANUAL_HOST_PREF, "");
+    if (value.length() == 0) {
+        value = prefs.getString("signalk_manual_host", "");
+        if (value.length() > 0) {
+            prefs.end();
+            Preferences writer;
+            writer.begin("signalk", false);
+            writer.putString(SK_MANUAL_HOST_PREF, value);
+            writer.remove("signalk_manual_host");
+            writer.end();
+        }
+    }
+    prefs.end();
+    return value;
+}
+static int get_manual_signalk_port() {
+    Preferences prefs;
+    prefs.begin("signalk", true);
+    int value = prefs.getInt(SK_MANUAL_PORT_PREF, 3000);
+    if (value == 3000 && prefs.isKey("signalk_manual_port")) {
+        value = prefs.getInt("signalk_manual_port", 3000);
+        if (value > 0) {
+            prefs.end();
+            Preferences writer;
+            writer.begin("signalk", false);
+            writer.putInt(SK_MANUAL_PORT_PREF, value);
+            writer.remove("signalk_manual_port");
+            writer.end();
+        }
+    }
+    prefs.end();
+    return value;
+}
+static String get_saved_release_pref(const char* key, const String& fallback);
+static void set_saved_release_pref(const char* key, const String& value);
+static bool is_valid_nvs_key(const char* key) {
+    if (key == nullptr) return false;
+    size_t len = strlen(key);
+    return len > 0 && len <= 15;
+}
+
+static String normalize_release_tag(const String& tag) {
+    String value = tag;
+    value.trim();
+    if (value.length() > 0 && value.charAt(0) == 'v') {
+        value = value.substring(1);
+    }
+    return value;
+}
+
+static bool version_is_newer(const String& candidate, const String& current) {
+    String a = normalize_release_tag(candidate);
+    String b = normalize_release_tag(current);
+    if (a.length() == 0) return false;
+    if (b.length() == 0) return true;
+
+    std::vector<int> current_parts;
+    std::vector<int> candidate_parts;
+    String current_token;
+    String candidate_token;
+
+    auto append_tokens = [](const String& text, std::vector<int>& out) {
+        String token;
+        for (size_t i = 0; i < text.length(); ++i) {
+            char ch = text.charAt(i);
+            if (isdigit(ch)) {
+                token += ch;
+            } else if (token.length() > 0) {
+                out.push_back(token.toInt());
+                token = "";
+            }
+        }
+        if (token.length() > 0) {
+            out.push_back(token.toInt());
+        }
+    };
+
+    append_tokens(a, candidate_parts);
+    append_tokens(b, current_parts);
+
+    size_t limit = std::max(candidate_parts.size(), current_parts.size());
+    if (limit == 0) return false;
+    while (candidate_parts.size() < limit) candidate_parts.push_back(0);
+    while (current_parts.size() < limit) current_parts.push_back(0);
+
+    for (size_t i = 0; i < limit; ++i) {
+        if (candidate_parts[i] > current_parts[i]) return true;
+        if (candidate_parts[i] < current_parts[i]) return false;
+    }
+    return false;
+}
+
+static String http_get_text(const String& url) {
+    HTTPClient client;
+    client.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+    client.setTimeout(15000);
+    client.setUserAgent("Smart86SailingSuite");
+    client.begin(url);
+    int code = client.GET();
+    String payload = "";
+    if (code >= 200 && code < 300) {
+        payload = client.getString();
+    }
+    client.end();
+    return payload;
+}
+
+static bool fetch_release_history(std::vector<String>& tags, std::vector<String>& download_urls, String& error_message) {
+    tags.clear();
+    download_urls.clear();
+
+    String payload = http_get_text(String("https://api.github.com/repos/") + kGitHubRepo + "/releases");
+    if (payload.length() == 0) {
+        error_message = "Unable to reach GitHub Releases.";
+        return false;
+    }
+
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, payload);
+    if (err) {
+        error_message = "GitHub API response was invalid.";
+        return false;
+    }
+
+    if (!doc.is<JsonArray>()) {
+        error_message = "GitHub API returned an unexpected format.";
+        return false;
+    }
+
+    JsonArray arr = doc.as<JsonArray>();
+    for (JsonVariant release : arr) {
+        if (!release["tag_name"].is<String>()) {
+            continue;
+        }
+
+        String tag = release["tag_name"].as<String>();
+        if (tag.length() == 0) {
+            continue;
+        }
+
+        String asset_url = "";
+        if (release["html_url"].is<String>()) {
+            asset_url = release["html_url"].as<String>();
+        }
+
+        if (release["assets"].is<JsonArray>()) {
+            JsonArray assets = release["assets"].as<JsonArray>();
+            for (JsonVariant asset : assets) {
+                if (asset["browser_download_url"].is<String>()) {
+                    asset_url = asset["browser_download_url"].as<String>();
+                    break;
+                }
+            }
+        }
+
+        tags.push_back(tag);
+        download_urls.push_back(asset_url);
+        if (tags.size() >= 5) {
+            break;
+        }
+    }
+
+    if (tags.empty()) {
+        error_message = "No public GitHub releases were found.";
+        return false;
+    }
+
+    error_message = "";
+    return true;
+}
+
+static String get_current_firmware_version() {
+    return String(FIRMWARE_VERSION);
+}
+
+static String resolve_release_asset_url(const String& tag, const String& fallback_download_url = "") {
+    String candidate = fallback_download_url;
+    if (candidate.length() == 0) {
+        candidate = get_saved_release_pref("firmware_latest_url", "");
+    }
+
+    if (tag.length() == 0) {
+        return candidate;
+    }
+
+    String api_url = String("https://api.github.com/repos/") + kGitHubRepo + "/releases/tags/" + tag;
+    String payload = http_get_text(api_url);
+    if (payload.length() == 0) {
+        return candidate;
+    }
+
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, payload);
+    if (err) {
+        return candidate;
+    }
+
+    if (doc["html_url"].is<String>()) {
+        candidate = doc["html_url"].as<String>();
+    }
+
+    if (doc["assets"].is<JsonArray>()) {
+        JsonArray assets = doc["assets"].as<JsonArray>();
+        for (JsonVariant asset : assets) {
+            if (asset["browser_download_url"].is<String>()) {
+                candidate = asset["browser_download_url"].as<String>();
+                break;
+            }
+        }
+    }
+
+    return candidate;
+}
+
+static String get_saved_release_pref(const char* key, const String& fallback) {
+    return load_string_pref(key, fallback.c_str());
+}
+
+static void set_saved_release_pref(const char* key, const String& value) {
+    save_string_pref(key, value);
+}
+
+static bool perform_firmware_ota(const String& tag, String& error_message) {
+    String download_url = resolve_release_asset_url(tag, get_saved_release_pref("firmware_latest_url", ""));
+    if (download_url.length() == 0) {
+        error_message = "No downloadable firmware asset was found for release " + tag + ".";
+        return false;
+    }
+
+    if (download_url.indexOf("http") != 0) {
+        error_message = "The firmware URL for release " + tag + " is not valid.";
+        return false;
+    }
+
+    esp_http_client_config_t client_config = {};
+    client_config.url = download_url.c_str();
+    client_config.timeout_ms = 30000;
+    client_config.keep_alive_enable = true;
+    client_config.buffer_size = 4096;
+
+    esp_https_ota_config_t ota_config = {};
+    ota_config.http_config = &client_config;
+    ota_config.bulk_flash_erase = false;
+    ota_config.partial_http_download = true;
+    ota_config.max_http_request_size = 65536;
+
+    esp_err_t err = esp_https_ota(&ota_config);
+    if (err != ESP_OK) {
+        error_message = "OTA failed for " + tag + ": " + String(esp_err_to_name(err));
+        return false;
+    }
+
+    error_message = "Firmware update staged successfully. Rebooting now...";
+    return true;
+}
 
 signalk_path_config_t config;  // Global default-initialized, runtime prefs override in load_config_from_preferences()
 
@@ -43,6 +315,7 @@ String extractFormValue(const String& body, const String& key) {
 
 // Load float from preferences with default
 float load_float_pref(const char* key, float default_val) {
+    if (!is_valid_nvs_key(key)) return default_val;
     Preferences prefs;
     prefs.begin(kPrefsNamespace, true);
     float val = prefs.getFloat(key, default_val);
@@ -52,14 +325,57 @@ float load_float_pref(const char* key, float default_val) {
 
 // Save float to preferences
 void save_float_pref(const char* key, float value) {
+    if (!is_valid_nvs_key(key)) return;
     Preferences prefs;
     prefs.begin(kPrefsNamespace, false);
     prefs.putFloat(key, value);
     prefs.end();
 }
 
+// Load bool from preferences with default
+bool load_bool_pref(const char* key, bool default_val) {
+    if (!is_valid_nvs_key(key)) return default_val;
+    Preferences prefs;
+    prefs.begin(kPrefsNamespace, true);
+    bool val = prefs.getBool(key, default_val);
+    prefs.end();
+    return val;
+}
+
+static bool prefs_has_key(const char* key) {
+    if (!is_valid_nvs_key(key)) return false;
+    Preferences prefs;
+    prefs.begin(kPrefsNamespace, true);
+    bool exists = prefs.isKey(key);
+    prefs.end();
+    return exists;
+}
+
+bool load_bool_pref_legacy(const char* key, const char* legacy_key, bool default_val) {
+    if (!is_valid_nvs_key(key)) return default_val;
+    if (prefs_has_key(key)) {
+        return load_bool_pref(key, default_val);
+    }
+    if (!is_valid_nvs_key(legacy_key)) return default_val;
+    Preferences prefs;
+    prefs.begin(kPrefsNamespace, true);
+    bool val = prefs.getBool(legacy_key, default_val);
+    prefs.end();
+    return val;
+}
+
+// Save bool to preferences
+void save_bool_pref(const char* key, bool value) {
+    if (!is_valid_nvs_key(key)) return;
+    Preferences prefs;
+    prefs.begin(kPrefsNamespace, false);
+    prefs.putBool(key, value);
+    prefs.end();
+}
+
 // Load int from preferences with default
 int load_int_pref(const char* key, int default_val) {
+    if (!is_valid_nvs_key(key)) return default_val;
     Preferences prefs;
     prefs.begin(kPrefsNamespace, true);
     int val = prefs.getInt(key, default_val);
@@ -67,8 +383,25 @@ int load_int_pref(const char* key, int default_val) {
     return val;
 }
 
+int load_int_pref_legacy(const char* key, const char* legacy_key, int default_val) {
+    if (!is_valid_nvs_key(key)) return default_val;
+    if (prefs_has_key(key)) {
+        int val = load_int_pref(key, default_val);
+        ESP_LOGI("WS", "[DEBUG] load_int_pref_legacy key='%s' -> type=int, value=%d (from primary key)\n", key, val);
+        return val;
+    }
+    if (!is_valid_nvs_key(legacy_key)) return default_val;
+    Preferences prefs;
+    prefs.begin(kPrefsNamespace, true);
+    int val = prefs.getInt(legacy_key, default_val);
+    prefs.end();
+    ESP_LOGI("WS", "[DEBUG] load_int_pref_legacy key='%s' legacy='%s' -> type=int, value=%d (from legacy key)\n", key, legacy_key, val);
+    return val;
+}
+
 // Save int to preferences
 void save_int_pref(const char* key, int value) {
+    if (!is_valid_nvs_key(key)) return;
     Preferences prefs;
     prefs.begin(kPrefsNamespace, false);
     prefs.putInt(key, value);
@@ -77,6 +410,7 @@ void save_int_pref(const char* key, int value) {
 
 // Load string from preferences with default
 String load_string_pref(const char* key, const char* default_val) {
+    if (!is_valid_nvs_key(key)) return String(default_val);
     Preferences prefs;
     prefs.begin(kPrefsNamespace, true);
     String val = prefs.getString(key, default_val);
@@ -86,6 +420,7 @@ String load_string_pref(const char* key, const char* default_val) {
 
 // Save string to preferences
 void save_string_pref(const char* key, const String& value) {
+    if (!is_valid_nvs_key(key)) return;
     // Check if value has changed
     String current = load_string_pref(key, "___nonexistent___");
     if (value == current) {
@@ -139,6 +474,8 @@ void load_config_from_preferences() {
 
     // Load engine Signal K paths (parameterized per engine)
     config.num_engines = load_int_pref("num_engines", 1);
+    if (config.num_engines < 1) config.num_engines = 1;
+    if (config.num_engines > 8) config.num_engines = 8;
     for (int i = 0; i < config.num_engines && i < 8; i++) {
         String key = String("eng_path_") + i;
         String default_path = String("propulsion.engines.") + i;
@@ -165,6 +502,17 @@ void load_config_from_preferences() {
     }
 
     // Load numeric thresholds
+    config.engine_oil_pressure_enabled = load_bool_pref("eng_oil_enabled", true);
+    config.engine_top_left_enabled = load_bool_pref_legacy("eng_tl_en", "eng_top_left_enabled", true);
+    Serial.printf("[DEBUG] config.engine_top_left_enabled loaded: value=%d, type=bool\n", config.engine_top_left_enabled ? 1 : 0);
+    int top_left_metric = load_int_pref_legacy("eng_tl_met", "eng_top_left_metric", (int)EngineTopLeftMetric::SOG);
+    if (top_left_metric < 0 || top_left_metric > 1) top_left_metric = (int)EngineTopLeftMetric::SOG;
+    config.engine_top_left_metric = static_cast<EngineTopLeftMetric>(top_left_metric);
+    Serial.printf("[DEBUG] config.engine_top_left_metric loaded: raw=%d, enum=%d, type=int\n", top_left_metric, static_cast<int>(config.engine_top_left_metric));
+    config.engine_top_right_enabled = load_bool_pref_legacy("eng_tr_en", "eng_top_right_enabled", true);
+    int top_right_metric = load_int_pref_legacy("eng_tr_met", "eng_top_right_metric", (int)EngineTopRightMetric::AlternatorVoltage);
+    if (top_right_metric < 0 || top_right_metric > 1) top_right_metric = (int)EngineTopRightMetric::AlternatorVoltage;
+    config.engine_top_right_metric = static_cast<EngineTopRightMetric>(top_right_metric);
     config.engine_oil_pressure_min = load_float_pref("eng_oil_min", 10.0f);
     config.engine_oil_pressure_max = load_float_pref("eng_oil_max", 60.0f);
     config.engine_temp_redline = load_float_pref("eng_temp_red", 100.0f);
@@ -253,6 +601,15 @@ void save_all_config_to_preferences() {
     save_int_pref("eng_scr_2_id", config.engine_screen_2_id);
 
     // Save numeric thresholds
+    save_bool_pref("eng_oil_enabled", config.engine_oil_pressure_enabled);
+    save_bool_pref("eng_tl_en", config.engine_top_left_enabled);
+    save_bool_pref("eng_top_left_enabled", config.engine_top_left_enabled);
+    save_int_pref("eng_tl_met", (int)config.engine_top_left_metric);
+    save_int_pref("eng_top_left_metric", (int)config.engine_top_left_metric);
+    save_bool_pref("eng_tr_en", config.engine_top_right_enabled);
+    save_bool_pref("eng_top_right_enabled", config.engine_top_right_enabled);
+    save_int_pref("eng_tr_met", (int)config.engine_top_right_metric);
+    save_int_pref("eng_top_right_metric", (int)config.engine_top_right_metric);
     save_float_pref("eng_oil_min", config.engine_oil_pressure_min);
     save_float_pref("eng_oil_max", config.engine_oil_pressure_max);
     save_float_pref("eng_temp_red", config.engine_temp_redline);
@@ -347,8 +704,13 @@ void export_config_to_json(JsonDocument& doc) {
     // Engine
     JsonObject engine = doc["engine"].to<JsonObject>();
     JsonObject oilPressure = engine["oilPressure"].to<JsonObject>();
+    oilPressure["enabled"] = config.engine_oil_pressure_enabled;
     oilPressure["minPSI"] = config.engine_oil_pressure_min;
     oilPressure["maxPSI"] = config.engine_oil_pressure_max;
+    engine["topLeftEnabled"] = config.engine_top_left_enabled;
+    engine["topLeftMetric"] = (int)config.engine_top_left_metric;
+    engine["topRightEnabled"] = config.engine_top_right_enabled;
+    engine["topRightMetric"] = (int)config.engine_top_right_metric;
     engine["tempRedlineCelsius"] = config.engine_temp_redline;
 
     // Charts
@@ -418,6 +780,7 @@ void handle_show_admin_index() {
     }
     .menu-item.signalk { border-left: 4px solid #2196F3; }
     .menu-item.display { border-left: 4px solid #4CAF50; }
+    .menu-item.firmware { border-left: 4px solid #ff9800; }
     .description {
         font-size: 0.85em;
         color: #666;
@@ -441,8 +804,339 @@ void handle_show_admin_index() {
             Display Settings
             <div class='description'>Customize gauges, units, and chart history</div>
         </a>
+        <a href='/firmware' class='menu-item firmware'>
+            Firmware Updates
+            <div class='description'>Check GitHub releases, update, and rollback to older versions</div>
+        </a>
     </div>
 </div>
+</body>
+</html>
+)";
+    web_server.send(200, "text/html", html);
+}
+
+void handle_firmware_status() {
+    JsonDocument doc;
+    doc["currentVersion"] = get_current_firmware_version();
+    doc["latestVersion"] = get_saved_release_pref("firmware_latest_tag", "unknown");
+    doc["hasUpdate"] = false;
+    doc["message"] = "Checking GitHub releases...";
+
+    std::vector<String> tags;
+    std::vector<String> download_urls;
+    String error_message;
+    bool ok = fetch_release_history(tags, download_urls, error_message);
+
+    if (ok && !tags.empty()) {
+        String latest_tag = tags[0];
+        String latest_downloader = download_urls[0];
+        set_saved_release_pref("firmware_latest_tag", latest_tag);
+        set_saved_release_pref("firmware_latest_url", latest_downloader);
+
+        doc["latestVersion"] = latest_tag;
+        doc["latestUrl"] = latest_downloader;
+        doc["hasUpdate"] = version_is_newer(latest_tag, get_current_firmware_version());
+        doc["message"] = doc["hasUpdate"].as<bool>() ? "New release available." : "You are on the latest available release.";
+
+        JsonArray releases = doc["releases"].to<JsonArray>();
+        for (size_t i = 0; i < tags.size(); ++i) {
+            JsonObject item = releases.add<JsonObject>();
+            item["tag"] = tags[i];
+            item["downloadUrl"] = download_urls[i];
+        }
+    } else {
+        doc["message"] = error_message;
+        if (doc["latestVersion"].as<String>().length() == 0 || doc["latestVersion"].as<String>() == "unknown") {
+            doc["latestVersion"] = "unknown";
+        }
+    }
+
+    String payload;
+    serializeJson(doc, payload);
+    web_server.send(200, "application/json", payload);
+}
+
+void handle_firmware_update() {
+    JsonDocument req;
+    String body = web_server.arg("plain");
+    if (body.length() > 0) {
+        deserializeJson(req, body);
+    }
+
+    String requested_tag = req["tag"].is<String>() ? req["tag"].as<String>() : get_saved_release_pref("firmware_latest_tag", "");
+    if (requested_tag.length() == 0) {
+        web_server.send(400, "application/json", R"({"status":"error","message":"No release tag was provided."})");
+        return;
+    }
+
+    String current_version = get_current_firmware_version();
+    if (!version_is_newer(requested_tag, current_version)) {
+        JsonDocument out;
+        out["status"] = "no-update";
+        out["currentVersion"] = current_version;
+        out["requestedTag"] = requested_tag;
+        out["message"] = "The selected release is not newer than the current firmware.";
+        String payload;
+        serializeJson(out, payload);
+        web_server.send(200, "application/json", payload);
+        return;
+    }
+
+    set_saved_release_pref("firmware_pending_tag", requested_tag);
+
+    String error_message;
+    bool ok = perform_firmware_ota(requested_tag, error_message);
+    JsonDocument out;
+    out["status"] = ok ? "updating" : "error";
+    out["tag"] = requested_tag;
+    out["message"] = ok ? "Starting firmware update for " + requested_tag + ". This may take a minute. The device will reboot when the update completes." : error_message;
+    String payload;
+    serializeJson(out, payload);
+    web_server.send(200, "application/json", payload);
+
+    if (ok) {
+        delay(250);
+        esp_restart();
+    }
+}
+
+void handle_firmware_rollback() {
+    JsonDocument req;
+    String body = web_server.arg("plain");
+    if (body.length() > 0) {
+        deserializeJson(req, body);
+    }
+
+    String tag = req["tag"].is<String>() ? req["tag"].as<String>() : "";
+    if (tag.length() == 0) {
+        web_server.send(400, "application/json", R"({"status":"error","message":"No rollback tag was provided."})");
+        return;
+    }
+
+    set_saved_release_pref("firmware_rollback_tag", tag);
+
+    String error_message;
+    bool ok = perform_firmware_ota(tag, error_message);
+    JsonDocument out;
+    out["status"] = ok ? "rollbacking" : "error";
+    out["tag"] = tag;
+    out["message"] = ok ? "Rolling back to release " + tag + ". The device will reboot when the previous firmware image is installed." : error_message;
+    String payload;
+    serializeJson(out, payload);
+    web_server.send(200, "application/json", payload);
+
+    if (ok) {
+        delay(250);
+        esp_restart();
+    }
+}
+
+void handle_show_firmware_page() {
+    String html;
+    html.reserve(20000);
+    html += R"(<!DOCTYPE html>
+<html>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Firmware Updates</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        color: #333;
+        min-height: 100vh;
+        padding: 20px;
+    }
+    .container {
+        max-width: 900px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        overflow: hidden;
+    }
+    .header {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        color: white;
+        padding: 30px;
+        text-align: center;
+    }
+    .header h1 { font-size: 2em; margin-bottom: 10px; }
+    .content { padding: 30px; }
+    .section {
+        margin: 25px 0;
+        padding: 20px;
+        background: #f5f5f5;
+        border-radius: 8px;
+        border-left: 4px solid #ff9800;
+    }
+    .section h2 { margin-bottom: 12px; font-size: 1.2em; }
+    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+    button, select {
+        padding: 12px 18px;
+        border-radius: 6px;
+        border: 1px solid #ddd;
+        font-size: 1em;
+    }
+    button {
+        background: #ff9800;
+        color: white;
+        border: none;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    button.secondary {
+        background: #2196F3;
+    }
+    button.danger {
+        background: #e53935;
+    }
+    .status {
+        background: #fff8e1;
+        border-left: 4px solid #ffb300;
+        padding: 12px 14px;
+        border-radius: 6px;
+        margin-top: 12px;
+        color: #5d4700;
+    }
+    .meta {
+        font-size: 0.9em;
+        color: #666;
+        margin-top: 8px;
+    }
+    .back-link {
+        display: inline-block;
+        margin-bottom: 20px;
+        padding: 8px 16px;
+        background: #f5f5f5;
+        border-radius: 6px;
+        text-decoration: none;
+        color: #333;
+        font-weight: 600;
+        border: 1px solid #ddd;
+    }
+    select {
+        min-width: 220px;
+        background: white;
+    }
+</style>
+</head>
+<body>
+<div class='container'>
+    <div class='header'>
+        <h1>Firmware Updates</h1>
+        <p>Check for software releases and choose a rollback target</p>
+    </div>
+    <div class='content'>
+        <a class='back-link' href='/'>← Back to Administration</a>
+
+        <div class='section'>
+            <h2>Current Firmware</h2>
+            <div class='meta'>Current version: <strong id='currentVersion'>loading...</strong></div>
+            <div class='meta'>Latest release found: <strong id='latestVersion'>checking...</strong></div>
+            <div id='statusBox' class='status'>Checking GitHub for the most recent release...</div>
+            <div class='row'>
+                <button class='secondary' id='checkBtn' type='button'>Check for Updates</button>
+                <button id='updateBtn' type='button'>Update to Latest Release</button>
+            </div>
+        </div>
+
+        <div class='section'>
+            <h2>Rollback to a Recent Release</h2>
+            <div class='row'>
+                <select id='rollbackSelect'>
+                    <option value=''>Loading recent releases...</option>
+                </select>
+                <button class='danger' id='rollbackBtn' type='button'>Install Selected Rollback</button>
+            </div>
+            <div class='meta'>This keeps the last five public GitHub release tags available for user-selected rollback and will flash the chosen release only when you confirm.</div>
+        </div>
+    </div>
+</div>
+<script>
+const currentVersionEl = document.getElementById('currentVersion');
+const latestVersionEl = document.getElementById('latestVersion');
+const statusBoxEl = document.getElementById('statusBox');
+const rollbackSelectEl = document.getElementById('rollbackSelect');
+
+async function loadStatus() {
+    try {
+        const res = await fetch('/firmware/status');
+        const data = await res.json();
+        currentVersionEl.textContent = data.currentVersion || 'unknown';
+        latestVersionEl.textContent = data.latestVersion || 'unknown';
+        statusBoxEl.textContent = data.message || 'No status available.';
+
+        const options = [];
+        if (Array.isArray(data.releases)) {
+            data.releases.forEach((release) => {
+                if (release && release.tag) {
+                    options.push(`<option value='${release.tag}'>${release.tag}</option>`);
+                }
+            });
+        }
+
+        if (options.length > 0) {
+            rollbackSelectEl.innerHTML = '<option value="">Select a prior release</option>' + options.join('');
+        } else {
+            rollbackSelectEl.innerHTML = '<option value="">No releases available</option>';
+        }
+
+        const updateBtn = document.getElementById('updateBtn');
+        if (data.hasUpdate) {
+            updateBtn.disabled = false;
+            updateBtn.textContent = `Update to ${data.latestVersion}`;
+        } else {
+            updateBtn.disabled = true;
+            updateBtn.textContent = 'No update available';
+        }
+    } catch (err) {
+        statusBoxEl.textContent = 'Error contacting the firmware update endpoint.';
+        console.error(err);
+    }
+}
+
+document.getElementById('checkBtn').addEventListener('click', loadStatus);
+
+document.getElementById('updateBtn').addEventListener('click', async () => {
+    const latestTag = document.getElementById('latestVersion').textContent.trim();
+    if (!latestTag || latestTag === 'unknown' || latestTag === 'checking...') {
+        statusBoxEl.textContent = 'There is no newer release to install yet.';
+        return;
+    }
+
+    statusBoxEl.textContent = 'Requesting update confirmation for ' + latestTag + '...';
+    const res = await fetch('/firmware/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag: latestTag })
+    });
+    const data = await res.json();
+    statusBoxEl.textContent = data.message || 'Update request sent.';
+    await loadStatus();
+});
+
+document.getElementById('rollbackBtn').addEventListener('click', async () => {
+    const tag = rollbackSelectEl.value;
+    if (!tag) {
+        statusBoxEl.textContent = 'Choose a release from the list before saving the rollback target.';
+        return;
+    }
+
+    const res = await fetch('/firmware/rollback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag })
+    });
+    const data = await res.json();
+    statusBoxEl.textContent = data.message || 'Rollback target saved.';
+});
+
+loadStatus();
+</script>
 </body>
 </html>
 )";
@@ -653,6 +1347,20 @@ void handle_show_signalk_config_page() {
     <div class='content'>
         <div class='info-text'>
             Configure Signal K paths for your boat's data model. Sections can be expanded to view and edit paths.
+        </div>
+        <div class='tree-item'>
+            <button type='button' class='tree-toggle expanded' onclick='toggleTree(this)'>Signal K Connection</button>
+            <div class='tree-content expanded'>
+                <div class='info-text'>
+                    If mDNS is unavailable on your network, set a fixed IP address and port here for the Signal K server.
+                </div>)";
+    html += "<div class='form-group'><label>Signal K Server IP / Host:</label><input type='text' name='signalk_override_host' value='";
+    html += get_manual_signalk_host();
+    html += "'></div>";
+    html += "<div class='form-group'><label>Signal K Server Port:</label><input type='number' name='signalk_override_port' value='";
+    html += String(get_manual_signalk_port());
+    html += R"(' min='1' max='65535'></div>
+            </div>
         </div>
         <form id='configForm'>
 )";
@@ -945,6 +1653,7 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 void handle_show_display_config_page() {
+    ESP_LOGI("WS", "[DEBUG] handle_show_display_config_page: rendering display config page\n");
     String html;
     html.reserve(8000);
     html += R"(<!DOCTYPE html>
@@ -1084,12 +1793,57 @@ void handle_show_display_config_page() {
                 <div class='form-group'><label>Number of Engines:</label><input type='number' name='num_engines' value=')";
     html += String(config.num_engines);
     html += R"(' min='1' max='8'></div>
-                <div class='form-group'><label>Oil Pressure Green Zone Minimum (PSI):</label><input type='number' name='eng_oil_min' value=')";
+                <div class='form-group'>
+                    <label style='display:flex; align-items:center; gap:10px;'>
+                        <input type='checkbox' name='eng_oil_enabled' value='true' )";
+    html += config.engine_oil_pressure_enabled ? "checked" : "";
+    html += R"(> Show Oil Pressure Gauge
+                    </label>
+                </div>
+                <div class='form-group'>
+                    <label style='display:flex; align-items:center; gap:10px;'>
+                        <input type='checkbox' name='eng_top_left_enabled' value='true' )";
+    html += config.engine_top_left_enabled ? "checked" : "";
+    html += R"(> Show Top Left Engine Metric
+                    </label>
+                    <select name='eng_top_left_metric'>
+                        <option value='0' )";
+    html += config.engine_top_left_metric == EngineTopLeftMetric::SOG ? "selected" : "";
+    html += R"(>SOG (kt)</option>
+                        <option value='1' )";
+    html += config.engine_top_left_metric == EngineTopLeftMetric::ThrottlePercent ? "selected" : "";
+    html += R"(>Throttle (%)</option>
+                    </select>
+                </div>
+                <div class='form-group'>
+                    <label style='display:flex; align-items:center; gap:10px;'>
+                        <input type='checkbox' name='eng_top_right_enabled' value='true' )";
+    html += config.engine_top_right_enabled ? "checked" : "";
+    html += R"(> Show Top Right Engine Metric
+                    </label>
+                    <select name='eng_top_right_metric'>
+                        <option value='0' )";
+    html += config.engine_top_right_metric == EngineTopRightMetric::AlternatorVoltage ? "selected" : "";
+    html += R"(>Alternator Voltage</option>
+                        <option value='1' )";
+    html += config.engine_top_right_metric == EngineTopRightMetric::BatteryVoltage ? "selected" : "";
+    html += R"(>Battery Voltage</option>
+                    </select>
+                </div>
+                <div id='oilPressureZoneFields' class='form-group' style='" )";
+    html += config.engine_oil_pressure_enabled ? "" : "display:none;";
+    html += R"('>
+                    <label>Oil Pressure Green Zone Minimum (PSI):</label><input type='number' name='eng_oil_min' value=')";
     html += String(config.engine_oil_pressure_min, 1);
-    html += R"(' step='0.1'></div>
-                <div class='form-group'><label>Oil Pressure Green Zone Maximum (PSI):</label><input type='number' name='eng_oil_max' value=')";
+    html += R"(' step='0.1'>
+                </div>
+                <div id='oilPressureZoneMaxFields' class='form-group' style='" )";
+    html += config.engine_oil_pressure_enabled ? "" : "display:none;";
+    html += R"('>
+                    <label>Oil Pressure Green Zone Maximum (PSI):</label><input type='number' name='eng_oil_max' value=')";
     html += String(config.engine_oil_pressure_max, 1);
-    html += R"(' step='0.1'></div>
+    html += R"(' step='0.1'>
+                </div>
                 <div class='form-group'><label>Temperature Redline (°C):</label><input type='number' name='eng_temp_red' value=')";
     html += String(config.engine_temp_redline, 1);
     html += R"(' step='0.1'></div>
@@ -1179,6 +1933,39 @@ function getValue(input) {
     }
 }
 
+function updateOilPressureZoneVisibility() {
+  const oilCheckbox = document.querySelector('input[name="eng_oil_enabled"]');
+  const zoneFields = document.getElementById('oilPressureZoneFields');
+  const zoneMaxFields = document.getElementById('oilPressureZoneMaxFields');
+
+  if (!oilCheckbox || !zoneFields || !zoneMaxFields) return;
+
+  const shouldShow = oilCheckbox.checked;
+  zoneFields.style.display = shouldShow ? '' : 'none';
+  zoneMaxFields.style.display = shouldShow ? '' : 'none';
+}
+
+function syncMetricCheckboxes() {
+  const topLeftEnabled = document.querySelector('input[name="eng_top_left_enabled"]');
+  const topLeftMetric = document.querySelector('select[name="eng_top_left_metric"]');
+  const topRightEnabled = document.querySelector('input[name="eng_top_right_enabled"]');
+  const topRightMetric = document.querySelector('select[name="eng_top_right_metric"]');
+
+  if (topLeftEnabled && topLeftMetric) {
+    const metricSelected = topLeftMetric.value === '1';
+    const derivedChecked = topLeftEnabled.checked || metricSelected;
+    topLeftEnabled.checked = derivedChecked;
+    topLeftMetric.disabled = !topLeftEnabled.checked;
+  }
+
+  if (topRightEnabled && topRightMetric) {
+    const metricSelected = topRightMetric.value === '1';
+    const derivedChecked = topRightEnabled.checked || metricSelected;
+    topRightEnabled.checked = derivedChecked;
+    topRightMetric.disabled = !topRightEnabled.checked;
+  }
+}
+
 function initChangeTracking() {
   originalValues = {};
   const inputs = document.querySelectorAll('input, select');
@@ -1186,10 +1973,21 @@ function initChangeTracking() {
     const name = input.name;
     if (name) {
       originalValues[name] = getValue(input);
-      input.addEventListener('change', updateSubmitButton);
+      input.addEventListener('change', () => {
+        syncMetricCheckboxes();
+        updateSubmitButton();
+      });
       input.style.borderColor = '#ddd';
     }
   });
+
+  const oilCheckbox = document.querySelector('input[name="eng_oil_enabled"]');
+  if (oilCheckbox) {
+    oilCheckbox.addEventListener('change', updateOilPressureZoneVisibility);
+  }
+
+  syncMetricCheckboxes();
+  updateOilPressureZoneVisibility();
   updateSubmitButton();
 }
 
@@ -1249,15 +2047,36 @@ initChangeTracking();
 async function saveDisplayConfig() {
     const changedData = {};
     const inputs = document.querySelectorAll('input, select');
+
+    syncMetricCheckboxes();
+    const topLeftCheckbox = document.querySelector('input[name="eng_top_left_enabled"]');
+    const topLeftMetric = document.querySelector('select[name="eng_top_left_metric"]');
+    const topRightCheckbox = document.querySelector('input[name="eng_top_right_enabled"]');
+    const topRightMetric = document.querySelector('select[name="eng_top_right_metric"]');
+
     for (let input of inputs) {
         const name = input.name;
-        if (name) {
-          const value = getValue(input);
-          if (value !== originalValues[name]) {
+        if (!name) continue;
+
+        let value = getValue(input);
+        if (name === 'eng_top_left_enabled' && topLeftCheckbox) {
+            value = topLeftCheckbox.checked;
+        }
+        if (name === 'eng_top_left_metric' && topLeftMetric) {
+            value = topLeftMetric.value;
+        }
+        if (name === 'eng_top_right_enabled' && topRightCheckbox) {
+            value = topRightCheckbox.checked;
+        }
+        if (name === 'eng_top_right_metric' && topRightMetric) {
+            value = topRightMetric.value;
+        }
+
+        if (value !== originalValues[name]) {
             changedData[name] = value;
-          }
         }
     }
+
     if (Object.keys(changedData).length === 0) {
         alert('No changes to save!');
         return;
@@ -1314,6 +2133,34 @@ void handle_save_config() {
         return;
     }
     
+    if (!doc["signalk_override_host"].isNull()) {
+        String host = doc["signalk_override_host"].as<String>();
+        host.trim();
+        Preferences netPrefs;
+        netPrefs.begin("signalk", false);
+        if (host.length() > 0) {
+            netPrefs.putString(SK_MANUAL_HOST_PREF, host);
+            netPrefs.putString(SK_TCP_HOST_PREF, host);
+            netPrefs.putString(SK_HTTP_HOST_PREF, host);
+        } else {
+            netPrefs.remove(SK_MANUAL_HOST_PREF);
+            netPrefs.remove(SK_TCP_HOST_PREF);
+            netPrefs.remove(SK_HTTP_HOST_PREF);
+        }
+        netPrefs.end();
+    }
+    if (!doc["signalk_override_port"].isNull()) {
+        int port = doc["signalk_override_port"].as<int>();
+        if (port < 1) port = 3000;
+        if (port > 65535) port = 65535;
+        Preferences netPrefs;
+        netPrefs.begin("signalk", false);
+        netPrefs.putInt(SK_MANUAL_PORT_PREF, port);
+        netPrefs.putInt(SK_TCP_PORT_PREF, port);
+        netPrefs.putInt(SK_HTTP_PORT_PREF, port);
+        netPrefs.end();
+    }
+
     // Load all string fields (Signal K paths only)
     if (!doc["nav_rot"].isNull()) config.navigation_rate_of_turn = doc["nav_rot"].as<String>();
     if (!doc["nav_hdg"].isNull()) config.navigation_heading_magnetic = doc["nav_hdg"].as<String>();
@@ -1409,6 +2256,21 @@ void handle_save_display_config() {
         if (config.num_engines > 8) config.num_engines = 8;
         if (config.num_engines < 1) config.num_engines = 1;
     }
+    if (!doc["eng_oil_enabled"].isNull()) config.engine_oil_pressure_enabled = doc["eng_oil_enabled"].as<bool>();
+    if (!doc["eng_top_left_enabled"].isNull()) config.engine_top_left_enabled = doc["eng_top_left_enabled"].as<bool>();
+    if (!doc["eng_top_left_metric"].isNull()) {
+        int metric = doc["eng_top_left_metric"].as<int>();
+        if (metric == (int)EngineTopLeftMetric::SOG || metric == (int)EngineTopLeftMetric::ThrottlePercent) {
+            config.engine_top_left_metric = static_cast<EngineTopLeftMetric>(metric);
+        }
+    }
+    if (!doc["eng_top_right_enabled"].isNull()) config.engine_top_right_enabled = doc["eng_top_right_enabled"].as<bool>();
+    if (!doc["eng_top_right_metric"].isNull()) {
+        int metric = doc["eng_top_right_metric"].as<int>();
+        if (metric == (int)EngineTopRightMetric::AlternatorVoltage || metric == (int)EngineTopRightMetric::BatteryVoltage) {
+            config.engine_top_right_metric = static_cast<EngineTopRightMetric>(metric);
+        }
+    }
     if (!doc["eng_oil_min"].isNull())  config.engine_oil_pressure_min = doc["eng_oil_min"].as<float>();
     if (!doc["eng_oil_max"].isNull()) config.engine_oil_pressure_max = doc["eng_oil_max"].as<float>();
     if (!doc["eng_temp_red"].isNull()) config.engine_temp_redline = doc["eng_temp_red"].as<float>();
@@ -1427,7 +2289,7 @@ void handle_save_display_config() {
 
         String param = "screen_" + String(id);
 
-        if (doc.containsKey(param)) {
+        if (!doc[param].isNull()) {
             bool enabled = doc[param].as<bool>();
             set_screen_enabled(id, enabled);
         }
@@ -1440,15 +2302,14 @@ void handle_save_display_config() {
 
     for (int i = 0; i < 7; i++) {
         String param = "screen_" + String(static_screens[i]);
-        if (doc.containsKey(param)) {
+        if (!doc[param].isNull()) {
             bool enabled = doc[param].as<bool>();
             set_screen_enabled(static_screens[i], enabled);
         }
     }
 
-    // Save all to preferences
+    // Save all to preferences and defer the LVGL re-init until the main loop is safe.
     save_all_config_to_preferences();
-    load_config_from_preferences();
     notify_config_changed();
 
     web_server.send(200, "text/plain", "Display settings saved");
@@ -1487,6 +2348,10 @@ void signalk_path_config_web_begin() {
     load_config_from_preferences();
     // Admin index page
     web_server.on("/", HTTP_GET, handle_show_admin_index);
+    web_server.on("/firmware", HTTP_GET, handle_show_firmware_page);
+    web_server.on("/firmware/status", HTTP_GET, handle_firmware_status);
+    web_server.on("/firmware/update", HTTP_POST, handle_firmware_update);
+    web_server.on("/firmware/rollback", HTTP_POST, handle_firmware_rollback);
     
     // Signal K path configuration
     web_server.on("/signalk-config", HTTP_GET, handle_show_signalk_config_page);

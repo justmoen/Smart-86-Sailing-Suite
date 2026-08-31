@@ -16,9 +16,22 @@ static void load_http_config() {
   if (!http_config_loaded) {
     Preferences prefs;
     prefs.begin("signalk", true);
-    // Provide defaults: localhost:3000 if not configured
-    signalk_http_host_cached = prefs.getString(SK_HTTP_HOST_PREF, "");
-    signalk_http_port_cached = prefs.getInt(SK_HTTP_PORT_PREF, 3000);
+
+    if (prefs.isKey(SK_HTTP_HOST_PREF)) {
+      signalk_http_host_cached = prefs.getString(SK_HTTP_HOST_PREF, "signalk.local");
+    } else if (prefs.isKey("signalk_host")) {
+      signalk_http_host_cached = prefs.getString("signalk_host", "signalk.local");
+    } else {
+      signalk_http_host_cached = "signalk.local";
+    }
+
+    if (prefs.isKey(SK_HTTP_PORT_PREF)) {
+      signalk_http_port_cached = prefs.getInt(SK_HTTP_PORT_PREF, 3000);
+    } else if (prefs.isKey("signalk_port")) {
+      signalk_http_port_cached = prefs.getInt("signalk_port", 3000);
+    } else {
+      signalk_http_port_cached = 3000;
+    }
     prefs.end();
     http_config_loaded = true;
   }

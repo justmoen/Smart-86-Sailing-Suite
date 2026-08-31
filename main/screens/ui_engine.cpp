@@ -26,6 +26,8 @@ struct EngineScreenState {
     float last_oil_pressure = 0;
     float last_temp = 0;
     float last_alternator = 0;
+    float last_battery_voltage = 0;
+    float last_throttle = 0;
 };
 
 static EngineScreenState engine_states[MAX_ENGINE_SCREENS] = {};
@@ -90,48 +92,54 @@ static void lv_engine_display(lv_updatable_screen_t *scr) {
     // Needle
     state->engine_rpm_indic = lv_meter_add_needle_line(state->engine_rpm_meter, scale, 4, lv_palette_main(LV_PALETTE_GREY), -10);
 
-    // Oil pressure
-    state->oil_press_meter = lv_meter_create(scr->screen);
-    lv_obj_align(state->oil_press_meter, LV_ALIGN_CENTER, -125, 180);
-    lv_obj_set_size(state->oil_press_meter, 160, 160);
-    lv_obj_remove_style(state->oil_press_meter, NULL, LV_PART_INDICATOR);
-    lv_obj_set_style_pad_all(state->oil_press_meter, 0, LV_PART_MAIN);
-    lv_meter_scale_t *oil_press_scale = lv_meter_add_scale(state->oil_press_meter);
-    lv_meter_set_scale_ticks(state->oil_press_meter, oil_press_scale, 10, 2, 7, lv_palette_main(LV_PALETTE_GREY));
+    // Oil pressure (optional)
+    if (config.engine_oil_pressure_enabled) {
+        state->oil_press_meter = lv_meter_create(scr->screen);
+        lv_obj_align(state->oil_press_meter, LV_ALIGN_CENTER, -125, 180);
+        lv_obj_set_size(state->oil_press_meter, 160, 160);
+        lv_obj_remove_style(state->oil_press_meter, NULL, LV_PART_INDICATOR);
+        lv_obj_set_style_pad_all(state->oil_press_meter, 0, LV_PART_MAIN);
+        lv_meter_scale_t *oil_press_scale = lv_meter_add_scale(state->oil_press_meter);
+        lv_meter_set_scale_ticks(state->oil_press_meter, oil_press_scale, 10, 2, 7, lv_palette_main(LV_PALETTE_GREY));
 #if LV_FONT_MONTSERRAT_26
-    lv_obj_set_style_text_font(state->oil_press_meter, &lv_font_montserrat_26, LV_PART_TICKS);
+        lv_obj_set_style_text_font(state->oil_press_meter, &lv_font_montserrat_26, LV_PART_TICKS);
 #endif
-    lv_meter_set_scale_major_ticks(state->oil_press_meter, oil_press_scale, 3, 2, 7, lv_palette_main(LV_PALETTE_GREY), 10);
-    lv_meter_set_scale_range(state->oil_press_meter, oil_press_scale, 0, 90, 270, 90);
-    
-    float oil_min_psi = config.engine_oil_pressure_min;
-    float oil_max_psi = config.engine_oil_pressure_max;
-    
-    // Green zone arc
-    state->oil_press_indic = lv_meter_add_arc(state->oil_press_meter, oil_press_scale, 3, lv_palette_main(LV_PALETTE_GREEN), 1);
-    lv_meter_set_indicator_start_value(state->oil_press_meter, state->oil_press_indic, oil_min_psi);
-    lv_meter_set_indicator_end_value(state->oil_press_meter, state->oil_press_indic, oil_max_psi);
-    
-    // Red zones (below min and above max)
-    lv_meter_indicator_t *red_low = lv_meter_add_arc(state->oil_press_meter, oil_press_scale, 3, lv_palette_main(LV_PALETTE_RED), 1);
-    lv_meter_set_indicator_start_value(state->oil_press_meter, red_low, 0);
-    lv_meter_set_indicator_end_value(state->oil_press_meter, red_low, oil_min_psi);
-    
-    lv_meter_indicator_t *red_high = lv_meter_add_arc(state->oil_press_meter, oil_press_scale, 3, lv_palette_main(LV_PALETTE_RED), 1);
-    lv_meter_set_indicator_start_value(state->oil_press_meter, red_high, oil_max_psi);
-    lv_meter_set_indicator_end_value(state->oil_press_meter, red_high, 90);
+        lv_meter_set_scale_major_ticks(state->oil_press_meter, oil_press_scale, 3, 2, 7, lv_palette_main(LV_PALETTE_GREY), 10);
+        lv_meter_set_scale_range(state->oil_press_meter, oil_press_scale, 0, 90, 270, 90);
+        
+        float oil_min_psi = config.engine_oil_pressure_min;
+        float oil_max_psi = config.engine_oil_pressure_max;
+        
+        // Green zone arc
+        state->oil_press_indic = lv_meter_add_arc(state->oil_press_meter, oil_press_scale, 3, lv_palette_main(LV_PALETTE_GREEN), 1);
+        lv_meter_set_indicator_start_value(state->oil_press_meter, state->oil_press_indic, oil_min_psi);
+        lv_meter_set_indicator_end_value(state->oil_press_meter, state->oil_press_indic, oil_max_psi);
+        
+        // Red zones (below min and above max)
+        lv_meter_indicator_t *red_low = lv_meter_add_arc(state->oil_press_meter, oil_press_scale, 3, lv_palette_main(LV_PALETTE_RED), 1);
+        lv_meter_set_indicator_start_value(state->oil_press_meter, red_low, 0);
+        lv_meter_set_indicator_end_value(state->oil_press_meter, red_low, oil_min_psi);
+        
+        lv_meter_indicator_t *red_high = lv_meter_add_arc(state->oil_press_meter, oil_press_scale, 3, lv_palette_main(LV_PALETTE_RED), 1);
+        lv_meter_set_indicator_start_value(state->oil_press_meter, red_high, oil_max_psi);
+        lv_meter_set_indicator_end_value(state->oil_press_meter, red_high, 90);
 
-    lv_obj_t *oil_press_label = lv_label_create(scr->screen);
-    lv_obj_align(oil_press_label, LV_ALIGN_CENTER, -125, 280);
+        lv_obj_t *oil_press_label = lv_label_create(scr->screen);
+        lv_obj_align(oil_press_label, LV_ALIGN_CENTER, -125, 280);
 #if LV_FONT_MONTSERRAT_32
-    lv_obj_set_style_text_font(oil_press_label, &lv_font_montserrat_32, 0);
+        lv_obj_set_style_text_font(oil_press_label, &lv_font_montserrat_32, 0);
 #endif
-    lv_obj_set_style_text_color(oil_press_label, lv_color_black(), 0);
-    lv_label_set_text_static(oil_press_label, "psi");
+        lv_obj_set_style_text_color(oil_press_label, lv_color_black(), 0);
+        lv_label_set_text_static(oil_press_label, "psi");
+    }
 
     // Engine temp
     state->eng_temp_meter = lv_meter_create(scr->screen);
-    lv_obj_align(state->eng_temp_meter, LV_ALIGN_CENTER, 125, 180);
+    if (config.engine_oil_pressure_enabled) {
+        lv_obj_align(state->eng_temp_meter, LV_ALIGN_CENTER, 125, 180);
+    } else {
+        lv_obj_align(state->eng_temp_meter, LV_ALIGN_CENTER, 0, 190);
+    }
     lv_obj_set_size(state->eng_temp_meter, 160, 160);
     lv_obj_remove_style(state->eng_temp_meter, NULL, LV_PART_INDICATOR);
     lv_obj_set_style_pad_all(state->eng_temp_meter, 0, LV_PART_MAIN);
@@ -154,7 +162,11 @@ static void lv_engine_display(lv_updatable_screen_t *scr) {
     state->temp_needle = lv_meter_add_needle_line(state->eng_temp_meter, eng_temp_scale, 3, lv_palette_main(LV_PALETTE_GREY), -10);
 
     lv_obj_t *eng_temp_label = lv_label_create(scr->screen);
-    lv_obj_align(eng_temp_label, LV_ALIGN_CENTER, 125, 280);
+    if (config.engine_oil_pressure_enabled) {
+        lv_obj_align(eng_temp_label, LV_ALIGN_CENTER, 125, 280);
+    } else {
+        lv_obj_align(eng_temp_label, LV_ALIGN_CENTER, 0, 290);
+    }
     lv_obj_set_style_text_font(eng_temp_label, &lv_font_montserrat_32, 0);
     lv_obj_set_style_text_color(eng_temp_label, lv_color_black(), 0);
     lv_label_set_text_static(eng_temp_label, LV_SYMBOL_DEGREES "C");
@@ -162,12 +174,28 @@ static void lv_engine_display(lv_updatable_screen_t *scr) {
     state->eng_sog_label = lv_label_create(scr->screen);
     lv_obj_align(state->eng_sog_label, LV_ALIGN_TOP_LEFT, 2, 2);
     lv_obj_set_style_text_font(state->eng_sog_label, &lv_font_montserrat_30, 0);
-    lv_label_set_text_static(state->eng_sog_label, "SOG (kt):\n--");
+    if (config.engine_top_left_enabled) {
+        if (config.engine_top_left_metric == EngineTopLeftMetric::SOG) {
+            lv_label_set_text_static(state->eng_sog_label, "SOG (kt):\n--");
+        } else {
+            lv_label_set_text_static(state->eng_sog_label, "THROTTLE (%):\n--");
+        }
+    } else {
+        lv_obj_add_flag(state->eng_sog_label, LV_OBJ_FLAG_HIDDEN);
+    }
 
     state->eng_alternator_label = lv_label_create(scr->screen);
     lv_obj_align(state->eng_alternator_label, LV_ALIGN_TOP_RIGHT, -2, 2);
     lv_obj_set_style_text_font(state->eng_alternator_label, &lv_font_montserrat_30, 0);
-    lv_label_set_text_static(state->eng_alternator_label, "ALT (V):\n--");
+    if (config.engine_top_right_enabled) {
+        if (config.engine_top_right_metric == EngineTopRightMetric::AlternatorVoltage) {
+            lv_label_set_text_static(state->eng_alternator_label, "ALT (V):\n--");
+        } else {
+            lv_label_set_text_static(state->eng_alternator_label, "BAT (V):\n--");
+        }
+    } else {
+        lv_obj_add_flag(state->eng_alternator_label, LV_OBJ_FLAG_HIDDEN);
+    }
     
     // Display engine ID in bottom right corner
     lv_obj_t *engine_id_label = lv_label_create(scr->screen);
@@ -183,8 +211,11 @@ static void engine_update_cb(lv_updatable_screen_t *scr) {
     EngineScreenState *state = (EngineScreenState *)scr->user_data;
     if (!state || !scr->screen) return;
 
-    if (!state->engine_rpm_indic || !state->oil_press_indic || !state->temp_arc_green || !state->temp_arc_red || !state->temp_needle || 
+    const auto& config = get_signalk_path_config();
+
+    if (!state->engine_rpm_indic || !state->temp_arc_green || !state->temp_arc_red || !state->temp_needle || 
         !state->eng_sog_label || !state->eng_alternator_label) return;
+    if (config.engine_oil_pressure_enabled && !state->oil_press_indic) return;
     
     int engine_id = state->engine_id;
     if (engine_id < 0) engine_id = 0;
@@ -197,24 +228,48 @@ static void engine_update_cb(lv_updatable_screen_t *scr) {
         }
         set_engine_rpm_value(state, state->last_rpm);
 
-        if (fresh(shipDataModel.propulsion.engines[engine_id].alternator_voltage.age)) {
-            state->last_alternator =
-                shipDataModel.propulsion.engines[engine_id].alternator_voltage.volt;
+        if (config.engine_top_left_enabled) {
+            if (config.engine_top_left_metric == EngineTopLeftMetric::SOG) {
+                float sog = shipDataModel.navigation.speed_over_ground.kn;
+                lv_label_set_text(state->eng_sog_label,
+                    (String("SOG (kt):\n    ") + String(sog, 1)).c_str());
+            } else {
+                if (fresh(shipDataModel.propulsion.engines[engine_id].throttle.age)) {
+                    state->last_throttle = shipDataModel.propulsion.engines[engine_id].throttle.pct;
+                }
+                lv_label_set_text(state->eng_sog_label,
+                    (String("THROTTLE (%):\n    ") + String(state->last_throttle, 0)).c_str());
+            }
         }
 
-        lv_label_set_text(state->eng_alternator_label,
-            (String("ALT (V):\n    ") + String(state->last_alternator, 1)).c_str());
+        if (config.engine_top_right_enabled) {
+            if (config.engine_top_right_metric == EngineTopRightMetric::AlternatorVoltage) {
+                if (fresh(shipDataModel.propulsion.engines[engine_id].alternator_voltage.age)) {
+                    state->last_alternator = shipDataModel.propulsion.engines[engine_id].alternator_voltage.volt;
+                }
+                lv_label_set_text(state->eng_alternator_label,
+                    (String("ALT (V):\n    ") + String(state->last_alternator, 1)).c_str());
+            } else {
+                if (fresh(shipDataModel.propulsion.engines[engine_id].battery_voltage.age)) {
+                    state->last_battery_voltage = shipDataModel.propulsion.engines[engine_id].battery_voltage.volt;
+                }
+                lv_label_set_text(state->eng_alternator_label,
+                    (String("BAT (V):\n    ") + String(state->last_battery_voltage, 1)).c_str());
+            }
+        }
         
-        if (fresh(shipDataModel.propulsion.engines[engine_id].oil_pressure.age)) {
-            state->last_oil_pressure =
-                shipDataModel.propulsion.engines[engine_id].oil_pressure.hPa * 0.0145037738;
-        }
+        if (config.engine_oil_pressure_enabled) {
+            if (fresh(shipDataModel.propulsion.engines[engine_id].oil_pressure.age)) {
+                state->last_oil_pressure =
+                    shipDataModel.propulsion.engines[engine_id].oil_pressure.hPa * 0.0145037738;
+            }
 
-        lv_meter_set_indicator_end_value(
-            state->oil_press_meter,
-            state->oil_press_indic,
-            state->last_oil_pressure
-        );
+            lv_meter_set_indicator_end_value(
+                state->oil_press_meter,
+                state->oil_press_indic,
+                state->last_oil_pressure
+            );
+        }
 
         if (fresh(shipDataModel.propulsion.engines[engine_id].temp_deg_C.age)) {
             state->last_temp = shipDataModel.propulsion.engines[engine_id].temp_deg_C.deg_C;

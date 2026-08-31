@@ -9,4 +9,5 @@ set(EXTRA_COMPONENT_DIRS
     )
 
 add_compile_options(-Wno-format)
-project(lvgl_demo_v9)
+project(lvgl_demo_v9 VERSION 3.6.0)
+add_compile_definitions(FIRMWARE_VERSION=\"${PROJECT_VERSION}\")

@@ -485,6 +485,10 @@
     struct _deg_C_t coolant_temp;
     struct _hPa_t coolant_pressure;
     struct _voltage_V_t alternator_voltage;
+    struct _current_amp_t actual_current;
+    struct _current_amp_t target_current;
+    struct _voltage_V_t battery_voltage;
+    struct _percent_t throttle;
     char engine_label[MAX_ENGINE_LBL_LENGTH] = {0};
   } engine_t;
 

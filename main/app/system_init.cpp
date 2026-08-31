@@ -8,6 +8,9 @@
 
 void init_system() {
     initArduino();
+    Serial.begin(115200);
+    delay(100);
+    Serial.println("[DEBUG] init_system: serial logging enabled");
 
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {

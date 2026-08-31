@@ -52,7 +52,7 @@ static fluid_type_e string_to_fluid_type(const String& fluid_lower) {
 
   bool signalk_parse(const char* payload, size_t length) {
     bool found = false;
-    DynamicJsonDocument doc(8192);
+    JsonDocument doc;
     DeserializationError err = deserializeJson(doc, payload, length);
     // Parse succeeded?
     if (err) {
@@ -76,7 +76,7 @@ static fluid_type_e string_to_fluid_type(const String& fluid_lower) {
             shipDataModel.navigation.heading_mag.age = millis();
           }
         } else if (path == config.navigation_position) {
-          if (value.containsKey("longitude") && value.containsKey("latitude")) {
+          if (!value["longitude"].isNull() && !value["latitude"].isNull()) {
             if (value["longitude"].is<float>() && value["latitude"].is<float>()) {
               shipDataModel.navigation.position.lat.deg = value["latitude"].as<float>();
               shipDataModel.navigation.position.lat.age = millis();
@@ -216,7 +216,7 @@ static fluid_type_e string_to_fluid_type(const String& fluid_lower) {
           engine_t* eng = lookup_engine(engineID.c_str());
           if (eng == NULL) return;
           String field = remainder.substring(dotIndex + 1);
-          if (field == "revolutions") {
+          if (field == "revolutions" || field == "rpm") {
             if (value.is<float>()) {
               eng->revolutions_RPM.rpm = value.as<float>() * 60;
               eng->revolutions_RPM.age = millis();
@@ -226,12 +226,34 @@ static fluid_type_e string_to_fluid_type(const String& fluid_lower) {
               eng->temp_deg_C.deg_C = value.as<float>() - 273.15;
               eng->temp_deg_C.age = millis();
             }
+          } else if (field == "actualCurrent") {
+            if (value.is<float>()) {
+              eng->actual_current.amp = value.as<float>();
+              eng->actual_current.age = millis();
+            }
+          } else if (field == "targetCurrent") {
+            if (value.is<float>()) {
+              eng->target_current.amp = value.as<float>();
+              eng->target_current.age = millis();
+            }
+          } else if (field == "batteries.voltage") {
+            if (value.is<float>()) {
+              eng->battery_voltage.volt = value.as<float>();
+              eng->battery_voltage.age = millis();
+            }
+          } else if (field == "throttle") {
+            if (value.is<float>()) {
+              float throttle = value.as<float>();
+              if (throttle <= 1.0f) throttle *= 100.0f;
+              eng->throttle.pct = throttle;
+              eng->throttle.age = millis();
+            }
           } else if (field == "oilPressure") {
             if (value.is<float>()) {
               eng->oil_pressure.hPa = value.as<float>() / 100.0;
               eng->oil_pressure.age = millis();
             }
-          } else if (field == "alternatorVoltage") {
+          } else if (field == "alternatorVoltage" || field == "alternator.voltage") {
             if (value.is<float>()) {
               eng->alternator_voltage.volt = value.as<float>();
               eng->alternator_voltage.age = millis();
@@ -264,7 +286,7 @@ static fluid_type_e string_to_fluid_type(const String& fluid_lower) {
               for (size_t i_v = 0; i_v < values.size(); i_v++) {
                 JsonObject valueObj = values[i_v];
                 if (!valueObj.isNull()) {
-                  if (valueObj.containsKey("path")) {
+                  if (!valueObj["path"].isNull()) {
                     String path = valueObj["path"].as<const char*>();
                     if (path != NULL) {
                       JsonVariant value = valueObj["value"];

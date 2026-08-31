@@ -79,8 +79,10 @@ extern "C" {
     while((btn_obj = lv_msgbox_get_btns(mbox)) && (btn_obj = lv_obj_get_child(btn_obj, btn_count++))) {
         lv_obj_set_style_bg_color(btn_obj, lv_color_hex(0x2a2a2a), LV_PART_MAIN);
         lv_obj_set_style_text_color(btn_obj, lv_color_hex(0xffffff), LV_PART_MAIN);
-        lv_obj_set_style_text_font(btn_obj, &lv_font_montserrat_20, LV_PART_MAIN);
-        lv_obj_set_style_pad_all(btn_obj, 12, LV_PART_MAIN);  // 10% expansion via padding
+        lv_obj_set_style_text_font(btn_obj, &lv_font_montserrat_18, LV_PART_MAIN);
+        lv_obj_set_size(btn_obj, 140, 48);
+        lv_obj_set_style_pad_hor(btn_obj, 12, LV_PART_MAIN);
+        lv_obj_set_style_pad_ver(btn_obj, 4, LV_PART_MAIN);
     }
     
     lv_obj_add_event_cb(mbox, event_msgbox_cb, LV_EVENT_VALUE_CHANGED, NULL);

@@ -1,4 +1,5 @@
 #include "net_mdns.h"
+#include "net_signalk_http.h"
 
 #include "mdns.h"
 #include "esp_log.h"
@@ -22,12 +23,12 @@ static bool resolve_hostname(const char* hostname,
 
     esp_err_t err = dns_gethostbyname(hostname, &addr, NULL, NULL);
     if (err != ERR_OK) {
-        ESP_LOGW(TAG, "DNS lookup failed for %s (err=%d)", hostname, err);
+        ESP_LOGD(TAG, "DNS lookup failed for %s (err=%d)", hostname, err);
         return false;
     }
 
     if (addr.type != IPADDR_TYPE_V4) {
-        ESP_LOGW(TAG, "Resolved non-IPv4 address for %s", hostname);
+        ESP_LOGD(TAG, "Resolved non-IPv4 address for %s", hostname);
         return false;
     }
 
@@ -56,7 +57,7 @@ static bool mdns_lookup(const char* service, const char* proto,
 
     esp_err_t err = mdns_query_ptr(service, proto, 3000, 20, &results);
     if (err != ESP_OK || !results) {
-        ESP_LOGW(TAG, "No results for %s.%s", service, proto);
+        ESP_LOGD(TAG, "No results for %s.%s", service, proto);
         return false;
     }
 
@@ -79,7 +80,7 @@ static bool mdns_lookup(const char* service, const char* proto,
         }
     }
 
-    ESP_LOGW(TAG, "No usable IPv4 found");
+    ESP_LOGD(TAG, "No usable IPv4 found for %s.%s", service, proto);
     mdns_query_results_free(results);
     return false;
 }
@@ -87,6 +88,31 @@ static bool mdns_lookup(const char* service, const char* proto,
 bool discover_n_config(void)
 {
     static bool mdns_started = false;
+
+    Preferences prefs;
+    prefs.begin("signalk", true);
+    String host = prefs.getString(SK_MANUAL_HOST_PREF, "");
+    if (host.length() == 0) {
+        host = prefs.getString("signalk_manual_host", "");
+    }
+    if (host.length() > 0) {
+        int manualPort = prefs.getInt(SK_MANUAL_PORT_PREF, 3000);
+        if (manualPort == 3000 && prefs.isKey("signalk_manual_port")) {
+            manualPort = prefs.getInt("signalk_manual_port", 3000);
+        }
+        prefs.end();
+
+        preferences.begin("signalk", false);
+        preferences.putString(SK_TCP_HOST_PREF, host.c_str());
+        preferences.putInt(SK_TCP_PORT_PREF, manualPort);
+        preferences.putString(SK_HTTP_HOST_PREF, host.c_str());
+        preferences.putInt(SK_HTTP_PORT_PREF, manualPort);
+        preferences.end();
+
+        ESP_LOGI(TAG, "SignalK using manual override: %s:%d", host.c_str(), manualPort);
+        return true;
+    }
+    prefs.end();
 
     if (!mdns_started) {
         ESP_ERROR_CHECK(mdns_init());
@@ -99,28 +125,50 @@ bool discover_n_config(void)
     }
 
     bool saved = false;
-
     std::string ip;
-    int port;
+    int port = 3000;
 
-    if (mdns_lookup("_signalk-ws", "_tcp", ip, port)) {
-        preferences.begin("signalk", false);  // Open in read-write mode
+    const char* service_names[] = {"_signalk-ws", "_signalk-http"};
+    for (const char* service : service_names) {
+        if (mdns_lookup(service, "_tcp", ip, port)) {
+            preferences.begin("signalk", false);
+            preferences.putString(SK_TCP_HOST_PREF, ip.c_str());
+            preferences.putInt(SK_TCP_PORT_PREF, port);
+            preferences.putString("sk_http_host", ip.c_str());
+            preferences.putInt("sk_http_port", port);
+            preferences.end();
+
+            saved = true;
+            ESP_LOGI(TAG, "SignalK discovered via mDNS: %s:%d (%s)", ip.c_str(), port, service);
+            return true;
+        }
+    }
+
+    if (resolve_hostname("signalk.local", ip, port) || resolve_hostname("signalk", ip, port)) {
+        preferences.begin("signalk", false);
         preferences.putString(SK_TCP_HOST_PREF, ip.c_str());
         preferences.putInt(SK_TCP_PORT_PREF, port);
+        preferences.putString("sk_http_host", ip.c_str());
+        preferences.putInt("sk_http_port", port);
         preferences.end();
 
         saved = true;
-
-        ESP_LOGI(TAG, "SignalK WS: %s:%d", ip.c_str(), port);
-    }// else {
-       // ESP_LOGW(TAG, "Failed to resolve %s", hostname);
-    //}
+        ESP_LOGI(TAG, "SignalK discovered via hostname: %s:%d", ip.c_str(), port);
+    }
 
     return saved;
 }
 
 void erase_mdns_lookups(void)
 {
+    preferences.begin("signalk", false);
     preferences.remove("signalk_host");
     preferences.remove("signalk_port");
+    preferences.remove(SK_MANUAL_HOST_PREF);
+    preferences.remove(SK_MANUAL_PORT_PREF);
+    preferences.remove("signalk_manual_host");
+    preferences.remove("signalk_manual_port");
+    preferences.remove(SK_HTTP_HOST_PREF);
+    preferences.remove(SK_HTTP_PORT_PREF);
+    preferences.end();
 }
