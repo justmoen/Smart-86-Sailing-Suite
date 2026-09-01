@@ -26,14 +26,14 @@ jobs:
             rm -f sdkconfig
             idf.py set-target esp32p4
 
-            echo "=== CI ARDUINO SSL SYMBOLS ==="
-            nm -C managed_components/espressif__arduino-esp32/libespressif__arduino-esp32.a | grep -E 'stop_ssl_socket|start_ssl_client|ssl_init' || true
+            echo "=== ARDUINO VERSION ==="
+            cat managed_components/espressif__arduino-esp32/idf_component.yml
 
-            echo "=== CI SSL OBJECT ==="
-            find managed_components/espressif__arduino-esp32 -name 'ssl_client.cpp.obj' -print
+            echo "=== LOCKFILE ARDUINO ==="
+            grep -A20 "espressif/arduino-esp32:" dependencies.lock
 
-            echo "=== CI COMPONENT TREE ==="
-            find managed_components/espressif__arduino-esp32/libraries/NetworkClientSecure -maxdepth 2 -type f | sort
+            echo "=== SSL OBJECT ==="
+            find managed_components/espressif__arduino-esp32 -name "ssl_client.cpp.obj" -print
 
-            echo "========== Build =========="
+            echo "=== BUILD ==="
             idf.py build
