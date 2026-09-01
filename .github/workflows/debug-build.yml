@@ -26,17 +26,11 @@ jobs:
             rm -f sdkconfig
             idf.py set-target esp32p4
 
-            echo "=== ARDUINO VERSION ==="
-            cat managed_components/espressif__arduino-esp32/idf_component.yml
+                echo "=== ARDUINO CMAKE SSL REFERENCES ==="
+                grep -R -n "NetworkClientSecure\|ssl_client.cpp\|ssl_client" managed_components/espressif__arduino-esp32 --include="CMakeLists.txt" --include="*.cmake" 2>/dev/null || true
 
-            echo "=== LOCKFILE ARDUINO ==="
-            grep -A20 "espressif/arduino-esp32:" dependencies.lock
+                echo "=== CI KCONFIG SSL ==="
+                grep -E "CONFIG_MBEDTLS|CONFIG_ESP_TLS" sdkconfig | head -50 || true
 
-            echo "=== SSL OBJECT ==="
-            find managed_components/espressif__arduino-esp32 -name "ssl_client.cpp.obj" -print
-
-            echo "=== NETWORKCLIENTSECURE CMAKE ==="
-            grep -R "ssl_client" managed_components/espressif__arduino-esp32/CMakeLists.txt managed_components/espressif__arduino-esp32/libraries/NetworkClientSecure 2>/dev/null || true
-
-            echo "=== SSL SOURCE ==="
-            find managed_components/espressif__arduino-esp32/libraries/NetworkClientSecure -name "ssl_client.cpp" -print
+                echo "=== BUILD ==="
+                idf.py build
