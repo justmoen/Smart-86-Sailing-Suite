@@ -26,11 +26,8 @@ jobs:
             rm -f sdkconfig
             idf.py set-target esp32p4
 
-                echo "=== ARDUINO CMAKE SSL REFERENCES ==="
-                grep -R -n "NetworkClientSecure\|ssl_client.cpp\|ssl_client" managed_components/espressif__arduino-esp32 --include="CMakeLists.txt" --include="*.cmake" 2>/dev/null || true
+            echo "=== NINJA SSL RULE ==="
+            grep -n -A5 -B5 "ssl_client.cpp.obj" build/esp-idf/espressif__arduino-esp32/build.ninja 2>/dev/null || true
 
-                echo "=== CI KCONFIG SSL ==="
-                grep -E "CONFIG_MBEDTLS|CONFIG_ESP_TLS" sdkconfig | head -50 || true
-
-                echo "=== BUILD ==="
-                idf.py build
+            echo "=== ARDUINO OBJECTS ==="
+            find build/esp-idf/espressif__arduino-esp32 -type f -name "*.obj" | grep -E "NetworkClientSecure|ssl_client" || true
