@@ -246,6 +246,33 @@ static void set_saved_release_pref(const char* key, const String& value) {
     save_string_pref(key, value);
 }
 
+static bool is_release_skipped(const String& tag) {
+    if (tag.length() == 0) {
+        return false;
+    }
+
+    String skipped_tag = get_saved_release_pref("firmware_skipped_tag", "");
+    return skipped_tag.length() > 0 && skipped_tag.equalsIgnoreCase(tag);
+}
+
+static void check_release_status_on_boot() {
+    std::vector<String> tags;
+    std::vector<String> download_urls;
+    String error_message;
+    if (!fetch_release_history(tags, download_urls, error_message)) {
+        return;
+    }
+
+    if (tags.empty()) {
+        return;
+    }
+
+    String latest_tag = tags[0];
+    String latest_downloader = download_urls[0];
+    set_saved_release_pref("firmware_latest_tag", latest_tag);
+    set_saved_release_pref("firmware_latest_url", latest_downloader);
+}
+
 static bool perform_firmware_ota(const String& tag, String& error_message) {
     String download_url = resolve_release_asset_url(tag, get_saved_release_pref("firmware_latest_url", ""));
     if (download_url.length() == 0) {
@@ -821,6 +848,7 @@ void handle_firmware_status() {
     doc["currentVersion"] = get_current_firmware_version();
     doc["latestVersion"] = get_saved_release_pref("firmware_latest_tag", "unknown");
     doc["hasUpdate"] = false;
+    doc["skipThisRelease"] = false;
     doc["message"] = "Checking GitHub releases...";
 
     std::vector<String> tags;
@@ -836,8 +864,16 @@ void handle_firmware_status() {
 
         doc["latestVersion"] = latest_tag;
         doc["latestUrl"] = latest_downloader;
-        doc["hasUpdate"] = version_is_newer(latest_tag, get_current_firmware_version());
-        doc["message"] = doc["hasUpdate"].as<bool>() ? "New release available." : "You are on the latest available release.";
+        doc["skipThisRelease"] = is_release_skipped(latest_tag);
+        doc["hasUpdate"] = version_is_newer(latest_tag, get_current_firmware_version()) && !doc["skipThisRelease"].as<bool>();
+
+        if (doc["skipThisRelease"].as<bool>()) {
+            doc["message"] = "A newer version is available, but this release has been skipped.";
+        } else if (doc["hasUpdate"].as<bool>()) {
+            doc["message"] = "New release available.";
+        } else {
+            doc["message"] = "You are on the latest available release.";
+        }
 
         JsonArray releases = doc["releases"].to<JsonArray>();
         for (size_t i = 0; i < tags.size(); ++i) {
@@ -854,6 +890,30 @@ void handle_firmware_status() {
 
     String payload;
     serializeJson(doc, payload);
+    web_server.send(200, "application/json", payload);
+}
+
+void handle_firmware_skip() {
+    JsonDocument req;
+    String body = web_server.arg("plain");
+    if (body.length() > 0) {
+        deserializeJson(req, body);
+    }
+
+    String tag = req["tag"].is<String>() ? req["tag"].as<String>() : get_saved_release_pref("firmware_latest_tag", "");
+    if (tag.length() == 0) {
+        web_server.send(400, "application/json", R"({"status":"error","message":"No release tag was provided."})");
+        return;
+    }
+
+    set_saved_release_pref("firmware_skipped_tag", tag);
+
+    JsonDocument out;
+    out["status"] = "skipped";
+    out["tag"] = tag;
+    out["message"] = "Release " + tag + " will be skipped on future boot checks.";
+    String payload;
+    serializeJson(out, payload);
     web_server.send(200, "application/json", payload);
 }
 
@@ -1041,6 +1101,7 @@ void handle_show_firmware_page() {
             <div class='row'>
                 <button class='secondary' id='checkBtn' type='button'>Check for Updates</button>
                 <button id='updateBtn' type='button'>Update to Latest Release</button>
+                <button class='secondary' id='skipBtn' type='button'>Skip This Release</button>
             </div>
         </div>
 
@@ -1086,12 +1147,22 @@ async function loadStatus() {
         }
 
         const updateBtn = document.getElementById('updateBtn');
+        const skipBtn = document.getElementById('skipBtn');
         if (data.hasUpdate) {
             updateBtn.disabled = false;
             updateBtn.textContent = `Update to ${data.latestVersion}`;
+            skipBtn.disabled = false;
+            skipBtn.textContent = `Skip ${data.latestVersion}`;
+        } else if (data.skipThisRelease) {
+            updateBtn.disabled = true;
+            updateBtn.textContent = 'Skipped release';
+            skipBtn.disabled = true;
+            skipBtn.textContent = 'Release skipped';
         } else {
             updateBtn.disabled = true;
             updateBtn.textContent = 'No update available';
+            skipBtn.disabled = true;
+            skipBtn.textContent = 'Skip This Release';
         }
     } catch (err) {
         statusBoxEl.textContent = 'Error contacting the firmware update endpoint.';
@@ -1116,6 +1187,24 @@ document.getElementById('updateBtn').addEventListener('click', async () => {
     });
     const data = await res.json();
     statusBoxEl.textContent = data.message || 'Update request sent.';
+    await loadStatus();
+});
+
+document.getElementById('skipBtn').addEventListener('click', async () => {
+    const latestTag = document.getElementById('latestVersion').textContent.trim();
+    if (!latestTag || latestTag === 'unknown' || latestTag === 'checking...') {
+        statusBoxEl.textContent = 'There is no release to skip yet.';
+        return;
+    }
+
+    statusBoxEl.textContent = 'Skipping release ' + latestTag + '...';
+    const res = await fetch('/firmware/skip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag: latestTag })
+    });
+    const data = await res.json();
+    statusBoxEl.textContent = data.message || 'Release skipped.';
     await loadStatus();
 });
 
@@ -2338,6 +2427,7 @@ signalk_path_config_t& get_signalk_path_config() {
 
 void load_signalk_path_config() {
     load_config_from_preferences();
+    check_release_status_on_boot();
 }
 
 void signalk_path_config_web_begin() {
@@ -2350,6 +2440,7 @@ void signalk_path_config_web_begin() {
     web_server.on("/", HTTP_GET, handle_show_admin_index);
     web_server.on("/firmware", HTTP_GET, handle_show_firmware_page);
     web_server.on("/firmware/status", HTTP_GET, handle_firmware_status);
+    web_server.on("/firmware/skip", HTTP_POST, handle_firmware_skip);
     web_server.on("/firmware/update", HTTP_POST, handle_firmware_update);
     web_server.on("/firmware/rollback", HTTP_POST, handle_firmware_rollback);
     

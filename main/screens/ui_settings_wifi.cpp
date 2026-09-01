@@ -7,20 +7,121 @@ String wifi_ssid;      // Store the name of the wireless network.
 String wifi_password;  // Store the password of the wireless network.
 boolean settingMode;
 
+static void save_wifi_history_entry(const String& ssid, const String& pass);
+
+static void save_current_wifi_credentials(const String& ssid, const String& password) {
+  if (ssid.length() == 0) return;
+  Preferences prefs;
+  prefs.begin("wifi-config", false);
+  prefs.putString("WIFI_SSID", ssid);
+  prefs.putString("WIFI_PASSWD", password);
+  prefs.end();
+  save_wifi_history_entry(ssid, password);
+}
+
+static void save_wifi_history_entry(const String& ssid, const String& pass) {
+  if (ssid.length() == 0) return;
+
+  Preferences prefs;
+  prefs.begin("wifi-config", false);
+
+  int count = prefs.getInt("WIFI_HISTORY_COUNT", 0);
+  for (int i = 0; i < count; ++i) {
+    String key_ssid = "WIFI_HISTORY_SSID_" + String(i);
+    String key_pass = "WIFI_HISTORY_PASS_" + String(i);
+    String saved_ssid = prefs.getString(key_ssid.c_str(), "");
+    if (saved_ssid.equals(ssid)) {
+      prefs.putString(key_pass.c_str(), pass);
+      prefs.end();
+      return;
+    }
+  }
+
+  if (count >= 5) {
+    for (int i = 1; i < count; ++i) {
+      String key_ssid = "WIFI_HISTORY_SSID_" + String(i - 1);
+      String key_pass = "WIFI_HISTORY_PASS_" + String(i - 1);
+      String next_ssid = prefs.getString(("WIFI_HISTORY_SSID_" + String(i)).c_str(), "");
+      String next_pass = prefs.getString(("WIFI_HISTORY_PASS_" + String(i)).c_str(), "");
+      prefs.putString(key_ssid.c_str(), next_ssid);
+      prefs.putString(key_pass.c_str(), next_pass);
+    }
+    count = 5;
+    count--;
+  }
+
+  int slot = count;
+  prefs.putString(("WIFI_HISTORY_SSID_" + String(slot)).c_str(), ssid);
+  prefs.putString(("WIFI_HISTORY_PASS_" + String(slot)).c_str(), pass);
+  prefs.putInt("WIFI_HISTORY_COUNT", count + 1);
+  prefs.end();
+}
+
+static int load_wifi_history(String* ssids, String* passwords, int max_items) {
+  Preferences prefs;
+  prefs.begin("wifi-config", true);
+  int count = prefs.getInt("WIFI_HISTORY_COUNT", 0);
+  count = min(count, max_items);
+  for (int i = 0; i < count; ++i) {
+    ssids[i] = prefs.getString(("WIFI_HISTORY_SSID_" + String(i)).c_str(), "");
+    passwords[i] = prefs.getString(("WIFI_HISTORY_PASS_" + String(i)).c_str(), "");
+  }
+  prefs.end();
+  return count;
+}
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
   boolean restoreConfig() {  // Check whether there is wifi configuration information storage, if there is return 1, if no return 0.
-    preferences.begin("wifi-config", true);  // Open in read-only mode
-    wifi_ssid = preferences.getString("WIFI_SSID", "");
-    wifi_password = preferences.getString("WIFI_PASSWD", "");
-    preferences.end();
-    
+    Preferences prefs;
+    prefs.begin("wifi-config", true);  // Open in read-only mode
+    wifi_ssid = prefs.getString("WIFI_SSID", "");
+    wifi_password = prefs.getString("WIFI_PASSWD", "");
+    prefs.end();
+
+    if (wifi_ssid.length() == 0) {
+      return false;
+    }
+
+    String historical_ssids[5];
+    String historical_passwords[5];
+    int history_count = load_wifi_history(historical_ssids, historical_passwords, 5);
+
+    for (int i = 0; i < history_count; ++i) {
+      if (historical_ssids[i].length() == 0) continue;
+      if (historical_ssids[i].equals(wifi_ssid)) {
+        wifi_password = historical_passwords[i];
+        break;
+      }
+    }
+
     WiFi.setMinSecurity(WIFI_AUTH_WEP);
     WiFi.setAutoReconnect(true);
     WiFi.mode(WIFI_STA);
-    WiFi.begin(wifi_ssid.c_str(), wifi_password.c_str());
+
+    // Try the current SSID first, then any prior networks in order as fallback.
+    String ssids[6];
+    String passwords[6];
+    ssids[0] = wifi_ssid;
+    passwords[0] = wifi_password;
+    int candidate_count = 1;
+
+    for (int i = 0; i < history_count && candidate_count < 6; ++i) {
+      if (historical_ssids[i].length() == 0 || historical_ssids[i].equals(wifi_ssid)) continue;
+      ssids[candidate_count] = historical_ssids[i];
+      passwords[candidate_count] = historical_passwords[i];
+      candidate_count++;
+    }
+
+    for (int i = 0; i < candidate_count; ++i) {
+      if (ssids[i].length() == 0) continue;
+      wifi_ssid = ssids[i];
+      wifi_password = passwords[i];
+      WiFi.begin(wifi_ssid.c_str(), wifi_password.c_str());
+    }
+
     return wifi_ssid.length() > 0;
   }
 
@@ -33,6 +134,9 @@ extern "C" {
   }
 
   void wifi_connected(void (*on_connected)()) {
+    if (wifi_ssid.length() > 0) {
+      save_current_wifi_credentials(wifi_ssid, wifi_password);
+    }
     (*on_connected)();
     settingMode = false;  // Turn off setting mode.
   }
@@ -80,8 +184,8 @@ extern "C" {
         lv_obj_set_style_bg_color(btn_obj, lv_color_hex(0x2a2a2a), LV_PART_MAIN);
         lv_obj_set_style_text_color(btn_obj, lv_color_hex(0xffffff), LV_PART_MAIN);
         lv_obj_set_style_text_font(btn_obj, &lv_font_montserrat_18, LV_PART_MAIN);
-        lv_obj_set_size(btn_obj, 140, 48);
-        lv_obj_set_style_pad_hor(btn_obj, 12, LV_PART_MAIN);
+        lv_obj_set_size(btn_obj, LV_SIZE_CONTENT, 48);
+        lv_obj_set_style_pad_hor(btn_obj, 24, LV_PART_MAIN); 
         lv_obj_set_style_pad_ver(btn_obj, 4, LV_PART_MAIN);
     }
     
@@ -101,13 +205,10 @@ extern "C" {
       screenServer0();
 #endif
     } else if (code == LV_EVENT_READY) {
-      preferences.begin("wifi-config", false);  // Open in read-write mode
-      preferences.remove("WIFI_SSID");
-      preferences.remove("WIFI_PASSWD");
-      preferences.putString("WIFI_SSID", WiFi.SSID(i));
-      preferences.putString("WIFI_PASSWD", lv_textarea_get_text(ta));
-      preferences.end();
-      lv_msgbox(lv_textarea_get_text(ta));
+      String ssid = WiFi.SSID(i);
+      String pass = lv_textarea_get_text(ta);
+      save_current_wifi_credentials(ssid, pass);
+      lv_msgbox(pass.c_str());
     }
   }
 
