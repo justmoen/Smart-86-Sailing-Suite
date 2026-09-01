@@ -22,6 +22,8 @@ struct EngineScreenState {
     lv_meter_indicator_t *temp_needle;
     lv_obj_t *eng_sog_label;
     lv_obj_t *eng_alternator_label;
+    lv_obj_t *rpm_value_label;
+    uint32_t last_update_ms = 0;
     float last_rpm = 0;
     float last_oil_pressure = 0;
     float last_temp = 0;
@@ -196,6 +198,12 @@ static void lv_engine_display(lv_updatable_screen_t *scr) {
     } else {
         lv_obj_add_flag(state->eng_alternator_label, LV_OBJ_FLAG_HIDDEN);
     }
+
+    state->rpm_value_label = lv_label_create(scr->screen);
+    lv_obj_align(state->rpm_value_label, LV_ALIGN_BOTTOM_LEFT, 8, -6);
+    lv_obj_set_style_text_font(state->rpm_value_label, &lv_font_montserrat_26, 0);
+    lv_obj_set_style_text_color(state->rpm_value_label, lv_color_black(), 0);
+    lv_label_set_text_static(state->rpm_value_label, "RPM: --");
     
     // Display engine ID in bottom right corner
     lv_obj_t *engine_id_label = lv_label_create(scr->screen);
@@ -211,10 +219,16 @@ static void engine_update_cb(lv_updatable_screen_t *scr) {
     EngineScreenState *state = (EngineScreenState *)scr->user_data;
     if (!state || !scr->screen) return;
 
+    const uint32_t now = millis();
+    if ((now - state->last_update_ms) < 1000) {
+        return;
+    }
+    state->last_update_ms = now;
+
     const auto& config = get_signalk_path_config();
 
     if (!state->engine_rpm_indic || !state->temp_arc_green || !state->temp_arc_red || !state->temp_needle || 
-        !state->eng_sog_label || !state->eng_alternator_label) return;
+        !state->eng_sog_label || !state->eng_alternator_label || !state->rpm_value_label) return;
     if (config.engine_oil_pressure_enabled && !state->oil_press_indic) return;
     
     int engine_id = state->engine_id;
@@ -224,9 +238,15 @@ static void engine_update_cb(lv_updatable_screen_t *scr) {
     // Use configured engine_id
     if (engine_id >= 0 && engine_id < 8) {
         if (fresh(shipDataModel.propulsion.engines[engine_id].revolutions_RPM.age)) {
-            state->last_rpm = shipDataModel.propulsion.engines[engine_id].revolutions_RPM.rpm / 100;
+            state->last_rpm = shipDataModel.propulsion.engines[engine_id].revolutions_RPM.rpm;
         }
-        set_engine_rpm_value(state, state->last_rpm);
+
+        float scaled_rpm = state->last_rpm;
+        if (scaled_rpm < 0.0f) scaled_rpm = 0.0f;
+        if (scaled_rpm > 6000.0f) scaled_rpm = 6000.0f;
+        set_engine_rpm_value(state, (int32_t)lroundf(scaled_rpm / 100.0f));
+        lv_label_set_text(state->rpm_value_label,
+            (String("RPM: ") + String((int32_t)lroundf(state->last_rpm))).c_str());
 
         if (config.engine_top_left_enabled) {
             if (config.engine_top_left_metric == EngineTopLeftMetric::SOG) {
@@ -309,6 +329,7 @@ void create_engine_screens(lv_updatable_screen_t **out_screens, int *out_count) 
         engine_states[i].temp_needle = nullptr;
         engine_states[i].eng_sog_label = nullptr;
         engine_states[i].eng_alternator_label = nullptr;
+        engine_states[i].rpm_value_label = nullptr;
         
         // Create screen with callbacks and user_data pointing to state
         engine_screens_array[i].screen = nullptr;

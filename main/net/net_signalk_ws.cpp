@@ -37,6 +37,10 @@ static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length)
             ESP_LOGW("WS", "Disconnected");
             break;
 
+        case WStype_ERROR:
+            ESP_LOGE("WS", "WebSocket error");
+            break;
+
         default:
             break;
     }
@@ -44,9 +48,13 @@ static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length)
 
 void signalk_ws_begin(const char* host, int port)
 {
-    webSocket.begin(host, port, "/signalk/v1/stream");
+    // Do not force a subprotocol. SignalK accepts generic WebSocket connections
+    // without a negotiated protocol; advertising "arduino" can be rejected by the
+    // server and results in immediate reset/disconnects.
+    webSocket.begin(host, port, "/signalk/v1/stream", "");
     webSocket.onEvent(webSocketEvent);
     webSocket.setReconnectInterval(5000);
+    webSocket.enableHeartbeat(15000, 3000, 3);
 }
 
 void signalk_ws_loop()

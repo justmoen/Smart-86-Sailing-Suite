@@ -218,7 +218,9 @@ static fluid_type_e string_to_fluid_type(const String& fluid_lower) {
           String field = remainder.substring(dotIndex + 1);
           if (field == "revolutions" || field == "rpm") {
             if (value.is<float>()) {
-              eng->revolutions_RPM.rpm = value.as<float>() * 60;
+              // SignalK engine RPM values are already reported in revolutions per minute.
+              // Do not multiply by 60 here; the gauge logic expects the raw RPM value.
+              eng->revolutions_RPM.rpm = value.as<float>();
               eng->revolutions_RPM.age = millis();
             }
           } else if (field == "temperature") {

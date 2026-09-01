@@ -27,6 +27,7 @@ static int pending_screen_index = -1;  // Deferred screen transition
 static int pending_create_screen_index = -1;  // Deferred screen creation
 static int pending_reinit_flag = 0;  // 1 = full reinit requested
 static int pending_load_screen_index = -1;   // Deferred screen load (separate from creation)
+static bool reinit_in_progress = false;
 
 // Initialize screens array with proper number of engine screens
 void init_screens_array() {
@@ -80,20 +81,21 @@ void init_screens_array() {
 
 static void create_if_needed(lv_updatable_screen_t *scr)
 {
-    if (!scr->created)
-    {
+    if (!scr || scr->created) {
+        return;
+    }
+
+    if (!scr->screen) {
         scr->screen = lv_obj_create(NULL);
         apply_screen_style(scr->screen);
-
         lv_obj_add_event_cb(scr->screen, gesture_event_cb, LV_EVENT_ALL, NULL);
-
-        // Screen creation happens in main loop task, not LVGL task
-        // No need to reset watchdog here
-        if (scr->create_cb)
-            scr->create_cb(scr);
-
-        scr->created = true;
     }
+
+    // Screen creation happens in main loop task, not LVGL task.
+    if (scr->create_cb)
+        scr->create_cb(scr);
+
+    scr->created = true;
 }
 
 void ui_manager_show(lv_updatable_screen_t *scr)
@@ -114,6 +116,10 @@ void ui_manager_show(lv_updatable_screen_t *scr)
 
 void ui_manager_next()
 {
+    if (screen_count <= 0) {
+        return;
+    }
+
     // Only queue one pending transition at a time - discard intermediate swipes
     // Calculate the target screen
     int next_index = current_index + 1;
@@ -125,7 +131,7 @@ void ui_manager_next()
         pending_screen_index = next_index;
         
         // Mark for creation if needed
-        if (!screens[next_index]->created) {
+        if (screens[next_index] && !screens[next_index]->created) {
             pending_create_screen_index = next_index;
         }
     }
@@ -133,6 +139,10 @@ void ui_manager_next()
 
 void ui_manager_prev()
 {
+    if (screen_count <= 0) {
+        return;
+    }
+
     // Only queue one pending transition at a time - discard intermediate swipes
     // Calculate the target screen
     int prev_index = current_index - 1;
@@ -144,7 +154,7 @@ void ui_manager_prev()
         pending_screen_index = prev_index;
         
         // Mark for creation if needed
-        if (!screens[prev_index]->created) {
+        if (screens[prev_index] && !screens[prev_index]->created) {
             pending_create_screen_index = prev_index;
         }
     }
@@ -188,8 +198,8 @@ void ui_manager_update()
 void ui_manager_process_deferred_screen_creation()
 {
     if (pending_reinit_flag) {
-        ui_manager_reinit_screens();
         pending_reinit_flag = 0;
+        ui_manager_reinit_screens();
         return;
     }
     
@@ -225,44 +235,68 @@ void ui_manager_process_deferred_screen_load()
 }
 
 void ui_manager_reinit_screens() {
-    // Destroy all existing screens
-    for (int i = 0; i < screen_count; i++) {
-        if (screens[i] && screens[i]->destroy_cb) {
-            screens[i]->destroy_cb(screens[i]);
-        }
-        if (screens[i] && screens[i]->screen) {
-            lv_obj_del(screens[i]->screen);
-            screens[i]->screen = nullptr;
-            screens[i]->created = false;
-        }
+    if (reinit_in_progress) {
+        return;
     }
-    
-    // Reset engine static state - skip, states reinited in create_engine_screens
-    
+    reinit_in_progress = true;
+
+    lv_updatable_screen_t *old_screens[MAX_SCREENS] = {nullptr};
+    int old_screen_count = screen_count;
+    for (int i = 0; i < old_screen_count; i++) {
+        old_screens[i] = screens[i];
+        screens[i] = nullptr;
+    }
+
+    // Destroy all existing screens before the array is rebuilt.
+    for (int i = 0; i < old_screen_count; i++) {
+        lv_updatable_screen_t *scr = old_screens[i];
+        if (!scr) continue;
+        if (scr->destroy_cb) {
+            scr->destroy_cb(scr);
+        }
+        if (scr->screen) {
+            lv_obj_del(scr->screen);
+            scr->screen = nullptr;
+        }
+        scr->created = false;
+    }
+
     // Reset state
     screen_count = 0;
     pending_screen_index = -1;
     pending_create_screen_index = -1;
     pending_load_screen_index = -1;
-    
-    // Reinitialize screens array with current config
+    pending_reinit_flag = 0;
+
+    // Reinitialize screens array with current config.
     init_screens_array();
-    
+
     for (int i = 0; i < screen_count; i++) {
+        if (!screens[i]) continue;
         screens[i]->created = false;
         screens[i]->screen = nullptr;
     }
-    
-    // Restore current_index (clamped)
-    current_index = 0;
-    
-    // Create and show current screen
-    create_if_needed(screens[current_index]);
-    current_screen = screens[current_index];
-    save_last_screen(current_index);
-    lv_scr_load(screens[current_index]->screen);
+
+    // Restore current_index (clamped) and create the screen safely.
+    current_screen = nullptr;
+    current_index = (current_index >= 0 && current_index < screen_count) ? current_index : 0;
+    if (screen_count > 0) {
+        create_if_needed(screens[current_index]);
+        current_screen = screens[current_index];
+        save_last_screen(current_index);
+        if (screens[current_index] && screens[current_index]->screen) {
+            lv_scr_load(screens[current_index]->screen);
+        }
+    } else {
+        current_index = 0;
+    }
+
+    reinit_in_progress = false;
 }
 
 void notify_config_changed() {
+    if (reinit_in_progress) {
+        return;
+    }
     pending_reinit_flag = 1;
 }
