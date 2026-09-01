@@ -1,0 +1,14 @@
+Command: cmake -G Ninja -DPYTHON_DEPS_CHECKED=1 -DPYTHON=/Users/justin.moen/.espressif/python_env/idf5.5_py3.14_env/bin/python -DESP_PLATFORM=1 -DIDF_TARGET=esp32p4 -DCCACHE_ENABLE=0 /Users/justin.moen/repos/Smart-86-Sailing-Suite
+CMake Deprecation Warning at CMakeLists.txt:3 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+info: INFO: Symbol BSP_I2S_NUM defined in multiple locations (see below). Please check if this is a correct behavior or a random name match:
+    /Users/justin.moen/repos/Smart-86-Sailing-Suite/components/bsp_extra/Kconfig:2
+    /Users/justin.moen/repos/Smart-86-Sailing-Suite/managed_components/waveshare__esp32_p4_wifi6_touch_lcd_4b/Kconfig:30
+info: Choice ESPTOOLPY_FLASHSIZE has multiple active selections. The last one will be used: ESPTOOLPY_FLASHSIZE_32MB .
