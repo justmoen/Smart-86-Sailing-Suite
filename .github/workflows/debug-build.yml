@@ -1,0 +1,48 @@
+name: Debug ESP32-P4 Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  debug-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Debug ESP32-P4 build
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.5.3
+          target: esp32p4
+          command: |
+            rm -f sdkconfig
+            idf.py set-target esp32p4
+
+            echo "========== ESP-IDF =========="
+            idf.py --version
+
+            echo "========== Arduino SSL source =========="
+            grep -R -n "stop_ssl_socket" \
+              managed_components/espressif__arduino-esp32/libraries/NetworkClientSecure/src \
+              || true
+
+            echo "========== Arduino archive =========="
+            nm -C build/esp-idf/espressif__arduino-esp32/libespressif__arduino-esp32.a \
+              | grep -E "stop_ssl_socket|start_ssl_client|send_ssl_data|ssl_init" \
+              || true
+
+            echo "========== SSL object =========="
+            find build/esp-idf/espressif__arduino-esp32 \
+              -name "ssl_client.cpp.obj" \
+              -print
+
+            echo "========== Build =========="
+            idf.py build
