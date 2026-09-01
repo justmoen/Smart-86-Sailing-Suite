@@ -331,18 +331,15 @@ dependencies:
       type: service
     version: 1.2.1
   espressif/esp_lvgl_port:
-    component_hash: d3c020b45c3dfc0d1706a83b63a1c34a6eb444a6e935f9afff79f92b7b94dcef
     dependencies:
     - name: idf
-      require: private
       version: '>=5.2'
     - name: lvgl/lvgl
-      registry_url: https://components.espressif.com
-      require: public
+      public: true
       version: '>=8,<10'
     source:
-      registry_url: https://components.espressif.com/
-      type: service
+      path: /Users/justin.moen/repos/Smart-86-Sailing-Suite/components/esp_lvgl_port
+      type: local
     version: 2.9.0
   espressif/esp_modem:
     component_hash: 06abed971065e9cb88039e011fd85ec1412c7416d3a3d84541a7a432e8d3f94d
@@ -564,6 +561,6 @@ direct_dependencies:
 - joltwallet/littlefs
 - lvgl/lvgl
 - waveshare/esp32_p4_wifi6_touch_lcd_4b
-manifest_hash: f3233e8c080f56934d024fadff715a2ef4eba1a6d4ca97f2018163fa2d4e52d0
+manifest_hash: 77c75d370f8d624086922917ddf1d7aae4a11ab4fa4c4beec2bdee7f97ae0daa
 target: esp32p4
 version: 2.0.0

@@ -3,4 +3,6 @@ dependencies:
   lvgl/lvgl:
     version: 8.3.0
     public: true
-  espressif/esp_lvgl_port: '*'
+  espressif/esp_lvgl_port:
+    version: '*'
+    override_path: ../components/esp_lvgl_port
