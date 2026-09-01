@@ -1,6 +1,6 @@
 [submodule "components/ReactESP"]
 	path = components/ReactESP
-	url = https://github.com/mairas/ReactESP
+	url = https://github.com/mairas/ReactESP.git
 [submodule "components/arduino-mqtt"]
 	path = components/arduino-mqtt
 	url = https://github.com/256dpi/arduino-mqtt
