@@ -9,5 +9,6 @@ set(EXTRA_COMPONENT_DIRS
     )
 
 add_compile_options(-Wno-format)
-project(sailing_suite VERSION 0.7.17)
+project(sailing_suite VERSION 0.7.19)
+idf_build_set_property(COMPILE_OPTIONS "-Wno-error=stringop-truncation" APPEND)
 add_compile_definitions(FIRMWARE_VERSION=\"${PROJECT_VERSION}\")

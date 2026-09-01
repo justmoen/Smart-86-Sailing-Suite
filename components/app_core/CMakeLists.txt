@@ -22,7 +22,7 @@ idf_component_register(
 
     REQUIRES
         ReactESP
-        arduino
+        arduino-esp32
         esp-tls
         mbedtls
         arduino-mqtt
