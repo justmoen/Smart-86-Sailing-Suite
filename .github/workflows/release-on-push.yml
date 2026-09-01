@@ -15,37 +15,22 @@ concurrency:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
-    env:
-      IDF_TARGET: esp32p4
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up ESP-IDF
+      # The action handles mounting your workspace, exporting the correct chip, and building
+      - name: Build ESP32-P4 firmware
         uses: espressif/esp-idf-ci-action@v1
         with:
           esp_idf_version: v5.5.3
-
-      - name: Print target info
-        shell: bash
-        run: |
-          echo "IDF_TARGET=${IDF_TARGET:-unset}"
-          env | grep IDF || true
-
-      - name: Build ESP32-P4 firmware
-        shell: bash
-        env:
-          IDF_TARGET: esp32p4
-        run: |
-          . "$IDF_PATH/export.sh"
-          unset IDF_TARGET
-          export IDF_TARGET=esp32p4
-          echo "Final IDF_TARGET=$IDF_TARGET"
-          rm -f sdkconfig
-          idf.py set-target esp32p4
-          idf.py build
+          target: esp32p4         # 🚀 Tells the action container to export esp32p4
+          command: |
+            rm -f sdkconfig
+            idf.py set-target esp32p4
+            idf.py build
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
