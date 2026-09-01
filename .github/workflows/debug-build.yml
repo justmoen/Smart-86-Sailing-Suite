@@ -35,5 +35,8 @@ jobs:
             echo "=== SSL OBJECT ==="
             find managed_components/espressif__arduino-esp32 -name "ssl_client.cpp.obj" -print
 
-            echo "=== BUILD ==="
-            idf.py build
+            echo "=== NETWORKCLIENTSECURE CMAKE ==="
+            grep -R "ssl_client" managed_components/espressif__arduino-esp32/CMakeLists.txt managed_components/espressif__arduino-esp32/libraries/NetworkClientSecure 2>/dev/null || true
+
+            echo "=== SSL SOURCE ==="
+            find managed_components/espressif__arduino-esp32/libraries/NetworkClientSecure -name "ssl_client.cpp" -print
