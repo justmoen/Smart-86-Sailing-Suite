@@ -23,12 +23,6 @@ jobs:
           esp_idf_version: v5.5.3
           target: esp32p4
           command: |
-            rm -f sdkconfig
             idf.py set-target esp32p4
-
-            echo "=== ARDUINO CMAKE 270-320 ==="
-            sed -n '270,320p' managed_components/espressif__arduino-esp32/CMakeLists.txt
-
-            echo "=== ARDUINO CMAKE 110-135 ==="
-            sed -n '110,135p' managed_components/espressif__arduino-esp32/CMakeLists.txt
+            idf.py build
 
