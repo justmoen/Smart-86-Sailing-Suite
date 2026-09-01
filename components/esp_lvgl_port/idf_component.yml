@@ -1,7 +1,0 @@
-dependencies:
-  idf: '>=5.2'
-  lvgl/lvgl:
-    public: true
-    version: '>=8,<10'
-description: ESP LVGL port
-version: 2.9.0

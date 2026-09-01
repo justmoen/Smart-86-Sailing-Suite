@@ -16,11 +16,11 @@ static lv_obj_t *bar_tank_l[MAX_TANKS];
 static void tanks_destroy_cb(lv_updatable_screen_t *scr) {
   for (int i = 0; i < MAX_TANKS; i++) {
     if (bar_tank[i]) {
-      lv_obj_del(bar_tank[i]);
+      lv_obj_delete(bar_tank[i]);
       bar_tank[i] = nullptr;
     }
     if (bar_tank_l[i]) {
-      lv_obj_del(bar_tank_l[i]);
+      lv_obj_delete(bar_tank_l[i]);
       bar_tank_l[i] = nullptr;
     }
   }

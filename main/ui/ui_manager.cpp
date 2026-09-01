@@ -111,7 +111,7 @@ void ui_manager_show(lv_updatable_screen_t *scr)
     current_screen = scr;
 
     save_last_screen(current_index);
-    lv_scr_load(scr->screen);
+    lv_screen_load(scr->screen);
 }
 
 void ui_manager_next()
@@ -181,7 +181,7 @@ void ui_manager_init()
     create_if_needed(screens[current_index]);
     current_screen = screens[current_index];
     save_last_screen(current_index);
-    lv_scr_load(screens[current_index]->screen);
+    lv_screen_load(screens[current_index]->screen);
 }
 
 void ui_manager_update()
@@ -230,7 +230,7 @@ void ui_manager_process_deferred_screen_load()
         save_last_screen(current_index);
         
         // Load screen without animation, outside of render lock
-        lv_scr_load_anim(next_screen->screen, LV_SCR_LOAD_ANIM_NONE, 0, 0, false);
+        lv_screen_load_anim(next_screen->screen, LV_SCR_LOAD_ANIM_NONE, 0, 0, false);
     }
 }
 
@@ -255,7 +255,7 @@ void ui_manager_reinit_screens() {
             scr->destroy_cb(scr);
         }
         if (scr->screen) {
-            lv_obj_del(scr->screen);
+            lv_obj_delete(scr->screen);
             scr->screen = nullptr;
         }
         scr->created = false;
@@ -285,7 +285,7 @@ void ui_manager_reinit_screens() {
         current_screen = screens[current_index];
         save_last_screen(current_index);
         if (screens[current_index] && screens[current_index]->screen) {
-            lv_scr_load(screens[current_index]->screen);
+            lv_screen_load(screens[current_index]->screen);
         }
     } else {
         current_index = 0;

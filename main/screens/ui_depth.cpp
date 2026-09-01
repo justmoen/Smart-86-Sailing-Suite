@@ -112,7 +112,7 @@ static void lv_depth_display(lv_updatable_screen_t *scr)
     lv_obj_align(x_label, LV_ALIGN_BOTTOM_MID, 0, 5);
     
     // Allow gesture events to pass through to screen
-    lv_obj_clear_flag(depth_chart, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(depth_chart, LV_OBJ_FLAG_CLICKABLE);
     
     // Style the chart
     lv_obj_set_style_text_font(depth_chart, &lv_font_montserrat_28, LV_PART_MAIN);

@@ -109,7 +109,7 @@ static void lv_speed_display(lv_updatable_screen_t *scr)
     lv_obj_align(x_label, LV_ALIGN_BOTTOM_MID, 0, 5);
     
     // Allow gesture events to pass through to screen
-    lv_obj_clear_flag(speed_chart, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(speed_chart, LV_OBJ_FLAG_CLICKABLE);
 
     
     // Style the chart

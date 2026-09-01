@@ -128,7 +128,7 @@ static void overlay_show()
 {
     overlay_create();
 
-    lv_obj_clear_flag(brightness_overlay, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(brightness_overlay, LV_OBJ_FLAG_HIDDEN);
 
     if(brightness_timer)
         lv_timer_del(brightness_timer);
@@ -140,7 +140,7 @@ static void overlay_show()
 
 static bool right_edge(lv_point_t *p)
 {
-    int w = lv_disp_get_hor_res(NULL);
+    int w = lv_display_get_horizontal_resolution(NULL);
     return p->x > w * 0.85;
 }
 
