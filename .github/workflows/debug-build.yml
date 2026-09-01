@@ -44,5 +44,10 @@ jobs:
               -name "ssl_client.cpp.obj" \
               -print
 
+            echo "=== Arduino component ==="
+            cat managed_components/espressif__arduino-esp32/idf_component.yml
+            echo "=== dependencies.lock Arduino entry ==="
+            grep -A12 -B2 "arduino-esp32" dependencies.lock
+
             echo "========== Build =========="
             idf.py build
