@@ -9,5 +9,5 @@ set(EXTRA_COMPONENT_DIRS
     )
 
 add_compile_options(-Wno-format)
-project(sailing_suite VERSION 0.7.4)
+project(sailing_suite VERSION 0.7.5)
 add_compile_definitions(FIRMWARE_VERSION=\"${PROJECT_VERSION}\")

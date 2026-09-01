@@ -28,6 +28,12 @@ jobs:
         with:
           esp_idf_version: v5.5.3
 
+      - name: Print target info
+        shell: bash
+        run: |
+          echo "IDF_TARGET=${IDF_TARGET:-unset}"
+          env | grep IDF || true
+
       - name: Build ESP32-P4 firmware
         shell: bash
         env:
@@ -36,7 +42,8 @@ jobs:
           . "$IDF_PATH/export.sh"
           unset IDF_TARGET
           export IDF_TARGET=esp32p4
-          echo "IDF_TARGET=$IDF_TARGET"
+          echo "Final IDF_TARGET=$IDF_TARGET"
+          rm -f sdkconfig
           idf.py set-target esp32p4
           idf.py build
 
