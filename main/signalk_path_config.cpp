@@ -6,6 +6,7 @@
 #include <WebServer.h>
 #include <vector>
 #include <esp_https_ota.h>
+#include <esp_crt_bundle.h>
 #include <esp_system.h>
 #include "net_mdns.h"
 #include "net_signalk_http.h"
@@ -13,7 +14,7 @@
 #include "ui_manager.h"
 
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "3.6.0"
+#define FIRMWARE_VERSION "v0.6.0"
 #endif
 
 constexpr const char* kPrefsNamespace = "sk-config";
@@ -290,6 +291,7 @@ static bool perform_firmware_ota(const String& tag, String& error_message) {
     client_config.timeout_ms = 30000;
     client_config.keep_alive_enable = true;
     client_config.buffer_size = 4096;
+    client_config.crt_bundle_attach = esp_crt_bundle_attach;
 
     esp_https_ota_config_t ota_config = {};
     ota_config.http_config = &client_config;
@@ -936,7 +938,7 @@ void handle_firmware_update() {
         out["status"] = "no-update";
         out["currentVersion"] = current_version;
         out["requestedTag"] = requested_tag;
-        out["message"] = "The selected release is not newer than the current firmware.";
+        out["message"] = "The selected release is not newer than the current firmware. Use the rollback selector to install an older tagged release.";
         String payload;
         serializeJson(out, payload);
         web_server.send(200, "application/json", payload);
@@ -977,6 +979,8 @@ void handle_firmware_rollback() {
     set_saved_release_pref("firmware_rollback_tag", tag);
 
     String error_message;
+    set_saved_release_pref("firmware_pending_tag", tag);
+
     bool ok = perform_firmware_ota(tag, error_message);
     JsonDocument out;
     out["status"] = ok ? "rollbacking" : "error";

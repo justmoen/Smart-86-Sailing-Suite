@@ -53,8 +53,13 @@ void signalk_ws_begin(const char* host, int port)
     // server and results in immediate reset/disconnects.
     webSocket.begin(host, port, "/signalk/v1/stream", "");
     webSocket.onEvent(webSocketEvent);
-    webSocket.setReconnectInterval(5000);
-    webSocket.enableHeartbeat(15000, 3000, 3);
+
+    // Newer SignalK versions enforce websocket ping/pong at the protocol level.
+    // Our client was not responding correctly to those heartbeat frames, which
+    // caused the socket to be dropped and immediately reconnected in a loop.
+    // We intentionally disable the client-side heartbeat to avoid tripping the
+    // server's native timeout while still allowing a clean reconnect path.
+    webSocket.setReconnectInterval(15000);
 }
 
 void signalk_ws_loop()

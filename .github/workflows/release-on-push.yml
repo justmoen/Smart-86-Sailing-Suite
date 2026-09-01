@@ -13,13 +13,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  create-release:
+  build-and-release:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Set up ESP-IDF
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.5.3
+
+      - name: Build ESP32-P4 firmware
+        shell: bash
+        run: |
+          . "$IDF_PATH/export.sh"
+          idf.py set-target esp32p4
+          idf.py build
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
@@ -29,3 +41,5 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: false
+          files: |
+            build/sailing_suite.bin
