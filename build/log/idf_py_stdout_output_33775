@@ -1,0 +1,88 @@
+Command: cmake -G Ninja -DPYTHON_DEPS_CHECKED=1 -DPYTHON=/Users/justin.moen/.espressif/python_env/idf5.5_py3.14_env/bin/python -DESP_PLATFORM=1 -DIDF_TARGET=esp32p4 -DCCACHE_ENABLE=0 /Users/justin.moen/repos/Smart-86-Sailing-Suite
+-- Existing sdkconfig '/Users/justin.moen/repos/Smart-86-Sailing-Suite/sdkconfig' renamed to '/Users/justin.moen/repos/Smart-86-Sailing-Suite/sdkconfig.old'.
+-- Found Git: /usr/bin/git (found version "2.50.1 (Apple Git-155)")
+-- Component directory /Users/justin.moen/repos/Smart-86-Sailing-Suite/components/ReactESP does not contain a CMakeLists.txt file. No component will be added
+-- Component directory /Users/justin.moen/repos/Smart-86-Sailing-Suite/components/WebSockets does not contain a CMakeLists.txt file. No component will be added
+-- Minimal build - OFF
+-- The C compiler identification is GNU 14.2.0
+-- The CXX compiler identification is GNU 14.2.0
+-- The ASM compiler identification is GNU
+-- Found assembler: /Users/justin.moen/.espressif/tools/riscv32-esp-elf/esp-14.2.0_20251107/riscv32-esp-elf/bin/riscv32-esp-elf-gcc
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /Users/justin.moen/.espressif/tools/riscv32-esp-elf/esp-14.2.0_20251107/riscv32-esp-elf/bin/riscv32-esp-elf-gcc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /Users/justin.moen/.espressif/tools/riscv32-esp-elf/esp-14.2.0_20251107/riscv32-esp-elf/bin/riscv32-esp-elf-g++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Building ESP-IDF components for target esp32p4
+NOTICE: Manifest files have changed, solving dependencies.
+NOTICE: Skipping optional dependency: espressif/esp-zboss-lib
+NOTICE: Skipping optional dependency: espressif/esp-zigbee-lib
+NOTICE: Skipping optional dependency: espressif/esp_rainmaker
+NOTICE: Skipping optional dependency: espressif/rmaker_common
+NOTICE: Skipping optional dependency: espressif/esp_insights
+NOTICE: Skipping optional dependency: espressif/esp_diag_data_store
+NOTICE: Skipping optional dependency: espressif/esp_diagnostics
+NOTICE: Skipping optional dependency: espressif/cbor
+NOTICE: Skipping optional dependency: espressif/qrcode
+....................................................NOTICE: Skipping optional dependency: espressif/esp-sr
+...............................NOTICE: Skipping optional dependency: espressif/cjson
+NOTICE: Skipping optional dependency: espressif/dm9051
+NOTICE: Skipping optional dependency: espressif/ksz8851snl
+NOTICE: Skipping optional dependency: espressif/w5500
+..............NOTICE: Updating lock file at /Users/justin.moen/repos/Smart-86-Sailing-Suite/dependencies.lock
+NOTICE: Processing 32 dependencies:
+NOTICE: [1/32] chmorgan/esp-audio-player (1.0.7)
+NOTICE: [2/32] chmorgan/esp-file-iterator (1.0.0)
+NOTICE: [3/32] chmorgan/esp-libhelix-mp3 (1.0.3)
+NOTICE: [4/32] espressif/arduino-esp32 (3.3.8)
+NOTICE: [5/32] espressif/cjson (1.7.19~2)
+NOTICE: [6/32] espressif/cmake_utilities (0.5.3)
+NOTICE: [7/32] espressif/dl_fft (0.6.0)
+NOTICE: [8/32] espressif/eppp_link (1.1.6)
+NOTICE: [9/32] espressif/esp-dl (3.3.10)
+NOTICE: [10/32] espressif/esp-dsp (1.8.0)
+NOTICE: [11/32] espressif/esp-modbus (1.0.18)
+NOTICE: [12/32] espressif/esp-sr (2.5.2)
+NOTICE: [13/32] espressif/esp_codec_dev (1.2.0)
+NOTICE: [14/32] espressif/esp_hosted (2.12.12)
+NOTICE: [15/32] espressif/esp_lcd_touch (1.2.1)
+NOTICE: [16/32] espressif/esp_lcd_touch_gt911 (1.2.1)
+NOTICE: [17/32] espressif/esp_lvgl_port (2.9.0)
+NOTICE: [18/32] espressif/esp_modem (2.1.0)
+NOTICE: [19/32] espressif/esp_new_jpeg (1.0.2)
+NOTICE: [20/32] espressif/esp_serial_slave_link (1.1.2)
+NOTICE: [21/32] espressif/esp_wifi_remote (1.6.4)
+NOTICE: [22/32] espressif/lan867x (2.1.0)
+NOTICE: [23/32] espressif/lan86xx_common (1.0.1)
+NOTICE: [24/32] espressif/libsodium (1.0.22~1)
+NOTICE: [25/32] espressif/mdns (1.12.0)
+NOTICE: [26/32] espressif/network_provisioning (1.0.2)
+NOTICE: [27/32] espressif/wifi_remote_over_eppp (0.3.3)
+NOTICE: [28/32] joltwallet/littlefs (1.22.3)
+NOTICE: [29/32] lvgl/lvgl (8.3.0)
+NOTICE: [30/32] waveshare/esp32_p4_wifi6_touch_lcd_4b (1.0.1)
+NOTICE: [31/32] waveshare/esp_lcd_st7703 (2.0.0)
+NOTICE: [32/32] idf (5.5.3)
+-- DEBUG: Use esp-modbus component folder: /Users/justin.moen/repos/Smart-86-Sailing-Suite/managed_components/espressif__esp-modbus.
+-- CONFIG_ESP32P4_SELECTS_REV_LESS_V3 is 
+-- IDF_VERSION_MAJOR is 5
+-- IDF_VERSION_MINOR is 5
+-- IDF_VERSION_PATCH is 3
+-- TARGET_LIB_PATH is set to: esp32p4
+-- Using new driver components (IDF >= 5.0)
+-- ESP-TEE is currently supported only on the esp32c6;esp32h2;esp32c5 SoCs
+NOTICE: Skipping optional dependency: espressif/esp-zboss-lib
+NOTICE: Skipping optional dependency: espressif/esp-zigbee-lib
+NOTICE: Skipping optional dependency: espressif/esp_rainmaker
+NOTICE: Skipping optional dependency: espressif/rmaker_common
+NOTICE: Skipping optional dependency: espressif/esp_insights
+NOTICE: Skipping optional dependency: espressif/esp_diag_data_store
+NOTICE: Skipping optional dependency: espressif/esp_diagnostics
+NOTICE: Skipping optional dependency: espressif/cbor
+NOTICE: Skipping optional dependency: espressif/qrcode
+-- Configuring incomplete, errors occurred!

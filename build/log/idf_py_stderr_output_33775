@@ -1,0 +1,21 @@
+Command: cmake -G Ninja -DPYTHON_DEPS_CHECKED=1 -DPYTHON=/Users/justin.moen/.espressif/python_env/idf5.5_py3.14_env/bin/python -DESP_PLATFORM=1 -DIDF_TARGET=esp32p4 -DCCACHE_ENABLE=0 /Users/justin.moen/repos/Smart-86-Sailing-Suite
+CMake Deprecation Warning at CMakeLists.txt:3 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+CMake Error at /Users/justin.moen/.espressif/v5.5.3/esp-idf/tools/cmake/build.cmake:330 (message):
+  Failed to resolve component 'ReactESP' required by component 'app_core':
+  unknown name.
+Call Stack (most recent call first):
+  /Users/justin.moen/.espressif/v5.5.3/esp-idf/tools/cmake/build.cmake:373 (__build_resolve_and_add_req)
+  /Users/justin.moen/.espressif/v5.5.3/esp-idf/tools/cmake/build.cmake:374 (__build_expand_requirements)
+  /Users/justin.moen/.espressif/v5.5.3/esp-idf/tools/cmake/build.cmake:687 (__build_expand_requirements)
+  /Users/justin.moen/.espressif/v5.5.3/esp-idf/tools/cmake/project.cmake:741 (idf_build_process)
+  CMakeLists.txt:12 (project)
+
+
