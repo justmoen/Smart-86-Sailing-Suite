@@ -29,7 +29,6 @@ jobs:
           esp_idf_version: v5.5.3
           target: esp32p4         # 🚀 Tells the action container to export esp32p4
           command: |
-            rm -f sdkconfig
             idf.py set-target esp32p4
             idf.py build
 
