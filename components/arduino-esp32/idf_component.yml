@@ -2,6 +2,8 @@ dependencies:
   chmorgan/esp-libhelix-mp3:
     require: public
     version: 1.0.3
+  espressif/arduino-esp32:
+    version: 3.3.11
   espressif/cbor:
     rules:
     - if: target not in [esp32c2, esp32p4]
@@ -96,6 +98,11 @@ dependencies:
     - if: target not in [esp32c2, esp32p4]
     - if: idf_version < 6.0
     version: 0.1.0~2
+  espressif/qrcode:
+    rules:
+    - if: target not in [esp32c2, esp32p4]
+    - if: idf_version < 6.0
+    version: 0.1.0~2
   espressif/rmaker_common:
     rules:
     - if: target not in [esp32c2, esp32p4]
@@ -108,8 +115,9 @@ dependencies:
   idf: '>=5.3,<6.2'
   joltwallet/littlefs:
     version: ^1.22.1
-description: Arduino core for ESP32, ESP32-C, ESP32-H, ESP32-P, ESP32-S series of
-  SoCs
+
+description: Arduino core for ESP32, ESP32-C, ESP32-H, ESP32-P, ESP32-S series of SoCs
+
 files:
   exclude:
   - .*
@@ -143,12 +151,17 @@ files:
   - variants/esp32p4/**/*
   - variants/esp32s2/**/*
   - variants/esp32s3/**/*
+
 license: LGPL-2.1
+
 repository: git://github.com/espressif/arduino-esp32.git
+
 repository_info:
   commit_sha: 759892884f915b0627b1c41f08264b7bb037a92c
+
 tags:
 - arduino
+
 targets:
 - esp32
 - esp32c2
@@ -160,5 +173,7 @@ targets:
 - esp32p4
 - esp32s2
 - esp32s3
+
 url: https://github.com/espressif/arduino-esp32
+
 version: 3.3.11

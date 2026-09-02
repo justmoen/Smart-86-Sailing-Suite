@@ -1,4 +1,4 @@
-name: Debug ESP32-P4 Arduino SSL PSK
+name: Build ESP32-P4 Arduino SSL Managed Component
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 jobs:
-  debug-ssl:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,58 +17,111 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Diagnose Arduino SSL PSK
+      - name: Build
         uses: espressif/esp-idf-ci-action@v1
         with:
           esp_idf_version: v5.5.3
           target: esp32p4
           command: |
-            set -o pipefail
+            set -e
 
             echo "============================================================"
-            echo "ESP-IDF VERSION"
+            echo "CLEAN MANAGED COMPONENT BUILD"
+            echo "============================================================"
+
+            echo ""
+            echo "Removing local Arduino component override..."
+
+            rm -rf components/arduino-esp32
+
+            echo ""
+            echo "Arduino component configuration:"
+            echo "--------------------------------"
+
+            if [ -f components/idf_component.yml ]; then
+              cat components/idf_component.yml
+            fi
+
+            echo ""
+            echo "============================================================"
+            echo "ESP-IDF"
             echo "============================================================"
 
             idf.py --version
 
             echo ""
             echo "============================================================"
-            echo "PSK CONFIGURATION"
+            echo "SET TARGET"
             echo "============================================================"
 
             idf.py set-target esp32p4
+
+            echo ""
+            echo "============================================================"
+            echo "ENABLE MBEDTLS PSK"
+            echo "============================================================"
+
+            echo "Adding CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=y"
+
+            if grep -q "^CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=" sdkconfig; then
+              sed -i \
+                "s/^CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=.*/CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=y/" \
+                sdkconfig
+            else
+              sed -i \
+                "/^CONFIG_MBEDTLS_PSK_MODES=/a CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=y" \
+                sdkconfig
+            fi
+
+            echo ""
+            echo "PSK configuration:"
+            grep -n "CONFIG_MBEDTLS_PSK_MODES" sdkconfig || true
+            grep -n "CONFIG_MBEDTLS_KEY_EXCHANGE_PSK" sdkconfig || true
+            grep -n "CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_PSK" sdkconfig || true
+            grep -n "CONFIG_MBEDTLS_KEY_EXCHANGE_RSA_PSK" sdkconfig || true
+
+            echo ""
+            echo "============================================================"
+            echo "RECONFIGURE"
+            echo "============================================================"
+
             idf.py reconfigure
 
-            echo "--- sdkconfig PSK settings ---"
-
-            grep -n CONFIG_MBEDTLS_PSK_MODES sdkconfig || true
-            grep -n CONFIG_MBEDTLS_KEY_EXCHANGE_PSK sdkconfig || true
-            grep -n CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_PSK sdkconfig || true
-            grep -n CONFIG_MBEDTLS_KEY_EXCHANGE_RSA_PSK sdkconfig || true
-            grep -n CONFIG_MBEDTLS_KEY_EXCHANGE_DHE_PSK sdkconfig || true
-
             echo ""
-            echo "--- generated PSK macros ---"
+            echo "============================================================"
+            echo "VERIFY CONFIGURATION"
+            echo "============================================================"
 
-            grep -n MBEDTLS_KEY_EXCHANGE_SOME_PSK_ENABLED build/config/sdkconfig.h || true
-            grep -n MBEDTLS_KEY_EXCHANGE__SOME__PSK_ENABLED build/config/sdkconfig.h || true
-            grep -n MBEDTLS_KEY_EXCHANGE_PSK_ENABLED build/config/sdkconfig.h || true
+            grep -n "CONFIG_MBEDTLS_PSK_MODES" sdkconfig || true
+            grep -n "CONFIG_MBEDTLS_KEY_EXCHANGE_PSK" sdkconfig || true
+            grep -n "CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_PSK" sdkconfig || true
+            grep -n "CONFIG_MBEDTLS_KEY_EXCHANGE_RSA_PSK" sdkconfig || true
 
             echo ""
             echo "============================================================"
-            echo "ARDUINO SSL CONDITION"
+            echo "VERIFY MANAGED ARDUINO COMPONENT"
             echo "============================================================"
 
-            sed -n 24,35p components/arduino-esp32/libraries/NetworkClientSecure/src/ssl_client.cpp
+            if [ -d managed_components/espressif__arduino-esp32 ]; then
+              echo "Managed Arduino component FOUND"
+              grep -n "version:" \
+                managed_components/espressif__arduino-esp32/idf_component.yml \
+                || true
+            else
+              echo "ERROR: Managed Arduino component NOT FOUND"
+              exit 1
+            fi
 
             echo ""
             echo "============================================================"
-            echo "NINJA SSL COMPILER COMMAND"
+            echo "CLEAN BUILD"
             echo "============================================================"
 
-            ninja -C build -t commands | grep ssl_client.cpp | head -1 || true
+            rm -rf build
+
+            idf.py build
 
             echo ""
             echo "============================================================"
-            echo "END"
+            echo "BUILD SUCCESS"
             echo "============================================================"
