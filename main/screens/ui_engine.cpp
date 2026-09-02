@@ -55,21 +55,47 @@ static int engine_screens_created = 0;
 // =============================================================================
 static void add_gauge_section(lv_obj_t *scale, int32_t start, int32_t end, lv_color_t color)
 {
+    // 1. Instantiation of the section block inside your target scale widget
     lv_scale_section_t *section = lv_scale_add_section(scale);
     lv_scale_section_set_range(section, start, end);
     
-    // Allocate persistent custom styles for the colored items/ticks zone
-    static lv_style_t section_part_style;
-    static bool style_inited = false;
-    if(!style_inited) {
-        lv_style_init(&section_part_style);
-        style_inited = true;
+    // 2. Allocate persistent custom styles for the colored sectors
+    // Using an array allows up to 24 unique zones (e.g., across 8 multi-engine screens) 
+    // to map to separate safe memory pointers without leaking data on updates.
+    #define MAX_SECTION_STYLES 24
+    static lv_style_t main_arc_styles[MAX_SECTION_STYLES];
+    static lv_style_t tick_styles[MAX_SECTION_STYLES];
+    static int style_index = 0;
+
+    if (style_index >= MAX_SECTION_STYLES) {
+        style_index = 0; // Guard wrapper reset loop
     }
-    lv_style_set_line_color(&section_part_style, color);
+
+    int current_idx = style_index++;
+
+    // -------------------------------------------------------------------------
+    // STYLE A: Solid Arc Color Segment (The Outer Background Band)
+    // -------------------------------------------------------------------------
+    lv_style_init(&main_arc_styles[current_idx]);
     
-    // Apply styling to LV_PART_ITEMS so the ticks change color in this section window
-    lv_scale_section_set_style(section, LV_PART_ITEMS, &section_part_style);
+    // CRITICAL LVGL 9 FIX: Targets the background arc path directly
+    lv_style_set_arc_color(&main_arc_styles[current_idx], color);
+    lv_style_set_arc_width(&main_arc_styles[current_idx], 5); // Match gauge frame thickness
+    
+    // Assign style to the section's main background trace
+    lv_scale_section_set_style(section, LV_PART_MAIN, &main_arc_styles[current_idx]);
+
+    // -------------------------------------------------------------------------
+    // STYLE B: Tick Marks Color Override (Minor & Major Ticks)
+    // -------------------------------------------------------------------------
+    lv_style_init(&tick_styles[current_idx]);
+    lv_style_set_line_color(&tick_styles[current_idx], color);
+
+    // Apply color modifications to both ticks inside this specific section window
+    lv_scale_section_set_style(section, LV_PART_ITEMS, &tick_styles[current_idx]);     // Minor marks
+    lv_scale_section_set_style(section, LV_PART_INDICATOR, &tick_styles[current_idx]); // Major marks & text
 }
+
 
 // =============================================================================
 // Display initialization
@@ -148,6 +174,11 @@ static void lv_engine_display(lv_updatable_screen_t *scr)
         state->oil_press_scale = lv_scale_create(scr->screen);
         lv_obj_set_size(state->oil_press_scale, 160, 160);
         lv_obj_align(state->oil_press_scale, LV_ALIGN_CENTER, -125, 180);
+        // Explicit black border configuration
+        lv_obj_set_style_border_color(state->oil_press_scale, lv_color_black(), LV_PART_MAIN);
+        lv_obj_set_style_border_width(state->oil_press_scale, 2, LV_PART_MAIN);
+        lv_obj_set_style_border_opa(state->oil_press_scale, LV_OPA_COVER, LV_PART_MAIN);
+
         
         // Background face config
         lv_obj_set_style_bg_color(state->oil_press_scale, lv_color_hex(0xD0D0D0), LV_PART_MAIN);
@@ -202,6 +233,12 @@ static void lv_engine_display(lv_updatable_screen_t *scr)
     int temp_x = config.engine_oil_pressure_enabled ? 125 : 0;
     int temp_y = 190;
     lv_obj_align(state->eng_temp_scale, LV_ALIGN_CENTER, temp_x, temp_y);
+
+    // Explicit black border configuration
+    lv_obj_set_style_border_color(state->eng_temp_scale, lv_color_black(), LV_PART_MAIN);
+    lv_obj_set_style_border_width(state->eng_temp_scale, 2, LV_PART_MAIN);
+    lv_obj_set_style_border_opa(state->eng_temp_scale, LV_OPA_COVER, LV_PART_MAIN);
+
     
     // Background face color parameters
     lv_obj_set_style_bg_color(state->eng_temp_scale, lv_color_hex(0xD0D0D0), LV_PART_MAIN);
@@ -340,6 +377,7 @@ static void engine_update_cb(lv_updatable_screen_t *scr)
     float rpm_gauge_value = scaled_rpm / 100.0f;
 
     lv_scale_set_line_needle_value(state->engine_rpm_scale, state->engine_rpm_needle, 280, rpm_gauge_value);
+    lv_obj_set_style_text_color(state->engine_rpm_scale, lv_color_black(), LV_PART_INDICATOR);
 
     lv_label_set_text(
         state->rpm_value_label,
