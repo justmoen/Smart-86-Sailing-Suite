@@ -130,9 +130,13 @@ set(ARDUINO_ALL_LIBRARIES
   Zigbee
 )
 
-set(ARDUINO_LIBRARY_ArduinoOTA_SRCS libraries/ArduinoOTA/src/ArduinoOTA.cpp)
+set(ARDUINO_LIBRARY_ArduinoOTA_SRCS
+  libraries/ArduinoOTA/src/ArduinoOTA.cpp
+)
 
-set(ARDUINO_LIBRARY_AsyncUDP_SRCS libraries/AsyncUDP/src/AsyncUDP.cpp)
+set(ARDUINO_LIBRARY_AsyncUDP_SRCS
+  libraries/AsyncUDP/src/AsyncUDP.cpp
+)
 
 set(ARDUINO_LIBRARY_BluetoothSerial_SRCS
   libraries/BluetoothSerial/src/BluetoothSerial.cpp
@@ -141,14 +145,25 @@ set(ARDUINO_LIBRARY_BluetoothSerial_SRCS
   libraries/BluetoothSerial/src/BTScanResultsSet.cpp
 )
 
-set(ARDUINO_LIBRARY_Console_SRCS libraries/Console/src/Console.cpp)
-set(ARDUINO_LIBRARY_Console_REQUIRES console)
+set(ARDUINO_LIBRARY_Console_SRCS
+  libraries/Console/src/Console.cpp
+)
 
-set(ARDUINO_LIBRARY_DNSServer_SRCS libraries/DNSServer/src/DNSServer.cpp)
+set(ARDUINO_LIBRARY_Console_REQUIRES
+  console
+)
 
-set(ARDUINO_LIBRARY_EEPROM_SRCS libraries/EEPROM/src/EEPROM.cpp)
+set(ARDUINO_LIBRARY_DNSServer_SRCS
+  libraries/DNSServer/src/DNSServer.cpp
+)
 
-set(ARDUINO_LIBRARY_ESP_I2S_SRCS libraries/ESP_I2S/src/ESP_I2S.cpp)
+set(ARDUINO_LIBRARY_EEPROM_SRCS
+  libraries/EEPROM/src/EEPROM.cpp
+)
+
+set(ARDUINO_LIBRARY_ESP_I2S_SRCS
+  libraries/ESP_I2S/src/ESP_I2S.cpp
+)
 
 set(ARDUINO_LIBRARY_ESP_NOW_SRCS
   libraries/ESP_NOW/src/ESP32_NOW.cpp
@@ -230,7 +245,6 @@ set(ARDUINO_LIBRARY_Matter_SRCS
   libraries/Matter/src/MatterEndpoints/MatterEnhancedColorLight.cpp
   libraries/Matter/src/MatterEndpoints/MatterFan.cpp
   libraries/Matter/src/MatterEndpoints/MatterTemperatureSensor.cpp
-  libraries/Matter/src/MatterEndpoints/MatterHumiditySensor.cpp
   libraries/Matter/src/MatterEndpoints/MatterContactSensor.cpp
   libraries/Matter/src/MatterEndpoints/MatterWaterLeakDetector.cpp
   libraries/Matter/src/MatterEndpoints/MatterWaterFreezeDetector.cpp
@@ -391,7 +405,6 @@ set(ARDUINO_LIBRARY_Zigbee_SRCS
   libraries/Zigbee/src/ep/ZigbeePM25Sensor.cpp
   libraries/Zigbee/src/ep/ZigbeeElectricalMeasurement.cpp
   libraries/Zigbee/src/ep/ZigbeeBinary.cpp
-  libraries/Zigbee/src/ep/ZigbeeDoorWindowHandle.cpp
   libraries/Zigbee/src/ep/ZigbeePowerOutlet.cpp
   libraries/Zigbee/src/ep/ZigbeeFanControl.cpp
   libraries/Zigbee/src/ep/ZigbeeMultistate.cpp
@@ -402,6 +415,7 @@ set(ARDUINO_LIBRARY_BLE_SRCS
   libraries/BLE/src/BLE2902.cpp
   libraries/BLE/src/BLE2904.cpp
   libraries/BLE/src/BLEAddress.cpp
+  libraries/BLE/src/BLEAdvertisedDevice.cpp
   libraries/BLE/src/BLEAdvertisedDevice.cpp
   libraries/BLE/src/BLEAdvertising.cpp
   libraries/BLE/src/BLEBeacon.cpp
@@ -461,10 +475,9 @@ set(includedirs
 #
 # Explicitly include NetworkClientSecure sources.
 #
-# These are already defined in ARDUINO_LIBRARY_NetworkClientSecure_SRCS above,
-# but explicitly adding them here guarantees that they are part of the Arduino
-# component target when the component is used locally instead of through the
-# managed component system.
+# These are already included through ARDUINO_LIBRARIES_SRCS when
+# NetworkClientSecure is enabled, but we explicitly add them here while
+# diagnosing the local-component build issue.
 #
 set(srcs
   ${CORE_SRCS}
@@ -472,6 +485,20 @@ set(srcs
   libraries/NetworkClientSecure/src/ssl_client.cpp
   libraries/NetworkClientSecure/src/NetworkClientSecure.cpp
 )
+
+#
+# Diagnostic: show the final source list immediately before registration.
+#
+message(STATUS "=== FINAL ARDUINO SRCS ===")
+message(STATUS "srcs = ${srcs}")
+
+foreach(src IN LISTS srcs)
+  if(src MATCHES "NetworkClientSecure")
+    message(STATUS "ARDUINO SRC: ${src}")
+  endif()
+endforeach()
+
+message(STATUS "=== END FINAL ARDUINO SRCS ===")
 
 set(priv_includes
   cores/esp32/libb64
@@ -531,12 +558,9 @@ else()
 endif()
 
 if(NOT CONFIG_ARDUINO_SELECTIVE_COMPILATION OR CONFIG_ARDUINO_SELECTIVE_OpenThread)
-  #if(CONFIG_SOC_IEEE802154_SUPPORTED) # Does not work!
-  #if(CONFIG_OPENTHREAD_ENABLED) # Does not work!
   if(IDF_TARGET STREQUAL "esp32c6" OR
      IDF_TARGET STREQUAL "esp32h2" OR
      IDF_TARGET STREQUAL "esp32c5")
-    # Sadly only this works
     list(APPEND requires openthread)
   endif()
 endif()
@@ -547,18 +571,6 @@ if(IDF_TARGET STREQUAL "esp32" OR
    IDF_TARGET STREQUAL "esp32p4")
   list(APPEND requires esp_driver_touch_sens)
 endif()
-
-#
-# Diagnostic: confirm the two NetworkClientSecure source files are actually
-# present in the final source list passed to idf_component_register().
-#
-message(STATUS "=== FINAL ARDUINO SRCS ===")
-foreach(src IN LISTS srcs)
-  if(src MATCHES "NetworkClientSecure")
-    message(STATUS "ARDUINO SRC: ${src}")
-  endif()
-endforeach()
-message(STATUS "=== END FINAL ARDUINO SRCS ===")
 
 idf_component_register(
   INCLUDE_DIRS ${includedirs}
@@ -586,43 +598,14 @@ target_compile_options(${COMPONENT_TARGET} PUBLIC
 )
 
 if(CONFIG_AUTOSTART_ARDUINO)
-  # in autostart mode, arduino-esp32 contains app_main() function and needs to
-  # reference setup() and loop() in the main component. If we add main
-  # component to priv_requires then we create a large circular dependency
-  # (arduino-esp32 -> main -> arduino-esp32) and can get linker errors, so
-  # instead we add setup() and loop() to the undefined symbols list so the
-  # linker will always include them.
-  #
-  # (As they are C++ symbol, we need to add the C++ mangled names.)
+  # In autostart mode, arduino-esp32 contains app_main() and needs to
+  # reference setup() and loop() in the main component.
   target_link_libraries(${COMPONENT_LIB} INTERFACE "-u _Z5setupv -u _Z4loopv")
 endif()
 
 #
 # Fix for WiFi/Bluetooth linker errors when CONFIG_DIAG_USE_EXTERNAL_LOG_WRAP
 # is not enabled.
-#
-# Problem:
-#   WiFi and Bluetooth binary libraries reference __wrap_esp_log_write functions.
-#   When CONFIG_DIAG_USE_EXTERNAL_LOG_WRAP=y, esp_diagnostics provides these
-#   wrappers.
-#   When not set, no component provides them, causing "undefined reference"
-#   linker errors.
-#
-# Solution:
-#   cores/esp32/esp32-hal-log-wrapper.c provides simple pass-through wrapper
-#   implementations that forward calls to the real ESP-IDF logging functions
-#   without additional processing.
-#
-# Two linker flags are required:
-#
-# 1. --wrap=symbol: Sets up the wrapping/redirection mechanism.
-#    Effect:
-#      esp_log_write() calls -> __wrap_esp_log_write()
-#      __real_esp_log_write() -> original esp_log_write()
-#
-# 2. -u symbol: Forces inclusion of wrapper symbols from static library.
-#    Static libraries are linked lazily, so without -u the linker can drop
-#    otherwise-unreferenced wrapper objects.
 #
 if(NOT CONFIG_DIAG_USE_EXTERNAL_LOG_WRAP)
   idf_build_set_property(
