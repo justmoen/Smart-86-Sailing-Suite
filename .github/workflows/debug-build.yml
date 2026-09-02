@@ -39,38 +39,34 @@ jobs:
             idf.py set-target esp32p4
             idf.py reconfigure
 
-            echo "--- sdkconfig ---"
+            echo "--- sdkconfig PSK settings ---"
 
-            grep -n -E \
-              '^CONFIG_(MBEDTLS_PSK_MODES|MBEDTLS_KEY_EXCHANGE_.*PSK)' \
-              sdkconfig \
-              || true
+            grep -n CONFIG_MBEDTLS_PSK_MODES sdkconfig || true
+            grep -n CONFIG_MBEDTLS_KEY_EXCHANGE_PSK sdkconfig || true
+            grep -n CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_PSK sdkconfig || true
+            grep -n CONFIG_MBEDTLS_KEY_EXCHANGE_RSA_PSK sdkconfig || true
+            grep -n CONFIG_MBEDTLS_KEY_EXCHANGE_DHE_PSK sdkconfig || true
 
             echo ""
-            echo "--- generated sdkconfig.h ---"
+            echo "--- generated PSK macros ---"
 
-            grep -n -E \
-              'MBEDTLS_KEY_EXCHANGE(_SOME|__SOME|_PSK).*PSK_ENABLED' \
-              build/config/sdkconfig.h \
-              || true
+            grep -n MBEDTLS_KEY_EXCHANGE_SOME_PSK_ENABLED build/config/sdkconfig.h || true
+            grep -n MBEDTLS_KEY_EXCHANGE__SOME__PSK_ENABLED build/config/sdkconfig.h || true
+            grep -n MBEDTLS_KEY_EXCHANGE_PSK_ENABLED build/config/sdkconfig.h || true
 
             echo ""
             echo "============================================================"
             echo "ARDUINO SSL CONDITION"
             echo "============================================================"
 
-            sed -n '24,35p' \
-              components/arduino-esp32/libraries/NetworkClientSecure/src/ssl_client.cpp
+            sed -n 24,35p components/arduino-esp32/libraries/NetworkClientSecure/src/ssl_client.cpp
 
             echo ""
             echo "============================================================"
             echo "NINJA SSL COMPILER COMMAND"
             echo "============================================================"
 
-            ninja -C build -t commands \
-              | grep "ssl_client.cpp" \
-              | head -1 \
-              || true
+            ninja -C build -t commands | grep ssl_client.cpp | head -1 || true
 
             echo ""
             echo "============================================================"
