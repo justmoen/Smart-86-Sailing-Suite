@@ -421,7 +421,15 @@ if(IDF_TARGET STREQUAL "esp32" OR IDF_TARGET STREQUAL "esp32s2" OR IDF_TARGET ST
   list(APPEND requires esp_driver_touch_sens)
 endif()
 
-idf_component_register(INCLUDE_DIRS ${includedirs} PRIV_INCLUDE_DIRS ${priv_includes} SRCS ${srcs} REQUIRES ${requires} PRIV_REQUIRES ${priv_requires})
+idf_component_register(
+    INCLUDE_DIRS ${includedirs}
+    PRIV_INCLUDE_DIRS ${priv_includes}
+    SRCS
+        ${srcs}
+        libraries/NetworkClientSecure/src/ssl_client.cpp
+    REQUIRES ${requires}
+    PRIV_REQUIRES ${priv_requires}
+)
 
 if(NOT CONFIG_FREERTOS_HZ EQUAL 1000 AND NOT "$ENV{ARDUINO_SKIP_TICK_CHECK}")
     # See delay() in cores/esp32/esp32-hal-misc.c.
