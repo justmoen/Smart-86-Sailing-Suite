@@ -290,7 +290,11 @@ static bool perform_firmware_ota(const String& tag, String& error_message) {
     client_config.url = download_url.c_str();
     client_config.timeout_ms = 30000;
     client_config.keep_alive_enable = true;
-    client_config.buffer_size = 4096;
+    
+    // CRITICAL CHANGES: Increase RX buffer to 8KB to survive large cloud HTTP response headers
+    client_config.buffer_size = 8192;   
+    client_config.buffer_size_tx = 2048; // Allocate dedicated TX buffer space explicitly
+    
     client_config.crt_bundle_attach = esp_crt_bundle_attach;
 
     esp_https_ota_config_t ota_config = {};
