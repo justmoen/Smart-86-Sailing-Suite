@@ -1,4 +1,4 @@
-name: Debug ESP32-P4 Arduino SSL Kconfig
+name: Debug ESP32-P4 Arduino SSL PSK
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 jobs:
-  debug-kconfig:
+  debug-ssl:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,7 +17,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Debug mbedTLS PSK Kconfig
+      - name: Diagnose Arduino SSL PSK
         uses: espressif/esp-idf-ci-action@v1
         with:
           esp_idf_version: v5.5.3
@@ -26,115 +26,45 @@ jobs:
             set -o pipefail
 
             echo "============================================================"
-            echo "PROJECT FILES"
-            echo "============================================================"
-
-            echo "--- sdkconfig.defaults ---"
-            if [ -f sdkconfig.defaults ]; then
-              cat sdkconfig.defaults
-            else
-              echo "NO sdkconfig.defaults"
-            fi
-
-            echo "--- existing sdkconfig PSK settings ---"
-            grep -n -i "PSK" sdkconfig || true
-
-            echo "============================================================"
-            echo "ESP-IDF VERSION"
+            echo "ESP-IDF"
             echo "============================================================"
 
             idf.py --version
 
+            echo ""
             echo "============================================================"
-            echo "KCONFIG SOURCE"
-            echo "============================================================"
-
-            echo "--- CONFIG_MBEDTLS_PSK_MODES definitions ---"
-            grep -R -n \
-              "config MBEDTLS_PSK_MODES" \
-              "$IDF_PATH/components" \
-              2>/dev/null \
-              | head -20 \
-              || true
-
-            echo "--- CONFIG_MBEDTLS_KEY_EXCHANGE_PSK definitions ---"
-            grep -R -n \
-              "config MBEDTLS_KEY_EXCHANGE_PSK" \
-              "$IDF_PATH/components" \
-              2>/dev/null \
-              | head -20 \
-              || true
-
-            echo "============================================================"
-            echo "KCONFIG CONTEXT"
-            echo "============================================================"
-
-            echo "--- mbedTLS Kconfig PSK context ---"
-            grep -R -n -B15 -A25 \
-              "MBEDTLS_PSK_MODES" \
-              "$IDF_PATH/components/mbedtls" \
-              2>/dev/null \
-              | head -150 \
-              || true
-
-            echo "--- key exchange PSK context ---"
-            grep -R -n -B15 -A25 \
-              "KEY_EXCHANGE_PSK" \
-              "$IDF_PATH/components/mbedtls" \
-              2>/dev/null \
-              | head -150 \
-              || true
-
-            echo "============================================================"
-            echo "GENERATE CONFIGURATION"
+            echo "PSK CONFIGURATION"
             echo "============================================================"
 
             idf.py set-target esp32p4
             idf.py reconfigure
 
-            echo "============================================================"
-            echo "RESULTING SDKCONFIG"
-            echo "============================================================"
+            echo "--- sdkconfig ---"
+            grep -n -E \
+              '^CONFIG_(MBEDTLS_PSK_MODES|MBEDTLS_KEY_EXCHANGE_.*PSK)' \
+              sdkconfig \
+              || true
 
-            echo "--- PSK ---"
-            grep -n -i "PSK" sdkconfig || true
-
-            echo "--- KEY EXCHANGE ---"
-            grep -n -i "KEY_EXCHANGE" sdkconfig || true
-
-            echo "--- all MBEDTLS ---"
-            grep -n "CONFIG_MBEDTLS" sdkconfig || true
-
-            echo "============================================================"
-            echo "GENERATED SDKCONFIG.H"
-            echo "============================================================"
-
-            grep -n -i "PSK" \
+            echo ""
+            echo "--- generated sdkconfig.h ---"
+            grep -n -E \
+              'MBEDTLS_KEY_EXCHANGE(_SOME|__SOME|_PSK).*PSK_ENABLED' \
               build/config/sdkconfig.h \
               || true
 
+            echo ""
             echo "============================================================"
-            echo "GENERATED MBEDTLS CONFIG"
-            echo "============================================================"
-
-            grep -R -n \
-              "MBEDTLS_KEY_EXCHANGE.*PSK" \
-              build \
-              2>/dev/null \
-              | head -100 \
-              || true
-
-            echo "============================================================"
-            echo "ESP-IDF MBEDTLS CONFIG HEADER"
+            echo "ESP-IDF PSK MACRO DEFINITIONS"
             echo "============================================================"
 
-            grep -R -n -B5 -A10 \
-              "MBEDTLS_KEY_EXCHANGE_PSK_ENABLED" \
+            grep -R -n -E \
+              '#define MBEDTLS_KEY_EXCHANGE(_SOME|__SOME|_PSK).*PSK_ENABLED' \
               "$IDF_PATH/components/mbedtls" \
               2>/dev/null \
-              | head -100 \
+              | head -30 \
               || true
 
+            echo ""
             echo "============================================================"
             echo "ARDUINO SSL CONDITION"
             echo "============================================================"
@@ -142,6 +72,17 @@ jobs:
             sed -n '24,35p' \
               components/arduino-esp32/libraries/NetworkClientSecure/src/ssl_client.cpp
 
+            echo ""
+            echo "============================================================"
+            echo "NINJA SSL COMPILER COMMAND"
+            echo "============================================================"
+
+            ninja -C build -t commands \
+              | grep "ssl_client.cpp" \
+              | head -1 \
+              || true
+
+            echo ""
             echo "============================================================"
             echo "END"
             echo "============================================================"
