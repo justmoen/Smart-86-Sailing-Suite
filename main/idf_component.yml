@@ -1,0 +1,8 @@
+## IDF Component Manager Manifest File
+dependencies:
+  lvgl/lvgl:
+    version: ^9.3.0
+    public: true
+  espressif/arduino-esp32:
+    version: ^3.3.0
+    public: true

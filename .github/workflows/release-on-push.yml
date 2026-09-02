@@ -1,0 +1,56 @@
+name: Release on tag
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-on-tag
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      # The action handles mounting your workspace, exporting the correct chip, and building
+      - name: Build ESP32-P4 firmware
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.5.5
+          target: esp32p4         # 🚀 Tells the action container to export esp32p4
+          command: |
+            # 1. Completely clear out temporary environment leftovers
+            rm -rf build sdkconfig
+            
+            # 2. Re-establish the baseline target architectural profile 
+            idf.py set-target esp32p4
+            
+            # 3. Force-append your precise v1.3 text parameters into the active configuration
+            cat sdkconfig.defaults >> sdkconfig
+            
+            # 4. CRITICAL: Force the compiler to re-evaluate eFuse/PMU flags for v1.x silicon
+            idf.py reconfigure
+            
+            # 5. Compile the final binary conforming to your v1.3 hardware parameters
+            idf.py build
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: |
+            build/sailing_suite.bin
