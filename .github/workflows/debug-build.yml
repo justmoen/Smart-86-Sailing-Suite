@@ -26,7 +26,7 @@ jobs:
             set -o pipefail
 
             echo "============================================================"
-            echo "ESP-IDF"
+            echo "ESP-IDF VERSION"
             echo "============================================================"
 
             idf.py --version
@@ -40,6 +40,7 @@ jobs:
             idf.py reconfigure
 
             echo "--- sdkconfig ---"
+
             grep -n -E \
               '^CONFIG_(MBEDTLS_PSK_MODES|MBEDTLS_KEY_EXCHANGE_.*PSK)' \
               sdkconfig \
@@ -47,21 +48,10 @@ jobs:
 
             echo ""
             echo "--- generated sdkconfig.h ---"
+
             grep -n -E \
               'MBEDTLS_KEY_EXCHANGE(_SOME|__SOME|_PSK).*PSK_ENABLED' \
               build/config/sdkconfig.h \
-              || true
-
-            echo ""
-            echo "============================================================"
-            echo "ESP-IDF PSK MACRO DEFINITIONS"
-            echo "============================================================"
-
-            grep -R -n -E \
-              '#define MBEDTLS_KEY_EXCHANGE(_SOME|__SOME|_PSK).*PSK_ENABLED' \
-              "$IDF_PATH/components/mbedtls" \
-              2>/dev/null \
-              | head -30 \
               || true
 
             echo ""
