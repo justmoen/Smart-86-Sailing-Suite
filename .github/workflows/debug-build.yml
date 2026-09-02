@@ -1,4 +1,4 @@
-name: Debug ESP32-P4 Arduino SSL
+name: Verify ESP32-P4 Arduino SSL PSK Fix
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 jobs:
-  debug-build:
+  verify-ssl-fix:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,13 +17,25 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Debug Arduino SSL compile
+      - name: Verify Arduino SSL PSK configuration
         uses: espressif/esp-idf-ci-action@v1
         with:
           esp_idf_version: v5.5.3
           target: esp32p4
           command: |
-            set -o pipefail
+            set -e
+
+            echo "============================================================"
+            echo "CREATE TEST CONFIGURATION"
+            echo "============================================================"
+
+            cat >> sdkconfig.defaults <<'EOF'
+            CONFIG_MBEDTLS_PSK_MODES=y
+            CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=y
+            EOF
+
+            echo "--- sdkconfig.defaults ---"
+            tail -20 sdkconfig.defaults
 
             echo "============================================================"
             echo "CONFIGURE"
@@ -33,210 +45,70 @@ jobs:
             idf.py reconfigure
 
             echo "============================================================"
-            echo "MBEDTLS PSK CONFIGURATION"
+            echo "VERIFY KCONFIG"
             echo "============================================================"
 
-            echo "--- sdkconfig PSK settings ---"
-            grep -i psk sdkconfig || true
+            echo "--- sdkconfig ---"
+            grep -E \
+              "CONFIG_MBEDTLS_(PSK_MODES|KEY_EXCHANGE_PSK)=" \
+              sdkconfig
 
-            echo "--- generated sdkconfig.h PSK settings ---"
-            grep -i psk build/config/sdkconfig.h || true
-
-            echo "--- all MBEDTLS settings ---"
-            grep CONFIG_MBEDTLS sdkconfig || true
-
-            echo "============================================================"
-            echo "PSK KCONFIG DETAIL"
-            echo "============================================================"
-
-            echo "--- PSK settings in sdkconfig ---"
-            grep -n -i psk sdkconfig || true
-
-            echo "--- PSK settings in generated sdkconfig.h ---"
-            grep -n -i psk build/config/sdkconfig.h || true
-
-            echo "--- PSK settings in generated sdkconfig.cmake ---"
-            grep -n -i psk build/config/sdkconfig.cmake || true
-
-            echo "--- Arduino Kconfig references ---"
-            grep -n -i psk \
-              components/arduino-esp32/Kconfig.projbuild \
-              2>/dev/null || true
-
-            echo "--- ESP-IDF mbedTLS Kconfig PSK references ---"
-            grep -R -n -i \
-              "MBEDTLS.*PSK\|PSK.*MBEDTLS\|KEY_EXCHANGE.*PSK" \
-              "$IDF_PATH/components/mbedtls" \
-              2>/dev/null | head -100 || true
-
-            echo "--- ESP-IDF Kconfig files mentioning PSK ---"
-            grep -R -n -i \
-              "PSK" \
-              "$IDF_PATH/components/mbedtls/Kconfig*" \
-              "$IDF_PATH/components/esp-tls/Kconfig*" \
-              2>/dev/null | head -100 || true
-
-            echo "============================================================"
-            echo "GENERATED MBEDTLS MACROS"
-            echo "============================================================"
-
-            echo "--- KEY_EXCHANGE PSK macros ---"
-            grep -n -i \
-              "KEY_EXCHANGE.*PSK\|PSK.*KEY_EXCHANGE" \
+            echo "--- generated sdkconfig.h ---"
+            grep -E \
+              "MBEDTLS_(KEY_EXCHANGE_PSK|PSK)" \
               build/config/sdkconfig.h \
-              2>/dev/null || true
-
-            echo "--- MBEDTLS PSK macros ---"
-            grep -n -i \
-              "MBEDTLS.*PSK\|PSK.*MBEDTLS" \
-              build/config/sdkconfig.h \
-              2>/dev/null || true
+              || true
 
             echo "============================================================"
-            echo "SSL CLIENT SOURCE CONDITIONS"
+            echo "VERIFY ESP-IDF GENERATED MBEDTLS MACROS"
             echo "============================================================"
 
-            echo "--- Beginning of ssl_client.cpp ---"
-            sed -n '1,100p' \
+            echo "--- esp_config.h PSK definitions ---"
+            grep -n -A20 -B5 \
+              "MBEDTLS_KEY_EXCHANGE_PSK_ENABLED" \
+              "$IDF_PATH/components/mbedtls/port/include/mbedtls/esp_config.h" \
+              || true
+
+            echo "============================================================"
+            echo "SSL SOURCE CONDITION"
+            echo "============================================================"
+
+            echo "--- ssl_client.cpp condition ---"
+            sed -n '24,35p' \
               components/arduino-esp32/libraries/NetworkClientSecure/src/ssl_client.cpp
 
-            echo "--- PSK warning ---"
-            grep -n -B15 -A25 \
-              "Please call" \
-              components/arduino-esp32/libraries/NetworkClientSecure/src/ssl_client.cpp \
-              || true
-
-            echo "--- preprocessor conditionals ---"
-            grep -n \
-              "#if\|#ifdef\|#ifndef\|#else\|#endif" \
-              components/arduino-esp32/libraries/NetworkClientSecure/src/ssl_client.cpp \
-              | head -150 || true
-
-            echo "--- stop_ssl_socket ---"
-            grep -n "stop_ssl_socket" \
-              components/arduino-esp32/libraries/NetworkClientSecure/src/ssl_client.cpp \
-              || true
-
-            echo "--- start_ssl_client ---"
-            grep -n "start_ssl_client" \
-              components/arduino-esp32/libraries/NetworkClientSecure/src/ssl_client.cpp \
-              || true
-
-            echo "--- send_ssl_data ---"
-            grep -n "send_ssl_data" \
-              components/arduino-esp32/libraries/NetworkClientSecure/src/ssl_client.cpp \
-              || true
-
-            echo "--- ssl_init ---"
-            grep -n "ssl_init" \
-              components/arduino-esp32/libraries/NetworkClientSecure/src/ssl_client.cpp \
-              || true
-
             echo "============================================================"
-            echo "ESP-IDF VERSION"
-            echo "============================================================"
-
-            idf.py --version
-
-            echo "--- Arduino component version ---"
-            grep -n \
-              "version:" \
-              components/arduino-esp32/idf_component.yml \
-              2>/dev/null || true
-
-            echo "============================================================"
-            echo "ARDUINO COMPONENT CONFIGURATION"
-            echo "============================================================"
-
-            echo "--- Arduino component manifest ---"
-            sed -n '1,120p' \
-              components/arduino-esp32/idf_component.yml \
-              2>/dev/null || true
-
-            echo "--- Arduino CMake NetworkClientSecure sources ---"
-            grep -n -A10 -B5 \
-              "ARDUINO_LIBRARY_NetworkClientSecure_SRCS" \
-              components/arduino-esp32/CMakeLists.txt \
-              || true
-
-            echo "============================================================"
-            echo "SSL NINJA RULE"
-            echo "============================================================"
-
-            grep -n -A8 -B2 \
-              "ssl_client.cpp.obj" \
-              build/build.ninja \
-              || true
-
-            echo "============================================================"
-            echo "NINJA QUERY"
-            echo "============================================================"
-
-            ninja -C build -t query \
-              esp-idf/arduino-esp32/CMakeFiles/__idf_arduino-esp32.dir/libraries/NetworkClientSecure/src/ssl_client.cpp.obj \
-              || true
-
-            echo "============================================================"
-            echo "NINJA TARGETS"
-            echo "============================================================"
-
-            ninja -C build -t targets all \
-              | grep arduino-esp32 \
-              || true
-
-            echo "============================================================"
-            echo "TRY BUILDING SSL OBJECT DIRECTLY"
+            echo "BUILD SSL OBJECT"
             echo "============================================================"
 
             ninja -C build -v \
               esp-idf/arduino-esp32/CMakeFiles/__idf_arduino-esp32.dir/libraries/NetworkClientSecure/src/ssl_client.cpp.obj
 
             echo "============================================================"
-            echo "OBJECT AFTER DIRECT BUILD"
+            echo "SSL OBJECT SYMBOLS"
             echo "============================================================"
 
-            ls -lh \
-              build/esp-idf/arduino-esp32/CMakeFiles/__idf_arduino-esp32.dir/libraries/NetworkClientSecure/src/ssl_client.cpp.obj \
-              2>/dev/null || true
-
-            echo "============================================================"
-            echo "OBJECT SYMBOLS"
-            echo "============================================================"
-
-            echo "--- All SSL-related symbols ---"
-            nm -C \
-              build/esp-idf/arduino-esp32/CMakeFiles/__idf_arduino-esp32.dir/libraries/NetworkClientSecure/src/ssl_client.cpp.obj \
-              2>/dev/null \
-              | grep -i ssl \
-              || true
+            SSL_OBJECT="build/esp-idf/arduino-esp32/CMakeFiles/__idf_arduino-esp32.dir/libraries/NetworkClientSecure/src/ssl_client.cpp.obj"
 
             echo "--- stop_ssl_socket ---"
-            nm -C \
-              build/esp-idf/arduino-esp32/CMakeFiles/__idf_arduino-esp32.dir/libraries/NetworkClientSecure/src/ssl_client.cpp.obj \
-              2>/dev/null \
-              | grep stop_ssl_socket \
-              || true
+            nm -C "$SSL_OBJECT" \
+              | grep stop_ssl_socket
 
             echo "--- start_ssl_client ---"
-            nm -C \
-              build/esp-idf/arduino-esp32/CMakeFiles/__idf_arduino-esp32.dir/libraries/NetworkClientSecure/src/ssl_client.cpp.obj \
-              2>/dev/null \
-              | grep start_ssl_client \
-              || true
+            nm -C "$SSL_OBJECT" \
+              | grep start_ssl_client
 
             echo "--- send_ssl_data ---"
-            nm -C \
-              build/esp-idf/arduino-esp32/CMakeFiles/__idf_arduino-esp32.dir/libraries/NetworkClientSecure/src/ssl_client.cpp.obj \
-              2>/dev/null \
-              | grep send_ssl_data \
-              || true
+            nm -C "$SSL_OBJECT" \
+              | grep send_ssl_data
 
             echo "--- ssl_init ---"
-            nm -C \
-              build/esp-idf/arduino-esp32/CMakeFiles/__idf_arduino-esp32.dir/libraries/NetworkClientSecure/src/ssl_client.cpp.obj \
-              2>/dev/null \
-              | grep ssl_init \
-              || true
+            nm -C "$SSL_OBJECT" \
+              | grep " ssl_init"
+
+            echo "--- attach_ssl_certificate_bundle ---"
+            nm -C "$SSL_OBJECT" \
+              | grep attach_ssl_certificate_bundle
 
             echo "============================================================"
             echo "BUILD ARDUINO ARCHIVE"
@@ -246,84 +118,37 @@ jobs:
               esp-idf/arduino-esp32/libarduino-esp32.a
 
             echo "============================================================"
-            echo "ARCHIVE"
-            echo "============================================================"
-
-            ls -lh \
-              build/esp-idf/arduino-esp32/libarduino-esp32.a
-
-            echo "============================================================"
-            echo "ARCHIVE SSL MEMBERS"
-            echo "============================================================"
-
-            ar t \
-              build/esp-idf/arduino-esp32/libarduino-esp32.a \
-              | grep ssl_client \
-              || true
-
-            echo "============================================================"
             echo "ARCHIVE SSL SYMBOLS"
             echo "============================================================"
 
+            ARDUINO_ARCHIVE="build/esp-idf/arduino-esp32/libarduino-esp32.a"
+
             echo "--- stop_ssl_socket ---"
-            nm -C \
-              build/esp-idf/arduino-esp32/libarduino-esp32.a \
-              | grep stop_ssl_socket \
-              || true
+            nm -C "$ARDUINO_ARCHIVE" \
+              | grep stop_ssl_socket
 
             echo "--- start_ssl_client ---"
-            nm -C \
-              build/esp-idf/arduino-esp32/libarduino-esp32.a \
-              | grep start_ssl_client \
-              || true
+            nm -C "$ARDUINO_ARCHIVE" \
+              | grep start_ssl_client
 
             echo "--- send_ssl_data ---"
-            nm -C \
-              build/esp-idf/arduino-esp32/libarduino-esp32.a \
-              | grep send_ssl_data \
-              || true
+            nm -C "$ARDUINO_ARCHIVE" \
+              | grep send_ssl_data
 
             echo "--- ssl_init ---"
-            nm -C \
-              build/esp-idf/arduino-esp32/libarduino-esp32.a \
-              | grep ssl_init \
-              || true
+            nm -C "$ARDUINO_ARCHIVE" \
+              | grep " ssl_init"
 
             echo "============================================================"
-            echo "COMPARE SOURCE MACROS WITH OBJECT"
+            echo "FULL APPLICATION BUILD"
             echo "============================================================"
 
-            echo "--- Compiler command for ssl_client.cpp ---"
-            grep -n -A20 -B5 \
-              "ssl_client.cpp.obj" \
-              build/build.ninja \
-              | head -100 \
-              || true
+            idf.py build
 
             echo "============================================================"
-            echo "FINAL INTERPRETATION"
+            echo "SUCCESS"
             echo "============================================================"
 
-            echo "If ssl_client.cpp contains the functions but the object"
-            echo "does not define them, conditional compilation is excluding"
-            echo "the implementations."
-
-            echo ""
-            echo "The compiler warning indicates that Arduino-ESP32 expects"
-            echo "mbedTLS PSK-based ciphersuite support to be enabled."
-
-            echo ""
-            echo "This diagnostic specifically searches ESP-IDF 5.5.3 for"
-            echo "the exact Kconfig symbol and generated MBEDTLS macro."
-
-            echo ""
-            echo "If CONFIG_MBEDTLS_PSK_MODES is the required project option,"
-            echo "we will add it to sdkconfig.defaults and remove the local"
-            echo "arduino-esp32 component override."
-
-            echo ""
-            echo "DO NOT MODIFY CMakeLists.txt based on this diagnostic."
-
-            echo "============================================================"
-            echo "DONE"
-            echo "============================================================"
+            echo "The Arduino SSL implementation is now being compiled."
+            echo "The required PSK symbols are present."
+            echo "The ESP32-P4 application links successfully."
