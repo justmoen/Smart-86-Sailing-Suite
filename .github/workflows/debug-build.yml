@@ -95,25 +95,15 @@ jobs:
 
             echo ""
             echo "--- NetworkClientSecure source directory ---"
-            ls -la \
-              components/arduino-esp32/libraries/NetworkClientSecure/src \
-              2>/dev/null || true
+            ls -la components/arduino-esp32/libraries/NetworkClientSecure/src 2>/dev/null || true
 
             echo ""
             echo "--- SSL source files physically present ---"
-            find components/arduino-esp32 \
-              -type f \
-              \( \
-                -name 'ssl_client.cpp' \
-                -o -name 'NetworkClientSecure.cpp' \
-              \) \
-              -print 2>/dev/null | sort || true
+            find components/arduino-esp32 -type f \( -name 'ssl_client.cpp' -o -name 'NetworkClientSecure.cpp' \) -print 2>/dev/null | sort || true
 
             echo ""
             echo "--- Git tracked SSL source files ---"
-            git ls-files \
-              'components/arduino-esp32/libraries/NetworkClientSecure/*' \
-              || true
+            git ls-files 'components/arduino-esp32/libraries/NetworkClientSecure/*' || true
 
 
             echo ""
@@ -123,29 +113,15 @@ jobs:
 
             echo ""
             echo "--- ARDUINO_ALL_LIBRARIES ---"
-            grep -n \
-              -A60 \
-              -B5 \
-              "set(ARDUINO_ALL_LIBRARIES" \
-              components/arduino-esp32/CMakeLists.txt \
-              || true
+            grep -n -A60 -B5 "set(ARDUINO_ALL_LIBRARIES" components/arduino-esp32/CMakeLists.txt || true
 
             echo ""
             echo "--- NetworkClientSecure declaration ---"
-            grep -n \
-              -A8 \
-              -B5 \
-              "ARDUINO_LIBRARY_NetworkClientSecure_SRCS" \
-              components/arduino-esp32/CMakeLists.txt \
-              || true
+            grep -n -A8 -B5 "ARDUINO_LIBRARY_NetworkClientSecure_SRCS" components/arduino-esp32/CMakeLists.txt || true
 
             echo ""
             echo "--- SSL source references anywhere in CMakeLists.txt ---"
-            grep -n \
-              -E \
-              "ssl_client\.cpp|NetworkClientSecure\.cpp" \
-              components/arduino-esp32/CMakeLists.txt \
-              || true
+            grep -n -E 'ssl_client\.cpp|NetworkClientSecure\.cpp' components/arduino-esp32/CMakeLists.txt || true
 
 
             echo ""
@@ -154,28 +130,20 @@ jobs:
             echo "============================================================"
 
             echo ""
-            echo "--- Arduino selective compilation settings ---"
-            grep -E \
-              '^CONFIG_ARDUINO_SELECTIVE|^CONFIG_ARDUINO_VARIANT|^CONFIG_AUTOSTART_ARDUINO' \
-              sdkconfig \
-              2>/dev/null \
-              | sort || true
+            echo "--- Arduino configuration ---"
+            grep -E '^CONFIG_ARDUINO_SELECTIVE|^CONFIG_ARDUINO_VARIANT|^CONFIG_AUTOSTART_ARDUINO' sdkconfig 2>/dev/null | sort || true
 
             echo ""
-            echo "--- TLS / mbedTLS settings ---"
-            grep -E \
-              '^(CONFIG_MBEDTLS|CONFIG_ESP_TLS|CONFIG_ARDUINO)' \
-              sdkconfig \
-              2>/dev/null \
-              | sort || true
+            echo "--- mbedTLS configuration ---"
+            grep -E '^CONFIG_MBEDTLS' sdkconfig 2>/dev/null | sort || true
 
             echo ""
-            echo "--- Target ---"
-            grep -E \
-              '^CONFIG_IDF_TARGET|^CONFIG_IDF_TARGET_ARCH' \
-              sdkconfig \
-              2>/dev/null \
-              || true
+            echo "--- ESP TLS configuration ---"
+            grep -E '^CONFIG_ESP_TLS' sdkconfig 2>/dev/null | sort || true
+
+            echo ""
+            echo "--- Target configuration ---"
+            grep -E '^CONFIG_IDF_TARGET|^CONFIG_IDF_TARGET_ARCH' sdkconfig 2>/dev/null || true
 
 
             echo ""
@@ -198,21 +166,12 @@ jobs:
             echo "============================================================"
 
             echo ""
-            echo "--- IDF version ---"
-            grep -E \
-              'IDF_VERSION|IDF_TARGET' \
-              build/CMakeCache.txt \
-              2>/dev/null \
-              | head -50 || true
+            echo "--- IDF version and target ---"
+            grep -E 'IDF_VERSION|IDF_TARGET' build/CMakeCache.txt 2>/dev/null | head -50 || true
 
             echo ""
-            echo "--- Arduino component references in cache ---"
-            grep -R -n \
-              "arduino-esp32" \
-              build/CMakeCache.txt \
-              build/esp-idf \
-              2>/dev/null \
-              | head -100 || true
+            echo "--- Arduino references in CMake cache/build ---"
+            grep -R -n "arduino-esp32" build/CMakeCache.txt build/esp-idf 2>/dev/null | head -100 || true
 
 
             echo ""
@@ -222,22 +181,11 @@ jobs:
 
             echo ""
             echo "--- Arduino directories ---"
-            find build \
-              -maxdepth 5 \
-              -type d \
-              -iname '*arduino*' \
-              -print 2>/dev/null \
-              | sort \
-              | head -200 || true
+            find build -maxdepth 5 -type d -iname '*arduino*' -print 2>/dev/null | sort | head -200 || true
 
             echo ""
             echo "--- Arduino files ---"
-            find build/esp-idf/arduino-esp32 \
-              -maxdepth 4 \
-              -type f \
-              -print 2>/dev/null \
-              | sort \
-              | head -500 || true
+            find build/esp-idf/arduino-esp32 -maxdepth 5 -type f -print 2>/dev/null | sort | head -500 || true
 
 
             echo ""
@@ -246,20 +194,12 @@ jobs:
             echo "============================================================"
 
             echo ""
-            echo "--- ssl_client.cpp references in entire build ---"
-            grep -R -n \
-              "ssl_client\.cpp" \
-              build \
-              2>/dev/null \
-              | head -300 || true
+            echo "--- ssl_client.cpp references ---"
+            grep -R -n "ssl_client\.cpp" build 2>/dev/null | head -300 || true
 
             echo ""
-            echo "--- NetworkClientSecure.cpp references in entire build ---"
-            grep -R -n \
-              "NetworkClientSecure\.cpp" \
-              build \
-              2>/dev/null \
-              | head -300 || true
+            echo "--- NetworkClientSecure.cpp references ---"
+            grep -R -n "NetworkClientSecure\.cpp" build 2>/dev/null | head -300 || true
 
 
             echo ""
@@ -269,28 +209,15 @@ jobs:
 
             echo ""
             echo "--- SSL references in build.ninja ---"
-            grep -n \
-              -E \
-              "ssl_client\.cpp|NetworkClientSecure\.cpp" \
-              build/build.ninja \
-              2>/dev/null \
-              | head -200 || true
+            grep -n -E 'ssl_client\.cpp|NetworkClientSecure\.cpp' build/build.ninja 2>/dev/null | head -200 || true
 
             echo ""
             echo "--- Arduino library references in build.ninja ---"
-            grep -n \
-              "arduino-esp32" \
-              build/build.ninja \
-              2>/dev/null \
-              | head -200 || true
+            grep -n "arduino-esp32" build/build.ninja 2>/dev/null | head -200 || true
 
             echo ""
             echo "--- libarduino references in build.ninja ---"
-            grep -n \
-              "libarduino" \
-              build/build.ninja \
-              2>/dev/null \
-              | head -200 || true
+            grep -n "libarduino" build/build.ninja 2>/dev/null | head -200 || true
 
 
             echo ""
@@ -300,48 +227,22 @@ jobs:
 
             echo ""
             echo "--- CMakeFiles ---"
-            find build/esp-idf/arduino-esp32/CMakeFiles \
-              -maxdepth 4 \
-              -type f \
-              -print 2>/dev/null \
-              | sort \
-              | head -500 || true
+            find build/esp-idf/arduino-esp32/CMakeFiles -maxdepth 5 -type f -print 2>/dev/null | sort | head -500 || true
 
             echo ""
             echo "--- DependInfo.cmake ---"
-            find build/esp-idf/arduino-esp32 \
-              -type f \
-              -name 'DependInfo.cmake' \
-              -print \
-              -exec sh -c '
-                for f do
-                  echo "--- $f"
-                  cat "$f"
-                done
-              ' sh {} + \
-              2>/dev/null \
-              | head -1000 || true
+            find build/esp-idf/arduino-esp32 -type f -name 'DependInfo.cmake' -print 2>/dev/null | while read f; do
+              echo "--- $f"
+              cat "$f"
+            done
 
             echo ""
             echo "--- Response files ---"
-            find build/esp-idf/arduino-esp32 \
-              -type f \
-              \( \
-                -name '*.rsp' \
-                -o -name '*.d' \
-              \) \
-              -print 2>/dev/null \
-              | sort \
-              | head -500 || true
+            find build/esp-idf/arduino-esp32 -type f \( -name '*.rsp' -o -name '*.d' \) -print 2>/dev/null | sort | head -500 || true
 
             echo ""
             echo "--- SSL references in dependency files ---"
-            grep -R -n \
-              -E \
-              "ssl_client|NetworkClientSecure" \
-              build/esp-idf/arduino-esp32/CMakeFiles \
-              2>/dev/null \
-              | head -300 || true
+            grep -R -n -E 'ssl_client|NetworkClientSecure' build/esp-idf/arduino-esp32/CMakeFiles 2>/dev/null | head -300 || true
 
 
             echo ""
@@ -349,16 +250,7 @@ jobs:
             echo "SSL OBJECT FILES"
             echo "============================================================"
 
-            find build \
-              -type f \
-              \( \
-                -name '*ssl_client*.o' \
-                -o -name '*ssl_client*.obj' \
-                -o -name '*NetworkClientSecure*.o' \
-                -o -name '*NetworkClientSecure*.obj' \
-              \) \
-              -print 2>/dev/null \
-              | sort || true
+            find build -type f \( -name '*ssl_client*.o' -o -name '*ssl_client*.obj' -o -name '*NetworkClientSecure*.o' -o -name '*NetworkClientSecure*.obj' \) -print 2>/dev/null | sort || true
 
 
             echo ""
@@ -366,30 +258,15 @@ jobs:
             echo "ALL ARDUINO OBJECT FILES"
             echo "============================================================"
 
-            find build/esp-idf/arduino-esp32 \
-              -type f \
-              \( \
-                -name '*.o' \
-                -o -name '*.obj' \
-              \) \
-              -print 2>/dev/null \
-              | sort \
-              | head -1000 || true
+            find build/esp-idf/arduino-esp32 -type f \( -name '*.o' -o -name '*.obj' \) -print 2>/dev/null | sort | head -1000 || true
 
 
             echo ""
             echo "============================================================"
-            echo "ARDUINO STATIC LIBRARIES"
+            echo "STATIC LIBRARIES"
             echo "============================================================"
 
-            find build \
-              -type f \
-              -name '*.a' \
-              -print 2>/dev/null \
-              | sort \
-              | grep -E \
-                'arduino|Network|WiFi|ssl|mbedtls' \
-              || true
+            find build -type f -name '*.a' -print 2>/dev/null | sort | grep -E 'arduino|Network|WiFi|ssl|mbedtls' || true
 
 
             echo ""
@@ -397,20 +274,12 @@ jobs:
             echo "ARDUINO ARCHIVE CONTENTS"
             echo "============================================================"
 
-            find build \
-              -type f \
-              -name 'libarduino-esp32.a' \
-              -exec sh -c '
-                for archive do
-                  echo ""
-                  echo "--- ARCHIVE: $archive"
-                  echo "--- Matching SSL members:"
-                  ar t "$archive" 2>/dev/null |
-                    grep -E \
-                    "ssl_client|NetworkClientSecure" \
-                    || true
-                done
-              ' sh {} + || true
+            find build -type f -name 'libarduino-esp32.a' -print 2>/dev/null | while read archive; do
+              echo ""
+              echo "--- ARCHIVE: $archive"
+              echo "--- Matching members:"
+              ar t "$archive" 2>/dev/null | grep -E 'ssl_client|NetworkClientSecure' || true
+            done
 
 
             echo ""
@@ -418,20 +287,12 @@ jobs:
             echo "ARDUINO ARCHIVE SYMBOLS"
             echo "============================================================"
 
-            find build \
-              -type f \
-              -name 'libarduino-esp32.a' \
-              -exec sh -c '
-                for archive do
-                  echo ""
-                  echo "--- ARCHIVE: $archive"
+            find build -type f -name 'libarduino-esp32.a' -print 2>/dev/null | while read archive; do
+              echo ""
+              echo "--- ARCHIVE: $archive"
 
-                  nm -C "$archive" 2>/dev/null |
-                    grep -E \
-                    "stop_ssl_socket|send_ssl_data|send_net_data|data_to_read|peek_net_receive|get_ssl_receive|get_net_receive|ssl_init|start_ssl_client|ssl_starttls_handshake|attach_ssl_certificate_bundle|verify_ssl_fingerprint" \
-                    || true
-                done
-              ' sh {} + || true
+              nm -C "$archive" 2>/dev/null | grep -E 'stop_ssl_socket|send_ssl_data|send_net_data|data_to_read|peek_net_receive|get_ssl_receive|get_net_receive|ssl_init|start_ssl_client|ssl_starttls_handshake|attach_ssl_certificate_bundle|verify_ssl_fingerprint' || true
+            done
 
 
             echo ""
@@ -439,23 +300,12 @@ jobs:
             echo "SSL OBJECT SYMBOLS"
             echo "============================================================"
 
-            find build \
-              -type f \
-              \( \
-                -name '*ssl_client*.o' \
-                -o -name '*ssl_client*.obj' \
-              \) \
-              -exec sh -c '
-                for obj do
-                  echo ""
-                  echo "--- OBJECT: $obj"
+            find build -type f \( -name '*ssl_client*.o' -o -name '*ssl_client*.obj' \) -print 2>/dev/null | while read obj; do
+              echo ""
+              echo "--- OBJECT: $obj"
 
-                  nm -C "$obj" 2>/dev/null |
-                    grep -E \
-                    "stop_ssl_socket|send_ssl_data|send_net_data|data_to_read|peek_net_receive|get_ssl_receive|get_net_receive|ssl_init|start_ssl_client|ssl_starttls_handshake|attach_ssl_certificate_bundle|verify_ssl_fingerprint" \
-                    || true
-                done
-              ' sh {} + || true
+              nm -C "$obj" 2>/dev/null | grep -E 'stop_ssl_socket|send_ssl_data|send_net_data|data_to_read|peek_net_receive|get_ssl_receive|get_net_receive|ssl_init|start_ssl_client|ssl_starttls_handshake|attach_ssl_certificate_bundle|verify_ssl_fingerprint' || true
+            done
 
 
             echo ""
@@ -463,46 +313,25 @@ jobs:
             echo "NETWORKCLIENTSECURE OBJECT SYMBOLS"
             echo "============================================================"
 
-            find build \
-              -type f \
-              \( \
-                -name '*NetworkClientSecure*.o' \
-                -o -name '*NetworkClientSecure*.obj' \
-              \) \
-              -exec sh -c '
-                for obj do
-                  echo ""
-                  echo "--- OBJECT: $obj"
+            find build -type f \( -name '*NetworkClientSecure*.o' -o -name '*NetworkClientSecure*.obj' \) -print 2>/dev/null | while read obj; do
+              echo ""
+              echo "--- OBJECT: $obj"
 
-                  nm -C "$obj" 2>/dev/null |
-                    grep -E \
-                    "stop_ssl_socket|send_ssl_data|send_net_data|data_to_read|peek_net_receive|get_ssl_receive|get_net_receive|ssl_init|start_ssl_client|ssl_starttls_handshake|attach_ssl_certificate_bundle|verify_ssl_fingerprint" \
-                    || true
-                done
-              ' sh {} + || true
+              nm -C "$obj" 2>/dev/null | grep -E 'stop_ssl_socket|send_ssl_data|send_net_data|data_to_read|peek_net_receive|get_ssl_receive|get_net_receive|ssl_init|start_ssl_client|ssl_starttls_handshake|attach_ssl_certificate_bundle|verify_ssl_fingerprint' || true
+            done
 
 
             echo ""
             echo "============================================================"
-            echo "ALL SSL SYMBOLS IN ARDUINO ARCHIVE"
+            echo "ALL SSL/TLS SYMBOLS IN ARDUINO ARCHIVE"
             echo "============================================================"
 
-            find build \
-              -type f \
-              -name 'libarduino-esp32.a' \
-              -exec sh -c '
-                for archive do
-                  echo ""
-                  echo "--- SSL symbol table: $archive"
+            find build -type f -name 'libarduino-esp32.a' -print 2>/dev/null | while read archive; do
+              echo ""
+              echo "--- SSL/TLS symbols: $archive"
 
-                  nm -C "$archive" 2>/dev/null |
-                    grep -i \
-                    -E \
-                    "ssl|tls|net_receive|send_net|data_to_read|peek_net" \
-                    | head -500 \
-                    || true
-                done
-              ' sh {} + || true
+              nm -C "$archive" 2>/dev/null | grep -i -E 'ssl|tls|net_receive|send_net|data_to_read|peek_net' | head -500 || true
+            done
 
 
             echo ""
@@ -511,44 +340,26 @@ jobs:
             echo "============================================================"
 
             echo ""
-            echo "--- Arduino library target ---"
-            grep -R -n \
-              "libarduino-esp32\.a" \
-              build/esp-idf/arduino-esp32 \
-              build/build.ninja \
-              2>/dev/null \
-              | head -300 || true
+            echo "--- Arduino archive references ---"
+            grep -R -n "libarduino-esp32\.a" build/esp-idf/arduino-esp32 build/build.ninja 2>/dev/null | head -300 || true
 
             echo ""
-            echo "--- Arduino component target ---"
-            grep -R -n \
-              "__idf_arduino-esp32\|arduino-esp32" \
-              build/esp-idf/arduino-esp32/CMakeFiles \
-              2>/dev/null \
-              | head -300 || true
+            echo "--- Arduino component references ---"
+            grep -R -n "__idf_arduino-esp32\|arduino-esp32" build/esp-idf/arduino-esp32/CMakeFiles 2>/dev/null | head -300 || true
 
 
             echo ""
             echo "============================================================"
-            echo "FINAL LINK COMMAND REFERENCES"
+            echo "FINAL LINK INFORMATION"
             echo "============================================================"
 
             echo ""
-            echo "--- Arduino archive references in entire build ---"
-            grep -R -n \
-              "libarduino-esp32\.a" \
-              build \
-              2>/dev/null \
-              | head -500 || true
+            echo "--- Arduino archive references in build ---"
+            grep -R -n "libarduino-esp32\.a" build 2>/dev/null | head -500 || true
 
             echo ""
-            echo "--- SSL symbol references in generated build files ---"
-            grep -R -n \
-              -E \
-              "stop_ssl_socket|send_ssl_data|send_net_data|data_to_read|peek_net_receive|get_ssl_receive|get_net_receive|ssl_init|start_ssl_client|ssl_starttls_handshake|attach_ssl_certificate_bundle|verify_ssl_fingerprint" \
-              build \
-              2>/dev/null \
-              | head -500 || true
+            echo "--- Undefined SSL symbols in build files ---"
+            grep -R -n -E 'stop_ssl_socket|send_ssl_data|send_net_data|data_to_read|peek_net_receive|get_ssl_receive|get_net_receive|ssl_init|start_ssl_client|ssl_starttls_handshake|attach_ssl_certificate_bundle|verify_ssl_fingerprint' build 2>/dev/null | head -500 || true
 
 
             echo ""
@@ -558,19 +369,11 @@ jobs:
 
             echo ""
             echo "--- ELF files ---"
-            find build \
-              -type f \
-              -name '*.elf' \
-              -print 2>/dev/null \
-              | sort || true
+            find build -type f -name '*.elf' -print 2>/dev/null | sort || true
 
             echo ""
             echo "--- MAP files ---"
-            find build \
-              -type f \
-              -name '*.map' \
-              -print 2>/dev/null \
-              | sort || true
+            find build -type f -name '*.map' -print 2>/dev/null | sort || true
 
 
             echo ""
@@ -578,20 +381,12 @@ jobs:
             echo "FINAL ELF SSL SYMBOLS"
             echo "============================================================"
 
-            find build \
-              -type f \
-              -name '*.elf' \
-              -exec sh -c '
-                for elf do
-                  echo ""
-                  echo "--- ELF: $elf"
+            find build -type f -name '*.elf' -print 2>/dev/null | while read elf; do
+              echo ""
+              echo "--- ELF: $elf"
 
-                  nm -C "$elf" 2>/dev/null |
-                    grep -E \
-                    "stop_ssl_socket|send_ssl_data|send_net_data|data_to_read|peek_net_receive|get_ssl_receive|get_net_receive|ssl_init|start_ssl_client|ssl_starttls_handshake|attach_ssl_certificate_bundle|verify_ssl_fingerprint" \
-                    || true
-                done
-              ' sh {} + || true
+              nm -C "$elf" 2>/dev/null | grep -E 'stop_ssl_socket|send_ssl_data|send_net_data|data_to_read|peek_net_receive|get_ssl_receive|get_net_receive|ssl_init|start_ssl_client|ssl_starttls_handshake|attach_ssl_certificate_bundle|verify_ssl_fingerprint' || true
+            done
 
 
             echo ""
@@ -599,57 +394,38 @@ jobs:
             echo "FINAL MAP SSL SYMBOL REFERENCES"
             echo "============================================================"
 
-            find build \
-              -type f \
-              -name '*.map' \
-              -exec sh -c '
-                for map do
-                  echo ""
-                  echo "--- MAP: $map"
+            find build -type f -name '*.map' -print 2>/dev/null | while read map; do
+              echo ""
+              echo "--- MAP: $map"
 
-                  grep -n -E \
-                    "stop_ssl_socket|send_ssl_data|send_net_data|data_to_read|peek_net_receive|get_ssl_receive|get_net_receive|ssl_init|start_ssl_client|ssl_starttls_handshake|attach_ssl_certificate_bundle|verify_ssl_fingerprint" \
-                    "$map" \
-                    2>/dev/null \
-                    | head -300 \
-                    || true
-                done
-              ' sh {} + || true
+              grep -n -E 'stop_ssl_socket|send_ssl_data|send_net_data|data_to_read|peek_net_receive|get_ssl_receive|get_net_receive|ssl_init|start_ssl_client|ssl_starttls_handshake|attach_ssl_certificate_bundle|verify_ssl_fingerprint' "$map" 2>/dev/null | head -300 || true
+            done
 
 
             echo ""
             echo "============================================================"
-            echo "CMAKE GENERATED SOURCE COUNTS"
+            echo "SUMMARY COUNTS"
             echo "============================================================"
 
             echo ""
-            echo "--- Count ssl_client.cpp references ---"
-            grep -R \
-              -l \
-              "ssl_client\.cpp" \
-              build \
-              2>/dev/null \
-              | wc -l || true
+            echo "--- ssl_client.cpp references in generated build ---"
+            grep -R -l "ssl_client\.cpp" build 2>/dev/null | wc -l || true
 
             echo ""
-            echo "--- Count NetworkClientSecure.cpp references ---"
-            grep -R \
-              -l \
-              "NetworkClientSecure\.cpp" \
-              build \
-              2>/dev/null \
-              | wc -l || true
+            echo "--- NetworkClientSecure.cpp references in generated build ---"
+            grep -R -l "NetworkClientSecure\.cpp" build 2>/dev/null | wc -l || true
 
             echo ""
-            echo "--- Count SSL object files ---"
-            find build \
-              -type f \
-              \( \
-                -name '*ssl_client*.o' \
-                -o -name '*ssl_client*.obj' \
-              \) \
-              2>/dev/null \
-              | wc -l || true
+            echo "--- ssl_client object count ---"
+            find build -type f \( -name '*ssl_client*.o' -o -name '*ssl_client*.obj' \) 2>/dev/null | wc -l || true
+
+            echo ""
+            echo "--- NetworkClientSecure object count ---"
+            find build -type f \( -name '*NetworkClientSecure*.o' -o -name '*NetworkClientSecure*.obj' \) 2>/dev/null | wc -l || true
+
+            echo ""
+            echo "--- Arduino archive count ---"
+            find build -type f -name 'libarduino-esp32.a' 2>/dev/null | wc -l || true
 
 
             echo ""
