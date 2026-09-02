@@ -25,5 +25,10 @@ jobs:
           command: |
             idf.py set-target esp32p4
             idf.py reconfigure
-            idf.py build
+            echo "=== ARDUINO SSL SOURCES ==="
+            grep -n -A5 -B2 "ARDUINO_LIBRARY_NetworkClientSecure_SRCS" components/arduino-esp32/CMakeLists.txt
+            echo "=== GENERATED SOURCES ==="
+            grep -R "ssl_client.cpp" build/esp-idf/arduino-esp32 2>/dev/null | head -20
+            echo "=== ARCHIVE ==="
+            ar t build/esp-idf/arduino-esp32/libarduino-esp32.a 2>/dev/null | grep -E "ssl_client|NetworkClientSecure"
 
