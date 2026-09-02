@@ -34,12 +34,12 @@ static void save_wifi_history_entry(
     Preferences prefs;
     prefs.begin("wifi-config", false);
 
-    int count = prefs.getInt("WIFI_HISTORY_COUNT", 0);
+    int count = prefs.getInt("WIFI_HIST_COUNT", 0);
 
     // Update an existing entry.
     for (int i = 0; i < count; ++i) {
-        String key_ssid = "WIFI_HISTORY_SSID_" + String(i);
-        String key_pass = "WIFI_HISTORY_PASS_" + String(i);
+        String key_ssid = "WIFI_HIST_SSID_" + String(i);
+        String key_pass = "WIFI_HIST_PASS_" + String(i);
 
         String saved_ssid =
             prefs.getString(key_ssid.c_str(), "");
@@ -55,19 +55,19 @@ static void save_wifi_history_entry(
     if (count >= 5) {
         for (int i = 1; i < count; ++i) {
             String key_ssid =
-                "WIFI_HISTORY_SSID_" + String(i - 1);
+                "WIFI_HIST_SSID_" + String(i - 1);
 
             String key_pass =
-                "WIFI_HISTORY_PASS_" + String(i - 1);
+                "WIFI_HIST_PASS_" + String(i - 1);
 
             String next_ssid =
                 prefs.getString(
-                    ("WIFI_HISTORY_SSID_" + String(i)).c_str(),
+                    ("WIFI_HIST_SSID_" + String(i)).c_str(),
                     "");
 
             String next_pass =
                 prefs.getString(
-                    ("WIFI_HISTORY_PASS_" + String(i)).c_str(),
+                    ("WIFI_HIST_PASS_" + String(i)).c_str(),
                     "");
 
             prefs.putString(
@@ -85,15 +85,15 @@ static void save_wifi_history_entry(
     int slot = count;
 
     prefs.putString(
-        ("WIFI_HISTORY_SSID_" + String(slot)).c_str(),
+        ("WIFI_HIST_SSID_" + String(slot)).c_str(),
         ssid);
 
     prefs.putString(
-        ("WIFI_HISTORY_PASS_" + String(slot)).c_str(),
+        ("WIFI_HIST_PASS_" + String(slot)).c_str(),
         pass);
 
     prefs.putInt(
-        "WIFI_HISTORY_COUNT",
+        "WIFI_HIST_COUNT",
         count + 1);
 
     prefs.end();
@@ -109,19 +109,19 @@ static int load_wifi_history(
     prefs.begin("wifi-config", true);
 
     int count =
-        prefs.getInt("WIFI_HISTORY_COUNT", 0);
+        prefs.getInt("WIFI_HIST_COUNT", 0);
 
     count = min(count, max_items);
 
     for (int i = 0; i < count; ++i) {
         ssids[i] =
             prefs.getString(
-                ("WIFI_HISTORY_SSID_" + String(i)).c_str(),
+                ("WIFI_HIST_SSID_" + String(i)).c_str(),
                 "");
 
         passwords[i] =
             prefs.getString(
-                ("WIFI_HISTORY_PASS_" + String(i)).c_str(),
+                ("WIFI_HIST_PASS_" + String(i)).c_str(),
                 "");
     }
 
