@@ -1,3 +1,4 @@
+#
 # Check ESP-IDF version and error out if it is not in the supported range.
 #
 # Note for arduino-esp32 developers: to bypass the version check locally,
@@ -82,7 +83,7 @@ set(CORE_SRCS
   cores/esp32/wiring_shift.c
   cores/esp32/WMath.cpp
   cores/esp32/WString.cpp
-  )
+)
 
 set(ARDUINO_ALL_LIBRARIES
   ArduinoOTA
@@ -127,7 +128,7 @@ set(ARDUINO_ALL_LIBRARIES
   WiFiProv
   Wire
   Zigbee
-  )
+)
 
 set(ARDUINO_LIBRARY_ArduinoOTA_SRCS libraries/ArduinoOTA/src/ArduinoOTA.cpp)
 
@@ -137,7 +138,8 @@ set(ARDUINO_LIBRARY_BluetoothSerial_SRCS
   libraries/BluetoothSerial/src/BluetoothSerial.cpp
   libraries/BluetoothSerial/src/BTAddress.cpp
   libraries/BluetoothSerial/src/BTAdvertisedDeviceSet.cpp
-  libraries/BluetoothSerial/src/BTScanResultsSet.cpp)
+  libraries/BluetoothSerial/src/BTScanResultsSet.cpp
+)
 
 set(ARDUINO_LIBRARY_Console_SRCS libraries/Console/src/Console.cpp)
 set(ARDUINO_LIBRARY_Console_REQUIRES console)
@@ -150,43 +152,65 @@ set(ARDUINO_LIBRARY_ESP_I2S_SRCS libraries/ESP_I2S/src/ESP_I2S.cpp)
 
 set(ARDUINO_LIBRARY_ESP_NOW_SRCS
   libraries/ESP_NOW/src/ESP32_NOW.cpp
-  libraries/ESP_NOW/src/ESP32_NOW_Serial.cpp)
+  libraries/ESP_NOW/src/ESP32_NOW_Serial.cpp
+)
 
 set(ARDUINO_LIBRARY_ESP_SR_SRCS
   libraries/ESP_SR/src/ESP_SR.cpp
-  libraries/ESP_SR/src/esp32-hal-sr.c)
+  libraries/ESP_SR/src/esp32-hal-sr.c
+)
 
 set(ARDUINO_LIBRARY_ESP_HostedOTA_SRCS
-  libraries/ESP_HostedOTA/src/ESP_HostedOTA.cpp)
+  libraries/ESP_HostedOTA/src/ESP_HostedOTA.cpp
+)
 
-set(ARDUINO_LIBRARY_ESP_Video_SRCS libraries/ESP_Video/src/ESP_Video.cpp)
+set(ARDUINO_LIBRARY_ESP_Video_SRCS
+  libraries/ESP_Video/src/ESP_Video.cpp
+)
 
-set(ARDUINO_LIBRARY_ESPmDNS_SRCS libraries/ESPmDNS/src/ESPmDNS.cpp)
+set(ARDUINO_LIBRARY_ESPmDNS_SRCS
+  libraries/ESPmDNS/src/ESPmDNS.cpp
+)
 
-set(ARDUINO_LIBRARY_Ethernet_SRCS libraries/Ethernet/src/ETH.cpp)
+set(ARDUINO_LIBRARY_Ethernet_SRCS
+  libraries/Ethernet/src/ETH.cpp
+)
 
-set(ARDUINO_LIBRARY_FFat_SRCS libraries/FFat/src/FFat.cpp)
+set(ARDUINO_LIBRARY_FFat_SRCS
+  libraries/FFat/src/FFat.cpp
+)
 
 set(ARDUINO_LIBRARY_FS_SRCS
   libraries/FS/src/FS.cpp
-  libraries/FS/src/vfs_api.cpp)
+  libraries/FS/src/vfs_api.cpp
+)
 
 set(ARDUINO_LIBRARY_Hash_SRCS
   libraries/Hash/src/SHA1Builder.cpp
   libraries/Hash/src/SHA2Builder.cpp
   libraries/Hash/src/SHA3Builder.cpp
   libraries/Hash/src/PBKDF2_HMACBuilder.cpp
-  )
+)
 
-set(ARDUINO_LIBRARY_HTTPClient_SRCS libraries/HTTPClient/src/HTTPClient.cpp)
+set(ARDUINO_LIBRARY_HTTPClient_SRCS
+  libraries/HTTPClient/src/HTTPClient.cpp
+)
 
-set(ARDUINO_LIBRARY_HTTPUpdate_SRCS libraries/HTTPUpdate/src/HTTPUpdate.cpp)
+set(ARDUINO_LIBRARY_HTTPUpdate_SRCS
+  libraries/HTTPUpdate/src/HTTPUpdate.cpp
+)
 
-set(ARDUINO_LIBRARY_Insights_SRCS libraries/Insights/src/Insights.cpp)
+set(ARDUINO_LIBRARY_Insights_SRCS
+  libraries/Insights/src/Insights.cpp
+)
 
-set(ARDUINO_LIBRARY_LittleFS_SRCS libraries/LittleFS/src/LittleFS.cpp)
+set(ARDUINO_LIBRARY_LittleFS_SRCS
+  libraries/LittleFS/src/LittleFS.cpp
+)
 
-set(ARDUINO_LIBRARY_NetBIOS_SRCS libraries/NetBIOS/src/NetBIOS.cpp)
+set(ARDUINO_LIBRARY_NetBIOS_SRCS
+  libraries/NetBIOS/src/NetBIOS.cpp
+)
 
 set(ARDUINO_LIBRARY_OpenThread_SRCS
   libraries/OpenThread/src/OThread.cpp
@@ -194,7 +218,8 @@ set(ARDUINO_LIBRARY_OpenThread_SRCS
   libraries/OpenThread/src/OThreadUDP.cpp
   libraries/OpenThread/src/OThreadCoAP.cpp
   libraries/OpenThread/src/OThreadCLI_Util.cpp
-  libraries/OpenThread/src/OThreadScan.cpp)
+  libraries/OpenThread/src/OThreadScan.cpp
+)
 
 set(ARDUINO_LIBRARY_Matter_SRCS
   libraries/Matter/src/MatterEndpoints/MatterGenericSwitch.cpp
@@ -205,7 +230,6 @@ set(ARDUINO_LIBRARY_Matter_SRCS
   libraries/Matter/src/MatterEndpoints/MatterEnhancedColorLight.cpp
   libraries/Matter/src/MatterEndpoints/MatterFan.cpp
   libraries/Matter/src/MatterEndpoints/MatterTemperatureSensor.cpp
-  libraries/Matter/src/MatterEndpoints/MatterTemperatureControlledCabinet.cpp
   libraries/Matter/src/MatterEndpoints/MatterHumiditySensor.cpp
   libraries/Matter/src/MatterEndpoints/MatterContactSensor.cpp
   libraries/Matter/src/MatterEndpoints/MatterWaterLeakDetector.cpp
@@ -219,11 +243,16 @@ set(ARDUINO_LIBRARY_Matter_SRCS
   libraries/Matter/src/MatterEndpoints/MatterWindowCovering.cpp
   libraries/Matter/src/MatterEndpoints/MatterLightSensor.cpp
   libraries/Matter/src/Matter.cpp
-  libraries/Matter/src/MatterEndPoint.cpp)
+  libraries/Matter/src/MatterEndPoint.cpp
+)
 
-set(ARDUINO_LIBRARY_PPP_SRCS libraries/PPP/src/PPP.cpp)
+set(ARDUINO_LIBRARY_PPP_SRCS
+  libraries/PPP/src/PPP.cpp
+)
 
-set(ARDUINO_LIBRARY_Preferences_SRCS libraries/Preferences/src/Preferences.cpp)
+set(ARDUINO_LIBRARY_Preferences_SRCS
+  libraries/Preferences/src/Preferences.cpp
+)
 
 set(ARDUINO_LIBRARY_RainMaker_SRCS
   libraries/RainMaker/src/RMaker.cpp
@@ -233,27 +262,40 @@ set(ARDUINO_LIBRARY_RainMaker_SRCS
   libraries/RainMaker/src/RMakerType.cpp
   libraries/RainMaker/src/RMakerQR.cpp
   libraries/RainMaker/src/RMakerUtils.cpp
-  libraries/RainMaker/src/AppInsights.cpp)
+  libraries/RainMaker/src/AppInsights.cpp
+)
 
-set(ARDUINO_LIBRARY_SD_MMC_SRCS libraries/SD_MMC/src/SD_MMC.cpp)
+set(ARDUINO_LIBRARY_SD_MMC_SRCS
+  libraries/SD_MMC/src/SD_MMC.cpp
+)
 
 set(ARDUINO_LIBRARY_SD_SRCS
   libraries/SD/src/SD.cpp
   libraries/SD/src/sd_diskio.cpp
-  libraries/SD/src/sd_diskio_crc.c)
+  libraries/SD/src/sd_diskio_crc.c
+)
 
-set(ARDUINO_LIBRARY_SimpleBLE_SRCS libraries/SimpleBLE/src/SimpleBLE.cpp)
+set(ARDUINO_LIBRARY_SimpleBLE_SRCS
+  libraries/SimpleBLE/src/SimpleBLE.cpp
+)
 
-set(ARDUINO_LIBRARY_SPIFFS_SRCS libraries/SPIFFS/src/SPIFFS.cpp)
+set(ARDUINO_LIBRARY_SPIFFS_SRCS
+  libraries/SPIFFS/src/SPIFFS.cpp
+)
 
-set(ARDUINO_LIBRARY_SPI_SRCS libraries/SPI/src/SPI.cpp)
+set(ARDUINO_LIBRARY_SPI_SRCS
+  libraries/SPI/src/SPI.cpp
+)
 
-set(ARDUINO_LIBRARY_Ticker_SRCS libraries/Ticker/src/Ticker.cpp)
+set(ARDUINO_LIBRARY_Ticker_SRCS
+  libraries/Ticker/src/Ticker.cpp
+)
 
 set(ARDUINO_LIBRARY_Update_SRCS
   libraries/Update/src/Updater.cpp
   libraries/Update/src/HttpsOTAUpdate.cpp
-  libraries/Update/src/Updater_Signing.cpp)
+  libraries/Update/src/Updater_Signing.cpp
+)
 
 set(ARDUINO_LIBRARY_USB_SRCS
   libraries/USB/src/USBAudioCard.cpp
@@ -276,8 +318,8 @@ set(ARDUINO_LIBRARY_USB_SRCS
   libraries/USB/src/USBHIDGamepad.cpp
   libraries/USB/src/USBHIDConsumerControl.cpp
   libraries/USB/src/USBHIDSystemControl.cpp
-  libraries/USB/src/USBHIDVendor.cpp
-  libraries/USB/src/USBVendor.cpp)
+  libraries/USB/src/USBVendor.cpp
+)
 
 set(ARDUINO_LIBRARY_WebServer_SRCS
   libraries/WebServer/src/WebServer.cpp
@@ -286,11 +328,13 @@ set(ARDUINO_LIBRARY_WebServer_SRCS
   libraries/WebServer/src/middleware/MiddlewareChain.cpp
   libraries/WebServer/src/middleware/AuthenticationMiddleware.cpp
   libraries/WebServer/src/middleware/CorsMiddleware.cpp
-  libraries/WebServer/src/middleware/LoggingMiddleware.cpp)
+  libraries/WebServer/src/middleware/LoggingMiddleware.cpp
+)
 
 set(ARDUINO_LIBRARY_NetworkClientSecure_SRCS
   libraries/NetworkClientSecure/src/ssl_client.cpp
-  libraries/NetworkClientSecure/src/NetworkClientSecure.cpp)
+  libraries/NetworkClientSecure/src/NetworkClientSecure.cpp
+)
 
 set(ARDUINO_LIBRARY_Network_SRCS
   libraries/Network/src/NetworkInterface.cpp
@@ -298,7 +342,8 @@ set(ARDUINO_LIBRARY_Network_SRCS
   libraries/Network/src/NetworkManager.cpp
   libraries/Network/src/NetworkClient.cpp
   libraries/Network/src/NetworkServer.cpp
-  libraries/Network/src/NetworkUdp.cpp)
+  libraries/Network/src/NetworkUdp.cpp
+)
 
 set(ARDUINO_LIBRARY_WiFi_SRCS
   libraries/WiFi/src/WiFiAP.cpp
@@ -308,11 +353,16 @@ set(ARDUINO_LIBRARY_WiFi_SRCS
   libraries/WiFi/src/WiFiScan.cpp
   libraries/WiFi/src/WiFiSTA.cpp
   libraries/WiFi/src/STA.cpp
-  libraries/WiFi/src/AP.cpp)
+  libraries/WiFi/src/AP.cpp
+)
 
-set(ARDUINO_LIBRARY_WiFiProv_SRCS libraries/WiFiProv/src/WiFiProv.cpp)
+set(ARDUINO_LIBRARY_WiFiProv_SRCS
+  libraries/WiFiProv/src/WiFiProv.cpp
+)
 
-set(ARDUINO_LIBRARY_Wire_SRCS libraries/Wire/src/Wire.cpp)
+set(ARDUINO_LIBRARY_Wire_SRCS
+  libraries/Wire/src/Wire.cpp
+)
 
 set(ARDUINO_LIBRARY_Zigbee_SRCS
   libraries/Zigbee/src/ZigbeeCore.cpp
@@ -341,10 +391,11 @@ set(ARDUINO_LIBRARY_Zigbee_SRCS
   libraries/Zigbee/src/ep/ZigbeePM25Sensor.cpp
   libraries/Zigbee/src/ep/ZigbeeElectricalMeasurement.cpp
   libraries/Zigbee/src/ep/ZigbeeBinary.cpp
+  libraries/Zigbee/src/ep/ZigbeeDoorWindowHandle.cpp
   libraries/Zigbee/src/ep/ZigbeePowerOutlet.cpp
   libraries/Zigbee/src/ep/ZigbeeFanControl.cpp
   libraries/Zigbee/src/ep/ZigbeeMultistate.cpp
-  )
+)
 
 set(ARDUINO_LIBRARY_BLE_SRCS
   libraries/BLE/src/BLE2901.cpp
@@ -377,167 +428,305 @@ set(ARDUINO_LIBRARY_BLE_SRCS
   libraries/BLE/src/BLEValue.cpp
   libraries/BLE/src/FreeRTOS.cpp
   libraries/BLE/src/GeneralUtils.cpp
-  )
+)
 
 set(ARDUINO_LIBRARIES_SRCS)
 set(ARDUINO_LIBRARIES_REQUIRES)
 set(ARDUINO_LIBRARIES_INCLUDEDIRS)
+
 foreach(libname IN LISTS ARDUINO_ALL_LIBRARIES)
   if(NOT CONFIG_ARDUINO_SELECTIVE_COMPILATION OR CONFIG_ARDUINO_SELECTIVE_${libname})
+
     if(ARDUINO_LIBRARY_${libname}_SRCS)
       list(APPEND ARDUINO_LIBRARIES_SRCS ${ARDUINO_LIBRARY_${libname}_SRCS})
     endif()
+
     if(ARDUINO_LIBRARY_${libname}_REQUIRES)
       list(APPEND ARDUINO_LIBRARIES_REQUIRES ${ARDUINO_LIBRARY_${libname}_REQUIRES})
     endif()
+
     if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/libraries/${libname}/src)
       list(APPEND ARDUINO_LIBRARIES_INCLUDEDIRS libraries/${libname}/src)
     endif()
+
   endif()
 endforeach()
 
-set(includedirs variants/${CONFIG_ARDUINO_VARIANT}/ cores/esp32/ ${ARDUINO_LIBRARIES_INCLUDEDIRS})
+set(includedirs
+  variants/${CONFIG_ARDUINO_VARIANT}/
+  cores/esp32/
+  ${ARDUINO_LIBRARIES_INCLUDEDIRS}
+)
+
+#
+# Explicitly include NetworkClientSecure sources.
+#
+# These are already defined in ARDUINO_LIBRARY_NetworkClientSecure_SRCS above,
+# but explicitly adding them here guarantees that they are part of the Arduino
+# component target when the component is used locally instead of through the
+# managed component system.
+#
 set(srcs
   ${CORE_SRCS}
   ${ARDUINO_LIBRARIES_SRCS}
   libraries/NetworkClientSecure/src/ssl_client.cpp
   libraries/NetworkClientSecure/src/NetworkClientSecure.cpp
 )
-set(priv_includes cores/esp32/libb64)
-set(requires spi_flash esp_partition mbedtls wpa_supplicant esp_adc esp_eth http_parser esp_ringbuf esp_driver_gptimer esp_driver_usb_serial_jtag driver esp_http_client esp_https_ota esp_timer)
-set(priv_requires fatfs nvs_flash app_update spiffs bootloader_support bt esp_hid esp_psram ${ARDUINO_LIBRARIES_REQUIRES})
+
+set(priv_includes
+  cores/esp32/libb64
+)
+
+set(requires
+  spi_flash
+  esp_partition
+  mbedtls
+  wpa_supplicant
+  esp_adc
+  esp_eth
+  http_parser
+  esp_ringbuf
+  esp_driver_gptimer
+  esp_driver_usb_serial_jtag
+  driver
+  esp_http_client
+  esp_https_ota
+  esp_timer
+)
+
+set(priv_requires
+  fatfs
+  nvs_flash
+  app_update
+  spiffs
+  bootloader_support
+  bt
+  esp_hid
+  esp_psram
+  ${ARDUINO_LIBRARIES_REQUIRES}
+)
 
 set(min_v6_idf_version "6.0.0")
+
 if (idf_version VERSION_LESS min_v6_idf_version)
   list(APPEND priv_requires usb)
 else()
-  list(APPEND requires esp_hal_uart esp_hal_ledc esp_hal_ana_conv esp_hal_gpio esp_hal_i2c esp_hal_gpspi esp_hal_timg esp_driver_i2c esp_driver_ledc esp_driver_sdm esp_driver_tsens esp_driver_rmt esp_driver_i2s esp_driver_uart esp_driver_dac)
+  list(APPEND requires
+    esp_hal_uart
+    esp_hal_ledc
+    esp_hal_ana_conv
+    esp_hal_gpio
+    esp_hal_i2c
+    esp_hal_gpspi
+    esp_hal_timg
+    esp_driver_i2c
+    esp_driver_ledc
+    esp_driver_sdm
+    esp_driver_tsens
+    esp_driver_rmt
+    esp_driver_i2s
+    esp_driver_uart
+    esp_driver_dac
+  )
 endif()
 
 if(NOT CONFIG_ARDUINO_SELECTIVE_COMPILATION OR CONFIG_ARDUINO_SELECTIVE_OpenThread)
   #if(CONFIG_SOC_IEEE802154_SUPPORTED) # Does not work!
   #if(CONFIG_OPENTHREAD_ENABLED) # Does not work!
-  if(IDF_TARGET STREQUAL "esp32c6" OR IDF_TARGET STREQUAL "esp32h2" OR IDF_TARGET STREQUAL "esp32c5") # Sadly only this works
+  if(IDF_TARGET STREQUAL "esp32c6" OR
+     IDF_TARGET STREQUAL "esp32h2" OR
+     IDF_TARGET STREQUAL "esp32c5")
+    # Sadly only this works
     list(APPEND requires openthread)
   endif()
 endif()
 
-if(IDF_TARGET STREQUAL "esp32" OR IDF_TARGET STREQUAL "esp32s2" OR IDF_TARGET STREQUAL "esp32s3" OR IDF_TARGET STREQUAL "esp32p4")
+if(IDF_TARGET STREQUAL "esp32" OR
+   IDF_TARGET STREQUAL "esp32s2" OR
+   IDF_TARGET STREQUAL "esp32s3" OR
+   IDF_TARGET STREQUAL "esp32p4")
   list(APPEND requires esp_driver_touch_sens)
 endif()
 
+#
+# Diagnostic: confirm the two NetworkClientSecure source files are actually
+# present in the final source list passed to idf_component_register().
+#
+message(STATUS "=== FINAL ARDUINO SRCS ===")
+foreach(src IN LISTS srcs)
+  if(src MATCHES "NetworkClientSecure")
+    message(STATUS "ARDUINO SRC: ${src}")
+  endif()
+endforeach()
+message(STATUS "=== END FINAL ARDUINO SRCS ===")
+
 idf_component_register(
-    INCLUDE_DIRS ${includedirs}
-    PRIV_INCLUDE_DIRS ${priv_includes}
-    SRCS ${srcs}
-    REQUIRES ${requires}
-    PRIV_REQUIRES ${priv_requires}
+  INCLUDE_DIRS ${includedirs}
+  PRIV_INCLUDE_DIRS ${priv_includes}
+  SRCS ${srcs}
+  REQUIRES ${requires}
+  PRIV_REQUIRES ${priv_requires}
 )
 
 if(NOT CONFIG_FREERTOS_HZ EQUAL 1000 AND NOT "$ENV{ARDUINO_SKIP_TICK_CHECK}")
-    # See delay() in cores/esp32/esp32-hal-misc.c.
-    message(FATAL_ERROR "esp32-arduino requires CONFIG_FREERTOS_HZ=1000 "
-                        "(currently ${CONFIG_FREERTOS_HZ})")
+  message(FATAL_ERROR "esp32-arduino requires CONFIG_FREERTOS_HZ=1000 "
+                      "(currently ${CONFIG_FREERTOS_HZ})")
 endif()
 
 string(TOUPPER ${CONFIG_ARDUINO_VARIANT} idf_target_caps)
 string(REPLACE "-" "_" idf_target_for_macro "${idf_target_caps}")
+
 target_compile_options(${COMPONENT_TARGET} PUBLIC
-    -DARDUINO=10812
-    -DARDUINO_${idf_target_for_macro}_DEV
-    -DARDUINO_ARCH_ESP32
-    -DARDUINO_BOARD="${idf_target_caps}_DEV"
-    -DARDUINO_VARIANT="${CONFIG_ARDUINO_VARIANT}"
-    -DESP32=ESP32)
+  -DARDUINO=10812
+  -DARDUINO_${idf_target_for_macro}_DEV
+  -DARDUINO_ARCH_ESP32
+  -DARDUINO_BOARD="${idf_target_caps}_DEV"
+  -DARDUINO_VARIANT="${CONFIG_ARDUINO_VARIANT}"
+  -DESP32=ESP32
+)
 
 if(CONFIG_AUTOSTART_ARDUINO)
-    # in autostart mode, arduino-esp32 contains app_main() function and needs to
-    # reference setup() and loop() in the main component. If we add main
-    # component to priv_requires then we create a large circular dependency
-    # (arduino-esp32 -> main -> arduino-esp32) and can get linker errors, so
-    # instead we add setup() and loop() to the undefined symbols list so the
-    # linker will always include them.
-    #
-    # (As they are C++ symbol, we need to add the C++ mangled names.)
-    target_link_libraries(${COMPONENT_LIB} INTERFACE "-u _Z5setupv -u _Z4loopv")
+  # in autostart mode, arduino-esp32 contains app_main() function and needs to
+  # reference setup() and loop() in the main component. If we add main
+  # component to priv_requires then we create a large circular dependency
+  # (arduino-esp32 -> main -> arduino-esp32) and can get linker errors, so
+  # instead we add setup() and loop() to the undefined symbols list so the
+  # linker will always include them.
+  #
+  # (As they are C++ symbol, we need to add the C++ mangled names.)
+  target_link_libraries(${COMPONENT_LIB} INTERFACE "-u _Z5setupv -u _Z4loopv")
 endif()
 
-# Fix for WiFi/Bluetooth linker errors when CONFIG_DIAG_USE_EXTERNAL_LOG_WRAP is not enabled
+#
+# Fix for WiFi/Bluetooth linker errors when CONFIG_DIAG_USE_EXTERNAL_LOG_WRAP
+# is not enabled.
 #
 # Problem:
 #   WiFi and Bluetooth binary libraries reference __wrap_esp_log_write functions.
-#   When CONFIG_DIAG_USE_EXTERNAL_LOG_WRAP=y, esp_diagnostics provides these wrappers.
-#   When not set, no component provides them, causing "undefined reference" linker errors.
+#   When CONFIG_DIAG_USE_EXTERNAL_LOG_WRAP=y, esp_diagnostics provides these
+#   wrappers.
+#   When not set, no component provides them, causing "undefined reference"
+#   linker errors.
 #
 # Solution:
-#   cores/esp32/esp32-hal-log-wrapper.c provides simple pass-through wrapper implementations
-#   that forward calls to the real ESP-IDF logging functions without additional processing.
+#   cores/esp32/esp32-hal-log-wrapper.c provides simple pass-through wrapper
+#   implementations that forward calls to the real ESP-IDF logging functions
+#   without additional processing.
 #
 # Two linker flags are required:
 #
-# 1. --wrap=symbol: Sets up the wrapping/redirection mechanism
-#    Effect: esp_log_write() calls → redirected to → __wrap_esp_log_write()
-#            __real_esp_log_write() → created as alias → original esp_log_write()
-#    Note: Applied at build level (idf_build_set_property) so it works when Arduino is a component
+# 1. --wrap=symbol: Sets up the wrapping/redirection mechanism.
+#    Effect:
+#      esp_log_write() calls -> __wrap_esp_log_write()
+#      __real_esp_log_write() -> original esp_log_write()
 #
-# 2. -u symbol: Forces inclusion of wrapper symbols from static library
-#    Why needed: Static library linking is "lazy" - only pulls objects with referenced symbols.
-#                Without -u, linker sees wrapper as unreferenced and drops it from the library.
-#                The -u flag marks symbols as "undefined", forcing linker to search and include them.
-#    Analogy: Same technique used for setup()/loop() symbols (see above)
+# 2. -u symbol: Forces inclusion of wrapper symbols from static library.
+#    Static libraries are linked lazily, so without -u the linker can drop
+#    otherwise-unreferenced wrapper objects.
+#
 if(NOT CONFIG_DIAG_USE_EXTERNAL_LOG_WRAP)
-    idf_build_set_property(LINK_OPTIONS "-Wl,--wrap=esp_log_write" APPEND)
-    idf_build_set_property(LINK_OPTIONS "-Wl,--wrap=esp_log_writev" APPEND)
-    target_link_libraries(${COMPONENT_LIB} INTERFACE "-u __wrap_esp_log_write" "-u __wrap_esp_log_writev")
+  idf_build_set_property(
+    LINK_OPTIONS "-Wl,--wrap=esp_log_write" APPEND
+  )
+
+  idf_build_set_property(
+    LINK_OPTIONS "-Wl,--wrap=esp_log_writev" APPEND
+  )
+
+  target_link_libraries(
+    ${COMPONENT_LIB}
+    INTERFACE
+    "-u __wrap_esp_log_write"
+    "-u __wrap_esp_log_writev"
+  )
 endif()
 
-# OpenThread message pool: redirect to Arduino wrapper (BOARD_HAS_PSRAM / PSRAM-aware allocation).
-# Same pattern as esp_log wrap: --wrap so calls use __wrap_* ; -u so linker keeps our wrapper .o.
-# Applied on OpenThread-capable targets (same targets that may add openthread to requires).
+#
+# OpenThread message pool: redirect to Arduino wrapper
+# (BOARD_HAS_PSRAM / PSRAM-aware allocation).
+#
 if(CONFIG_OPENTHREAD_ENABLED AND CONFIG_SOC_IEEE802154_SUPPORTED)
-  idf_build_set_property(LINK_OPTIONS "-Wl,--wrap=otPlatMessagePoolInit" APPEND)
-  idf_build_set_property(LINK_OPTIONS "-Wl,--wrap=otPlatMessagePoolNew" APPEND)
-  idf_build_set_property(LINK_OPTIONS "-Wl,--wrap=otPlatMessagePoolFree" APPEND)
-  idf_build_set_property(LINK_OPTIONS "-Wl,--wrap=otPlatMessagePoolNumFreeBuffers" APPEND)
-  idf_build_set_property(LINK_OPTIONS "-Wl,--wrap=otPlatMessagePoolDeinit" APPEND)
-  target_link_libraries(${COMPONENT_LIB} INTERFACE
+
+  idf_build_set_property(
+    LINK_OPTIONS "-Wl,--wrap=otPlatMessagePoolInit" APPEND
+  )
+
+  idf_build_set_property(
+    LINK_OPTIONS "-Wl,--wrap=otPlatMessagePoolNew" APPEND
+  )
+
+  idf_build_set_property(
+    LINK_OPTIONS "-Wl,--wrap=otPlatMessagePoolFree" APPEND
+  )
+
+  idf_build_set_property(
+    LINK_OPTIONS "-Wl,--wrap=otPlatMessagePoolNumFreeBuffers" APPEND
+  )
+
+  idf_build_set_property(
+    LINK_OPTIONS "-Wl,--wrap=otPlatMessagePoolDeinit" APPEND
+  )
+
+  target_link_libraries(
+    ${COMPONENT_LIB}
+    INTERFACE
     "-u __wrap_otPlatMessagePoolInit"
     "-u __wrap_otPlatMessagePoolNew"
     "-u __wrap_otPlatMessagePoolFree"
     "-u __wrap_otPlatMessagePoolNumFreeBuffers"
-    "-u __wrap_otPlatMessagePoolDeinit")
+    "-u __wrap_otPlatMessagePoolDeinit"
+  )
+
 endif()
 
-# This function adds a dependency on the given component if the component is included into the build.
+#
+# This function adds a dependency on the given component if the component
+# is included into the build.
+#
 function(maybe_add_component component_name)
-    idf_build_get_property(components BUILD_COMPONENTS)
-    if (${component_name} IN_LIST components)
-        idf_component_get_property(lib_name ${component_name} COMPONENT_LIB)
-        target_link_libraries(${COMPONENT_LIB} PUBLIC ${lib_name})
-    endif()
+  idf_build_get_property(components BUILD_COMPONENTS)
+
+  if (${component_name} IN_LIST components)
+    idf_component_get_property(
+      lib_name
+      ${component_name}
+      COMPONENT_LIB
+    )
+
+    target_link_libraries(
+      ${COMPONENT_LIB}
+      PUBLIC
+      ${lib_name}
+    )
+  endif()
 endfunction()
 
 if(IDF_TARGET MATCHES "esp32s2|esp32s3|esp32p4" AND CONFIG_TINYUSB_ENABLED)
-    maybe_add_component(arduino_tinyusb)
+  maybe_add_component(arduino_tinyusb)
 endif()
-if(NOT CONFIG_ARDUINO_SELECTIVE_COMPILATION OR CONFIG_ARDUINO_SELECTIVE_ArduinoOTA)
-    maybe_add_component(esp_https_ota)
-endif()
-if(NOT CONFIG_ARDUINO_SELECTIVE_COMPILATION OR CONFIG_ARDUINO_SELECTIVE_ESP_SR)
-    maybe_add_component(espressif__esp_sr)
-endif()
-if(NOT CONFIG_ARDUINO_SELECTIVE_COMPILATION OR CONFIG_ARDUINO_SELECTIVE_Matter)
-    maybe_add_component(espressif__esp_matter)
 
+if(NOT CONFIG_ARDUINO_SELECTIVE_COMPILATION OR CONFIG_ARDUINO_SELECTIVE_ArduinoOTA)
+  maybe_add_component(esp_https_ota)
 endif()
+
+if(NOT CONFIG_ARDUINO_SELECTIVE_COMPILATION OR CONFIG_ARDUINO_SELECTIVE_ESP_SR)
+  maybe_add_component(espressif__esp_sr)
+endif()
+
+if(NOT CONFIG_ARDUINO_SELECTIVE_COMPILATION OR CONFIG_ARDUINO_SELECTIVE_Matter)
+  maybe_add_component(espressif__esp_matter)
+endif()
+
 if(NOT CONFIG_ARDUINO_SELECTIVE_COMPILATION OR CONFIG_ARDUINO_SELECTIVE_LittleFS)
-    maybe_add_component(joltwallet__littlefs)
+  maybe_add_component(joltwallet__littlefs)
 endif()
+
 if(NOT CONFIG_ARDUINO_SELECTIVE_COMPILATION OR CONFIG_ARDUINO_SELECTIVE_WiFiProv)
-    maybe_add_component(espressif__network_provisioning)
+  maybe_add_component(espressif__network_provisioning)
 endif()
+
 if(NOT CONFIG_ARDUINO_SELECTIVE_COMPILATION OR CONFIG_ARDUINO_SELECTIVE_ESP_Video)
-    if(IDF_TARGET STREQUAL "esp32s3" OR IDF_TARGET STREQUAL "esp32p4")
-        maybe_add_component(espressif__esp_video)
-    endif()
+  if(IDF_TARGET STREQUAL "esp32s3" OR IDF_TARGET STREQUAL "esp32p4")
+    maybe_add_component(espressif__esp_video)
+  endif()
 endif()
