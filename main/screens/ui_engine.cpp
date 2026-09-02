@@ -165,7 +165,7 @@ static void lv_engine_display(lv_updatable_screen_t *scr)
     lv_obj_t *main_label = lv_label_create(scr->screen);
     lv_obj_align(main_label, LV_ALIGN_CENTER, 0, 50);
 
-    lv_obj_set_style_text_font(main_label, &lv_font_montserrat_22, LV_PART_MAIN);#endif
+    lv_obj_set_style_text_font(main_label, &lv_font_montserrat_22, LV_PART_MAIN);
     lv_obj_set_style_text_color(main_label, lv_color_black(), LV_PART_MAIN);
     lv_label_set_text_static(main_label, "RPMx100");
 
