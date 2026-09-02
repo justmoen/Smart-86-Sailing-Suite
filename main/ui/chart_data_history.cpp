@@ -18,10 +18,6 @@ ChartDataHistory::ChartDataHistory(const char* key, int default_duration_min, in
         point_interval_ms = 2000;  // 2s fallback for smooth scrolling
     }
     
-#ifdef CONFIG_LOG_DEFAULT_LEVEL_INFO
-    Serial.printf("ChartHistory(%s,%dmin,%dpts): interval=%ums\n", key, duration_minutes, point_count, (unsigned)point_interval_ms);
-#endif
-    
     // Load saved duration from NVS
     Preferences prefs;
     prefs.begin(namespace_key.c_str(), true);

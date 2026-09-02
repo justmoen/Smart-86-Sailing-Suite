@@ -51,7 +51,7 @@ void signalk_ws_begin(const char* host, int port)
     // Do not force a subprotocol. SignalK accepts generic WebSocket connections
     // without a negotiated protocol; advertising "arduino" can be rejected by the
     // server and results in immediate reset/disconnects.
-    webSocket.begin(host, port, "/signalk/v1/stream", "");
+    webSocket.begin(host, port, "/signalk/v1/stream&subscribe=self&period=1000", "");
     webSocket.onEvent(webSocketEvent);
 
     // Newer SignalK versions enforce websocket ping/pong at the protocol level.

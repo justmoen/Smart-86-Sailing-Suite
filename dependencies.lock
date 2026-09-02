@@ -350,15 +350,15 @@ dependencies:
       type: service
     version: 1.5.11
   espressif/esp_hosted:
-    component_hash: 8ca10092db3e8c8122540d907ab705805a269377d31192f087ba1def2f5f4f91
+    component_hash: f970ce453bcd6e779e067de04488aa6212295f4a607f041d038844c8cf8edea3
     dependencies:
     - name: idf
       require: private
       version: '>=5.3'
     source:
-      registry_url: https://components.espressif.com
+      registry_url: https://components.espressif.com/
       type: service
-    version: 2.12.12
+    version: 2.12.11
   espressif/esp_lcd_touch:
     component_hash: 3f85a7d95af876f1a6ecca8eb90a81614890d0f03a038390804e5a77e2caf862
     dependencies:
@@ -749,9 +749,10 @@ direct_dependencies:
 - chmorgan/esp-audio-player
 - chmorgan/esp-file-iterator
 - espressif/arduino-esp32
+- espressif/esp_hosted
 - idf
 - lvgl/lvgl
 - waveshare/esp32_p4_wifi6_touch_lcd_4b
-manifest_hash: 80605b8e077fbff52e4f188371f3a5d1ef4dea76928512706a9993c0b81b6e74
+manifest_hash: 3849c27d434f41d954cf1f0457a1fdbaee0b835774e74e432197c534fe5a6513
 target: esp32p4
 version: 2.0.0

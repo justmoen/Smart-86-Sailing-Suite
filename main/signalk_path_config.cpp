@@ -14,7 +14,7 @@
 #include "ui_manager.h"
 
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "v0.7.22"
+#define FIRMWARE_VERSION "v0.7.23"
 #endif
 
 constexpr const char* kPrefsNamespace = "sk-config";
@@ -300,8 +300,8 @@ static bool perform_firmware_ota(const String& tag, String& error_message) {
     esp_https_ota_config_t ota_config = {};
     ota_config.http_config = &client_config;
     ota_config.bulk_flash_erase = false;
-    ota_config.partial_http_download = true;
-    ota_config.max_http_request_size = 65536;
+    ota_config.partial_http_download = false;
+    ota_config.max_http_request_size = 0;
 
     esp_err_t err = esp_https_ota(&ota_config);
     if (err != ESP_OK) {
@@ -537,11 +537,9 @@ void load_config_from_preferences() {
     // Load numeric thresholds
     config.engine_oil_pressure_enabled = load_bool_pref("eng_oil_enabled", true);
     config.engine_top_left_enabled = load_bool_pref_legacy("eng_tl_en", "eng_top_left_enabled", true);
-    Serial.printf("[DEBUG] config.engine_top_left_enabled loaded: value=%d, type=bool\n", config.engine_top_left_enabled ? 1 : 0);
     int top_left_metric = load_int_pref_legacy("eng_tl_met", "eng_top_left_metric", (int)EngineTopLeftMetric::SOG);
     if (top_left_metric < 0 || top_left_metric > 1) top_left_metric = (int)EngineTopLeftMetric::SOG;
     config.engine_top_left_metric = static_cast<EngineTopLeftMetric>(top_left_metric);
-    Serial.printf("[DEBUG] config.engine_top_left_metric loaded: raw=%d, enum=%d, type=int\n", top_left_metric, static_cast<int>(config.engine_top_left_metric));
     config.engine_top_right_enabled = load_bool_pref_legacy("eng_tr_en", "eng_top_right_enabled", true);
     int top_right_metric = load_int_pref_legacy("eng_tr_met", "eng_top_right_metric", (int)EngineTopRightMetric::AlternatorVoltage);
     if (top_right_metric < 0 || top_right_metric > 1) top_right_metric = (int)EngineTopRightMetric::AlternatorVoltage;

@@ -6,3 +6,5 @@ dependencies:
   espressif/arduino-esp32:
     version: ^3.3.0
     public: true
+  espressif/esp_hosted:
+    version: "==2.12.11"
