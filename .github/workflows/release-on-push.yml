@@ -26,10 +26,22 @@ jobs:
       - name: Build ESP32-P4 firmware
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v5.5.3
+          esp_idf_version: v5.5.5
           target: esp32p4         # 🚀 Tells the action container to export esp32p4
           command: |
+            # 1. Completely clear out temporary environment leftovers
+            rm -rf build sdkconfig
+            
+            # 2. Re-establish the baseline target architectural profile 
             idf.py set-target esp32p4
+            
+            # 3. Force-append your precise v1.3 text parameters into the active configuration
+            cat sdkconfig.defaults >> sdkconfig
+            
+            # 4. CRITICAL: Force the compiler to re-evaluate eFuse/PMU flags for v1.x silicon
+            idf.py reconfigure
+            
+            # 5. Compile the final binary conforming to your v1.3 hardware parameters
             idf.py build
 
       - name: Create GitHub release

@@ -14,7 +14,7 @@
 #include "ui_manager.h"
 
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "v0.6.0"
+#define FIRMWARE_VERSION "v0.7.22"
 #endif
 
 constexpr const char* kPrefsNamespace = "sk-config";
