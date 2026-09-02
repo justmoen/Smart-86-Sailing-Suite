@@ -23,12 +23,636 @@ jobs:
           esp_idf_version: v5.5.3
           target: esp32p4
           command: |
-            idf.py set-target esp32p4
-            idf.py reconfigure
-            echo "=== ARDUINO SSL SOURCES ==="
-            grep -n -A5 -B2 "ARDUINO_LIBRARY_NetworkClientSecure_SRCS" components/arduino-esp32/CMakeLists.txt
-            echo "=== GENERATED SOURCES ==="
-            grep -R "ssl_client.cpp" build/esp-idf/arduino-esp32 2>/dev/null | head -20
-            echo "=== ARCHIVE ==="
-            ar t build/esp-idf/arduino-esp32/libarduino-esp32.a 2>/dev/null | grep -E "ssl_client|NetworkClientSecure"
+            set -o pipefail
 
+            echo ""
+            echo "============================================================"
+            echo "ENVIRONMENT"
+            echo "============================================================"
+
+            pwd
+
+            echo ""
+            echo "--- Git ---"
+            git status --short || true
+            git rev-parse HEAD || true
+
+            echo ""
+            echo "--- ESP-IDF ---"
+            idf.py --version || true
+
+            echo ""
+            echo "--- Python ---"
+            python3 --version || true
+
+            echo ""
+            echo "--- CMake ---"
+            cmake --version | head -1 || true
+
+            echo ""
+            echo "--- Ninja ---"
+            ninja --version || true
+
+            echo ""
+            echo "--- GCC ---"
+            gcc --version | head -1 || true
+
+            echo ""
+            echo "--- G++ ---"
+            g++ --version | head -1 || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "ARDUINO COMPONENT"
+            echo "============================================================"
+
+            echo ""
+            echo "--- Arduino component directory ---"
+            ls -la components/arduino-esp32 || true
+
+            echo ""
+            echo "--- Arduino component manifest ---"
+            if [ -f components/arduino-esp32/idf_component.yml ]; then
+              cat components/arduino-esp32/idf_component.yml
+            else
+              echo "No components/arduino-esp32/idf_component.yml"
+            fi
+
+            echo ""
+            echo "--- Arduino CMake file ---"
+            wc -l components/arduino-esp32/CMakeLists.txt || true
+
+            echo ""
+            echo "--- Arduino CMake SHA256 ---"
+            sha256sum components/arduino-esp32/CMakeLists.txt || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "PHYSICAL SSL SOURCE CHECK"
+            echo "============================================================"
+
+            echo ""
+            echo "--- NetworkClientSecure source directory ---"
+            ls -la \
+              components/arduino-esp32/libraries/NetworkClientSecure/src \
+              2>/dev/null || true
+
+            echo ""
+            echo "--- SSL source files physically present ---"
+            find components/arduino-esp32 \
+              -type f \
+              \( \
+                -name 'ssl_client.cpp' \
+                -o -name 'NetworkClientSecure.cpp' \
+              \) \
+              -print 2>/dev/null | sort || true
+
+            echo ""
+            echo "--- Git tracked SSL source files ---"
+            git ls-files \
+              'components/arduino-esp32/libraries/NetworkClientSecure/*' \
+              || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "ARDUINO CMAKE SOURCE DECLARATIONS"
+            echo "============================================================"
+
+            echo ""
+            echo "--- ARDUINO_ALL_LIBRARIES ---"
+            grep -n \
+              -A60 \
+              -B5 \
+              "set(ARDUINO_ALL_LIBRARIES" \
+              components/arduino-esp32/CMakeLists.txt \
+              || true
+
+            echo ""
+            echo "--- NetworkClientSecure declaration ---"
+            grep -n \
+              -A8 \
+              -B5 \
+              "ARDUINO_LIBRARY_NetworkClientSecure_SRCS" \
+              components/arduino-esp32/CMakeLists.txt \
+              || true
+
+            echo ""
+            echo "--- SSL source references anywhere in CMakeLists.txt ---"
+            grep -n \
+              -E \
+              "ssl_client\.cpp|NetworkClientSecure\.cpp" \
+              components/arduino-esp32/CMakeLists.txt \
+              || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "ESP-IDF CONFIGURATION"
+            echo "============================================================"
+
+            echo ""
+            echo "--- Arduino selective compilation settings ---"
+            grep -E \
+              '^CONFIG_ARDUINO_SELECTIVE|^CONFIG_ARDUINO_VARIANT|^CONFIG_AUTOSTART_ARDUINO' \
+              sdkconfig \
+              2>/dev/null \
+              | sort || true
+
+            echo ""
+            echo "--- TLS / mbedTLS settings ---"
+            grep -E \
+              '^(CONFIG_MBEDTLS|CONFIG_ESP_TLS|CONFIG_ARDUINO)' \
+              sdkconfig \
+              2>/dev/null \
+              | sort || true
+
+            echo ""
+            echo "--- Target ---"
+            grep -E \
+              '^CONFIG_IDF_TARGET|^CONFIG_IDF_TARGET_ARCH' \
+              sdkconfig \
+              2>/dev/null \
+              || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "CONFIGURE / REGENERATE"
+            echo "============================================================"
+
+            echo ""
+            echo "--- Running set-target ---"
+            idf.py set-target esp32p4
+
+            echo ""
+            echo "--- Running reconfigure ---"
+            idf.py reconfigure
+
+
+            echo ""
+            echo "============================================================"
+            echo "POST-CONFIGURE CMAKE CACHE"
+            echo "============================================================"
+
+            echo ""
+            echo "--- IDF version ---"
+            grep -E \
+              'IDF_VERSION|IDF_TARGET' \
+              build/CMakeCache.txt \
+              2>/dev/null \
+              | head -50 || true
+
+            echo ""
+            echo "--- Arduino component references in cache ---"
+            grep -R -n \
+              "arduino-esp32" \
+              build/CMakeCache.txt \
+              build/esp-idf \
+              2>/dev/null \
+              | head -100 || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "GENERATED ARDUINO BUILD DIRECTORY"
+            echo "============================================================"
+
+            echo ""
+            echo "--- Arduino directories ---"
+            find build \
+              -maxdepth 5 \
+              -type d \
+              -iname '*arduino*' \
+              -print 2>/dev/null \
+              | sort \
+              | head -200 || true
+
+            echo ""
+            echo "--- Arduino files ---"
+            find build/esp-idf/arduino-esp32 \
+              -maxdepth 4 \
+              -type f \
+              -print 2>/dev/null \
+              | sort \
+              | head -500 || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "GENERATED SOURCE REFERENCES"
+            echo "============================================================"
+
+            echo ""
+            echo "--- ssl_client.cpp references in entire build ---"
+            grep -R -n \
+              "ssl_client\.cpp" \
+              build \
+              2>/dev/null \
+              | head -300 || true
+
+            echo ""
+            echo "--- NetworkClientSecure.cpp references in entire build ---"
+            grep -R -n \
+              "NetworkClientSecure\.cpp" \
+              build \
+              2>/dev/null \
+              | head -300 || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "BUILD.NINJA"
+            echo "============================================================"
+
+            echo ""
+            echo "--- SSL references in build.ninja ---"
+            grep -n \
+              -E \
+              "ssl_client\.cpp|NetworkClientSecure\.cpp" \
+              build/build.ninja \
+              2>/dev/null \
+              | head -200 || true
+
+            echo ""
+            echo "--- Arduino library references in build.ninja ---"
+            grep -n \
+              "arduino-esp32" \
+              build/build.ninja \
+              2>/dev/null \
+              | head -200 || true
+
+            echo ""
+            echo "--- libarduino references in build.ninja ---"
+            grep -n \
+              "libarduino" \
+              build/build.ninja \
+              2>/dev/null \
+              | head -200 || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "ARDUINO TARGET / DEPENDENCY INFORMATION"
+            echo "============================================================"
+
+            echo ""
+            echo "--- CMakeFiles ---"
+            find build/esp-idf/arduino-esp32/CMakeFiles \
+              -maxdepth 4 \
+              -type f \
+              -print 2>/dev/null \
+              | sort \
+              | head -500 || true
+
+            echo ""
+            echo "--- DependInfo.cmake ---"
+            find build/esp-idf/arduino-esp32 \
+              -type f \
+              -name 'DependInfo.cmake' \
+              -print \
+              -exec sh -c '
+                for f do
+                  echo "--- $f"
+                  cat "$f"
+                done
+              ' sh {} + \
+              2>/dev/null \
+              | head -1000 || true
+
+            echo ""
+            echo "--- Response files ---"
+            find build/esp-idf/arduino-esp32 \
+              -type f \
+              \( \
+                -name '*.rsp' \
+                -o -name '*.d' \
+              \) \
+              -print 2>/dev/null \
+              | sort \
+              | head -500 || true
+
+            echo ""
+            echo "--- SSL references in dependency files ---"
+            grep -R -n \
+              -E \
+              "ssl_client|NetworkClientSecure" \
+              build/esp-idf/arduino-esp32/CMakeFiles \
+              2>/dev/null \
+              | head -300 || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "SSL OBJECT FILES"
+            echo "============================================================"
+
+            find build \
+              -type f \
+              \( \
+                -name '*ssl_client*.o' \
+                -o -name '*ssl_client*.obj' \
+                -o -name '*NetworkClientSecure*.o' \
+                -o -name '*NetworkClientSecure*.obj' \
+              \) \
+              -print 2>/dev/null \
+              | sort || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "ALL ARDUINO OBJECT FILES"
+            echo "============================================================"
+
+            find build/esp-idf/arduino-esp32 \
+              -type f \
+              \( \
+                -name '*.o' \
+                -o -name '*.obj' \
+              \) \
+              -print 2>/dev/null \
+              | sort \
+              | head -1000 || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "ARDUINO STATIC LIBRARIES"
+            echo "============================================================"
+
+            find build \
+              -type f \
+              -name '*.a' \
+              -print 2>/dev/null \
+              | sort \
+              | grep -E \
+                'arduino|Network|WiFi|ssl|mbedtls' \
+              || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "ARDUINO ARCHIVE CONTENTS"
+            echo "============================================================"
+
+            find build \
+              -type f \
+              -name 'libarduino-esp32.a' \
+              -exec sh -c '
+                for archive do
+                  echo ""
+                  echo "--- ARCHIVE: $archive"
+                  echo "--- Matching SSL members:"
+                  ar t "$archive" 2>/dev/null |
+                    grep -E \
+                    "ssl_client|NetworkClientSecure" \
+                    || true
+                done
+              ' sh {} + || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "ARDUINO ARCHIVE SYMBOLS"
+            echo "============================================================"
+
+            find build \
+              -type f \
+              -name 'libarduino-esp32.a' \
+              -exec sh -c '
+                for archive do
+                  echo ""
+                  echo "--- ARCHIVE: $archive"
+
+                  nm -C "$archive" 2>/dev/null |
+                    grep -E \
+                    "stop_ssl_socket|send_ssl_data|send_net_data|data_to_read|peek_net_receive|get_ssl_receive|get_net_receive|ssl_init|start_ssl_client|ssl_starttls_handshake|attach_ssl_certificate_bundle|verify_ssl_fingerprint" \
+                    || true
+                done
+              ' sh {} + || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "SSL OBJECT SYMBOLS"
+            echo "============================================================"
+
+            find build \
+              -type f \
+              \( \
+                -name '*ssl_client*.o' \
+                -o -name '*ssl_client*.obj' \
+              \) \
+              -exec sh -c '
+                for obj do
+                  echo ""
+                  echo "--- OBJECT: $obj"
+
+                  nm -C "$obj" 2>/dev/null |
+                    grep -E \
+                    "stop_ssl_socket|send_ssl_data|send_net_data|data_to_read|peek_net_receive|get_ssl_receive|get_net_receive|ssl_init|start_ssl_client|ssl_starttls_handshake|attach_ssl_certificate_bundle|verify_ssl_fingerprint" \
+                    || true
+                done
+              ' sh {} + || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "NETWORKCLIENTSECURE OBJECT SYMBOLS"
+            echo "============================================================"
+
+            find build \
+              -type f \
+              \( \
+                -name '*NetworkClientSecure*.o' \
+                -o -name '*NetworkClientSecure*.obj' \
+              \) \
+              -exec sh -c '
+                for obj do
+                  echo ""
+                  echo "--- OBJECT: $obj"
+
+                  nm -C "$obj" 2>/dev/null |
+                    grep -E \
+                    "stop_ssl_socket|send_ssl_data|send_net_data|data_to_read|peek_net_receive|get_ssl_receive|get_net_receive|ssl_init|start_ssl_client|ssl_starttls_handshake|attach_ssl_certificate_bundle|verify_ssl_fingerprint" \
+                    || true
+                done
+              ' sh {} + || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "ALL SSL SYMBOLS IN ARDUINO ARCHIVE"
+            echo "============================================================"
+
+            find build \
+              -type f \
+              -name 'libarduino-esp32.a' \
+              -exec sh -c '
+                for archive do
+                  echo ""
+                  echo "--- SSL symbol table: $archive"
+
+                  nm -C "$archive" 2>/dev/null |
+                    grep -i \
+                    -E \
+                    "ssl|tls|net_receive|send_net|data_to_read|peek_net" \
+                    | head -500 \
+                    || true
+                done
+              ' sh {} + || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "BUILD TARGET INFORMATION"
+            echo "============================================================"
+
+            echo ""
+            echo "--- Arduino library target ---"
+            grep -R -n \
+              "libarduino-esp32\.a" \
+              build/esp-idf/arduino-esp32 \
+              build/build.ninja \
+              2>/dev/null \
+              | head -300 || true
+
+            echo ""
+            echo "--- Arduino component target ---"
+            grep -R -n \
+              "__idf_arduino-esp32\|arduino-esp32" \
+              build/esp-idf/arduino-esp32/CMakeFiles \
+              2>/dev/null \
+              | head -300 || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "FINAL LINK COMMAND REFERENCES"
+            echo "============================================================"
+
+            echo ""
+            echo "--- Arduino archive references in entire build ---"
+            grep -R -n \
+              "libarduino-esp32\.a" \
+              build \
+              2>/dev/null \
+              | head -500 || true
+
+            echo ""
+            echo "--- SSL symbol references in generated build files ---"
+            grep -R -n \
+              -E \
+              "stop_ssl_socket|send_ssl_data|send_net_data|data_to_read|peek_net_receive|get_ssl_receive|get_net_receive|ssl_init|start_ssl_client|ssl_starttls_handshake|attach_ssl_certificate_bundle|verify_ssl_fingerprint" \
+              build \
+              2>/dev/null \
+              | head -500 || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "FINAL ELF / MAP FILES"
+            echo "============================================================"
+
+            echo ""
+            echo "--- ELF files ---"
+            find build \
+              -type f \
+              -name '*.elf' \
+              -print 2>/dev/null \
+              | sort || true
+
+            echo ""
+            echo "--- MAP files ---"
+            find build \
+              -type f \
+              -name '*.map' \
+              -print 2>/dev/null \
+              | sort || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "FINAL ELF SSL SYMBOLS"
+            echo "============================================================"
+
+            find build \
+              -type f \
+              -name '*.elf' \
+              -exec sh -c '
+                for elf do
+                  echo ""
+                  echo "--- ELF: $elf"
+
+                  nm -C "$elf" 2>/dev/null |
+                    grep -E \
+                    "stop_ssl_socket|send_ssl_data|send_net_data|data_to_read|peek_net_receive|get_ssl_receive|get_net_receive|ssl_init|start_ssl_client|ssl_starttls_handshake|attach_ssl_certificate_bundle|verify_ssl_fingerprint" \
+                    || true
+                done
+              ' sh {} + || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "FINAL MAP SSL SYMBOL REFERENCES"
+            echo "============================================================"
+
+            find build \
+              -type f \
+              -name '*.map' \
+              -exec sh -c '
+                for map do
+                  echo ""
+                  echo "--- MAP: $map"
+
+                  grep -n -E \
+                    "stop_ssl_socket|send_ssl_data|send_net_data|data_to_read|peek_net_receive|get_ssl_receive|get_net_receive|ssl_init|start_ssl_client|ssl_starttls_handshake|attach_ssl_certificate_bundle|verify_ssl_fingerprint" \
+                    "$map" \
+                    2>/dev/null \
+                    | head -300 \
+                    || true
+                done
+              ' sh {} + || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "CMAKE GENERATED SOURCE COUNTS"
+            echo "============================================================"
+
+            echo ""
+            echo "--- Count ssl_client.cpp references ---"
+            grep -R \
+              -l \
+              "ssl_client\.cpp" \
+              build \
+              2>/dev/null \
+              | wc -l || true
+
+            echo ""
+            echo "--- Count NetworkClientSecure.cpp references ---"
+            grep -R \
+              -l \
+              "NetworkClientSecure\.cpp" \
+              build \
+              2>/dev/null \
+              | wc -l || true
+
+            echo ""
+            echo "--- Count SSL object files ---"
+            find build \
+              -type f \
+              \( \
+                -name '*ssl_client*.o' \
+                -o -name '*ssl_client*.obj' \
+              \) \
+              2>/dev/null \
+              | wc -l || true
+
+
+            echo ""
+            echo "============================================================"
+            echo "DONE"
+            echo "============================================================"
