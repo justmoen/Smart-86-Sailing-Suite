@@ -17,7 +17,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Debug Arduino SSL build
+      - name: Debug Arduino SSL compile
         uses: espressif/esp-idf-ci-action@v1
         with:
           esp_idf_version: v5.5.3
@@ -26,161 +26,84 @@ jobs:
             set -o pipefail
 
             echo "============================================================"
-            echo "1. ENVIRONMENT"
-            echo "============================================================"
-            pwd
-            git rev-parse HEAD
-            idf.py --version
-            python3 --version
-            cmake --version | head -1
-            ninja --version
-
-            echo "============================================================"
-            echo "2. ARDUINO SOURCE FILES"
-            echo "============================================================"
-
-            echo "--- NetworkClientSecure directory ---"
-            ls -la components/arduino-esp32/libraries/NetworkClientSecure/src
-
-            echo "--- ssl_client.cpp ---"
-            ls -l components/arduino-esp32/libraries/NetworkClientSecure/src/ssl_client.cpp
-
-            echo "--- NetworkClientSecure.cpp ---"
-            ls -l components/arduino-esp32/libraries/NetworkClientSecure/src/NetworkClientSecure.cpp
-
-            echo "--- Git tracked files ---"
-            git ls-files components/arduino-esp32/libraries/NetworkClientSecure/src/
-
-            echo "============================================================"
-            echo "3. ARDUINO CMAKE"
-            echo "============================================================"
-
-            echo "--- CMakeLists version ---"
-            wc -l components/arduino-esp32/CMakeLists.txt
-            sha256sum components/arduino-esp32/CMakeLists.txt
-
-            echo "--- SSL source declaration ---"
-            grep -n "ssl_client.cpp" components/arduino-esp32/CMakeLists.txt || true
-
-            echo "--- NetworkClientSecure declaration ---"
-            grep -n "NetworkClientSecure.cpp" components/arduino-esp32/CMakeLists.txt || true
-
-            echo "--- Selective compilation ---"
-            grep -n "ARDUINO_SELECTIVE" components/arduino-esp32/CMakeLists.txt || true
-
-            echo "============================================================"
-            echo "4. SDKCONFIG"
-            echo "============================================================"
-
-            echo "--- Arduino settings ---"
-            grep CONFIG_ARDUINO sdkconfig || true
-
-            echo "--- mbedTLS settings ---"
-            grep CONFIG_MBEDTLS sdkconfig || true
-
-            echo "--- ESP TLS settings ---"
-            grep CONFIG_ESP_TLS sdkconfig || true
-
-            echo "--- Target ---"
-            grep CONFIG_IDF_TARGET sdkconfig || true
-
-            echo "============================================================"
-            echo "5. CONFIGURE"
+            echo "CONFIGURE"
             echo "============================================================"
 
             idf.py set-target esp32p4
             idf.py reconfigure
 
             echo "============================================================"
-            echo "6. GENERATED ARDUINO DIRECTORY"
+            echo "SSL NINJA RULE"
             echo "============================================================"
 
-            find build/esp-idf -maxdepth 2 -type d -print | sort
+            grep -n -A8 -B2 "ssl_client.cpp.obj" build/build.ninja || true
 
             echo "============================================================"
-            echo "7. GENERATED ARDUINO FILES"
+            echo "NINJA QUERY"
             echo "============================================================"
 
-            find build/esp-idf/arduino-esp32 -type f -print 2>/dev/null | sort || true
+            ninja -C build -t query esp-idf/arduino-esp32/CMakeFiles/__idf_arduino-esp32.dir/libraries/NetworkClientSecure/src/ssl_client.cpp.obj || true
 
             echo "============================================================"
-            echo "8. SSL SOURCE IN BUILD FILES"
+            echo "NINJA TARGETS"
             echo "============================================================"
 
-            grep -R -n "ssl_client.cpp" build/esp-idf/arduino-esp32 2>/dev/null || true
+            ninja -C build -t targets all | grep arduino-esp32 || true
 
             echo "============================================================"
-            echo "9. NETWORKCLIENTSECURE SOURCE IN BUILD FILES"
+            echo "TRY BUILDING SSL OBJECT DIRECTLY"
             echo "============================================================"
 
-            grep -R -n "NetworkClientSecure.cpp" build/esp-idf/arduino-esp32 2>/dev/null || true
+            ninja -C build -v \
+              esp-idf/arduino-esp32/CMakeFiles/__idf_arduino-esp32.dir/libraries/NetworkClientSecure/src/ssl_client.cpp.obj
 
             echo "============================================================"
-            echo "10. BUILD.NINJA"
+            echo "OBJECT AFTER DIRECT BUILD"
             echo "============================================================"
 
-            grep -n "ssl_client.cpp" build/build.ninja 2>/dev/null || true
+            ls -lh \
+              build/esp-idf/arduino-esp32/CMakeFiles/__idf_arduino-esp32.dir/libraries/NetworkClientSecure/src/ssl_client.cpp.obj \
+              2>/dev/null || true
 
             echo "============================================================"
-            echo "11. ARDUINO OBJECT FILES"
+            echo "OBJECT SYMBOLS"
             echo "============================================================"
 
-            find build/esp-idf/arduino-esp32 -type f -name "*.o" -print 2>/dev/null | sort
+            nm -C \
+              build/esp-idf/arduino-esp32/CMakeFiles/__idf_arduino-esp32.dir/libraries/NetworkClientSecure/src/ssl_client.cpp.obj \
+              2>/dev/null | grep ssl || true
 
             echo "============================================================"
-            echo "12. SSL OBJECT FILES"
+            echo "BUILD ARDUINO ARCHIVE"
             echo "============================================================"
 
-            find build -type f -name "*ssl_client*.o" -print 2>/dev/null | sort
+            ninja -C build -v \
+              esp-idf/arduino-esp32/libarduino-esp32.a
 
             echo "============================================================"
-            echo "13. ARDUINO ARCHIVE"
+            echo "ARCHIVE"
             echo "============================================================"
 
-            find build -type f -name "libarduino-esp32.a" -print 2>/dev/null
+            ls -lh build/esp-idf/arduino-esp32/libarduino-esp32.a
 
             echo "============================================================"
-            echo "14. ARCHIVE MEMBERS"
+            echo "ARCHIVE SSL MEMBERS"
             echo "============================================================"
 
-            find build -type f -name "libarduino-esp32.a" -print 2>/dev/null | while read archive
-            do
-              echo "ARCHIVE: $archive"
-              ar t "$archive" | grep ssl_client || true
-              ar t "$archive" | grep NetworkClientSecure || true
-            done
+            ar t build/esp-idf/arduino-esp32/libarduino-esp32.a | grep ssl_client || true
 
             echo "============================================================"
-            echo "15. ARCHIVE SYMBOLS"
+            echo "ARCHIVE SSL SYMBOLS"
             echo "============================================================"
 
-            find build -type f -name "libarduino-esp32.a" -print 2>/dev/null | while read archive
-            do
-              echo "ARCHIVE: $archive"
-              nm -C "$archive" | grep stop_ssl_socket || true
-              nm -C "$archive" | grep start_ssl_client || true
-              nm -C "$archive" | grep send_ssl_data || true
-              nm -C "$archive" | grep ssl_init || true
-            done
+            nm -C build/esp-idf/arduino-esp32/libarduino-esp32.a \
+              | grep stop_ssl_socket || true
 
-            echo "============================================================"
-            echo "16. FINAL RESULT"
-            echo "============================================================"
+            nm -C build/esp-idf/arduino-esp32/libarduino-esp32.a \
+              | grep start_ssl_client || true
 
-            echo "If ssl_client.cpp appears in CMakeLists but NOT in build.ninja:"
-            echo "  -> CMake source aggregation problem"
-
-            echo "If ssl_client.cpp appears in build.ninja but no .o exists:"
-            echo "  -> compile/build problem"
-
-            echo "If .o exists but is absent from libarduino-esp32.a:"
-            echo "  -> archive problem"
-
-            echo "If archive contains ssl_client object but symbols are U:"
-            echo "  -> compilation/preprocessor problem"
-
-            echo "If archive contains T definitions:"
-            echo "  -> source compiled correctly; investigate link ordering"
+            nm -C build/esp-idf/arduino-esp32/libarduino-esp32.a \
+              | grep send_ssl_data || true
 
             echo "============================================================"
             echo "DONE"
