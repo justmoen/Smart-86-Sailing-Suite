@@ -147,7 +147,6 @@ license: LGPL-2.1
 repository: git://github.com/espressif/arduino-esp32.git
 repository_info:
   commit_sha: 759892884f915b0627b1c41f08264b7bb037a92c
-  path: .
 tags:
 - arduino
 targets:
