@@ -4,15 +4,19 @@ cmake_minimum_required(VERSION 3.16)
 # Arduino-ESP32 component
 # ============================================================
 
-if(NOT IDF_VERSION)
-  message(FATAL_ERROR "IDF_VERSION is not defined")
-endif()
-
-if(IDF_VERSION VERSION_LESS "5.3.0" OR IDF_VERSION VERSION_GREATER_EQUAL "6.2.0")
-  message(FATAL_ERROR
-    "Arduino-ESP32 requires ESP-IDF >= 5.3.0 and < 6.2.0. "
-    "Detected IDF_VERSION=${IDF_VERSION}"
-  )
+# ESP-IDF performs a preliminary component-requirements scan
+# before IDF_VERSION is necessarily defined.
+#
+# Therefore, do not fail if IDF_VERSION is unavailable during
+# that scan. The normal configuration pass will perform the
+# version check when IDF_VERSION is defined.
+if(DEFINED IDF_VERSION)
+  if(IDF_VERSION VERSION_LESS "5.3.0" OR IDF_VERSION VERSION_GREATER_EQUAL "6.2.0")
+    message(FATAL_ERROR
+      "Arduino-ESP32 requires ESP-IDF >= 5.3.0 and < 6.2.0. "
+      "Detected IDF_VERSION=${IDF_VERSION}"
+    )
+  endif()
 endif()
 
 # ============================================================
@@ -404,10 +408,10 @@ set(srcs
 # ============================================================
 # Diagnostics
 #
-# These are intentionally limited to message()/list operations.
-# Do not perform filesystem checks or target-property queries
-# here because ESP-IDF evaluates this file during its component
-# requirements scan as well as the normal configuration pass.
+# These diagnostics intentionally use only CMake message/list
+# operations. ESP-IDF evaluates this file during its preliminary
+# component-requirements scan, so filesystem and target queries
+# are deliberately kept out of this file.
 # ============================================================
 
 message(STATUS "")
