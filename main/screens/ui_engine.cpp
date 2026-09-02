@@ -113,6 +113,10 @@ static void lv_engine_display(lv_updatable_screen_t *scr)
     state->engine_rpm_scale = lv_scale_create(scr->screen);
     lv_obj_set_size(state->engine_rpm_scale, 680, 680);
     lv_obj_center(state->engine_rpm_scale);
+
+    // Add these lines right after initializing state->engine_rpm_scale:
+    lv_obj_set_style_text_font(state->engine_rpm_scale, &lv_font_montserrat_32, LV_PART_INDICATOR);
+    lv_obj_set_style_pad_radial(state->engine_rpm_scale, 15, LV_PART_INDICATOR);
     
     // Enable visible solid grey background drawing for the scale face
     lv_obj_set_style_bg_color(state->engine_rpm_scale, lv_color_hex(0xD0D0D0), LV_PART_MAIN);
@@ -161,9 +165,7 @@ static void lv_engine_display(lv_updatable_screen_t *scr)
     lv_obj_t *main_label = lv_label_create(scr->screen);
     lv_obj_align(main_label, LV_ALIGN_CENTER, 0, 50);
 
-#if LV_FONT_MONTSERRAT_22
-    lv_obj_set_style_text_font(main_label, &lv_font_montserrat_22, LV_PART_MAIN);
-#endif
+    lv_obj_set_style_text_font(main_label, &lv_font_montserrat_22, LV_PART_MAIN);#endif
     lv_obj_set_style_text_color(main_label, lv_color_black(), LV_PART_MAIN);
     lv_label_set_text_static(main_label, "RPMx100");
 
@@ -179,6 +181,10 @@ static void lv_engine_display(lv_updatable_screen_t *scr)
         lv_obj_set_style_border_width(state->oil_press_scale, 2, LV_PART_MAIN);
         lv_obj_set_style_border_opa(state->oil_press_scale, LV_OPA_COVER, LV_PART_MAIN);
 
+        // Add these lines right after initializing state->oil_press_scale:
+        lv_obj_set_style_text_color(state->oil_press_scale, lv_color_black(), LV_PART_INDICATOR);
+        lv_obj_set_style_text_font(state->oil_press_scale, &lv_font_montserrat_24, LV_PART_INDICATOR);
+        lv_obj_set_style_pad_radial(state->oil_press_scale, 10, LV_PART_INDICATOR);
         
         // Background face config
         lv_obj_set_style_bg_color(state->oil_press_scale, lv_color_hex(0xD0D0D0), LV_PART_MAIN);
@@ -217,9 +223,7 @@ static void lv_engine_display(lv_updatable_screen_t *scr)
         lv_obj_t *oil_press_label = lv_label_create(scr->screen);
         lv_obj_align(oil_press_label, LV_ALIGN_CENTER, -125, 280);
 
-#if LV_FONT_MONTSERRAT_32
         lv_obj_set_style_text_font(oil_press_label, &lv_font_montserrat_32, LV_PART_MAIN);
-#endif
         lv_obj_set_style_text_color(oil_press_label, lv_color_black(), LV_PART_MAIN);
         lv_label_set_text_static(oil_press_label, "psi");
     }
@@ -239,6 +243,9 @@ static void lv_engine_display(lv_updatable_screen_t *scr)
     lv_obj_set_style_border_width(state->eng_temp_scale, 2, LV_PART_MAIN);
     lv_obj_set_style_border_opa(state->eng_temp_scale, LV_OPA_COVER, LV_PART_MAIN);
 
+    lv_obj_set_style_text_color(state->eng_temp_scale, lv_color_black(), LV_PART_INDICATOR);
+    lv_obj_set_style_text_font(state->eng_temp_scale, &lv_font_montserrat_24, LV_PART_INDICATOR);
+    lv_obj_set_style_pad_radial(state->eng_temp_scale, 10, LV_PART_INDICATOR);
     
     // Background face color parameters
     lv_obj_set_style_bg_color(state->eng_temp_scale, lv_color_hex(0xD0D0D0), LV_PART_MAIN);
