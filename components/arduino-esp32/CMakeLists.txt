@@ -1,140 +1,138 @@
-#
-# Check ESP-IDF version and error out if it is not in the supported range.
-#
-# Note for arduino-esp32 developers: to bypass the version check locally,
-# set ARDUINO_SKIP_IDF_VERSION_CHECK environment variable to 1. For example:
-#   export ARDUINO_SKIP_IDF_VERSION_CHECK=1
-#   idf.py build
-#
+cmake_minimum_required(VERSION 3.16)
 
-set(min_supported_idf_version "5.3.0")
-set(max_supported_idf_version "6.1.99")
-set(idf_version "${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}.${IDF_VERSION_PATCH}")
+# ============================================================
+# Arduino-ESP32 component
+# ============================================================
 
-if ("${idf_version}" AND NOT "$ENV{ARDUINO_SKIP_IDF_VERSION_CHECK}")
-  if (idf_version VERSION_LESS min_supported_idf_version)
-    message(FATAL_ERROR "Arduino-esp32 can be used with ESP-IDF versions "
-                        "between ${min_supported_idf_version} and ${max_supported_idf_version}, "
-                        "but an older version is detected: ${idf_version}.")
-  endif()
-
-  if (idf_version VERSION_GREATER max_supported_idf_version)
-    message(FATAL_ERROR "Arduino-esp32 can be used with ESP-IDF versions "
-                        "between ${min_supported_idf_version} and ${max_supported_idf_version}, "
-                        "but a newer version is detected: ${idf_version}.")
-  endif()
+if(NOT IDF_VERSION)
+  message(FATAL_ERROR "IDF_VERSION is not defined")
 endif()
+
+if(IDF_VERSION VERSION_LESS "5.3.0" OR IDF_VERSION VERSION_GREATER_EQUAL "6.2.0")
+  message(FATAL_ERROR
+    "Arduino-ESP32 requires ESP-IDF >= 5.3.0 and < 6.2.0. "
+    "Detected IDF_VERSION=${IDF_VERSION}"
+  )
+endif()
+
+# ============================================================
+# Core Arduino sources
+# ============================================================
 
 set(CORE_SRCS
   cores/esp32/base64.cpp
   cores/esp32/cbuf.cpp
-  cores/esp32/ColorFormat.c
-  cores/esp32/chip-debug-report.cpp
   cores/esp32/esp32-hal-adc.c
   cores/esp32/esp32-hal-bt.c
   cores/esp32/esp32-hal-cpu.c
   cores/esp32/esp32-hal-dac.c
   cores/esp32/esp32-hal-gpio.c
-  cores/esp32/esp32-hal-hosted.c
   cores/esp32/esp32-hal-i2c.c
-  cores/esp32/esp32-hal-i2c-ng.c
-  cores/esp32/esp32-hal-i2c-slave.c
   cores/esp32/esp32-hal-ledc.c
-  cores/esp32/esp32-hal-log-wrapper.c
   cores/esp32/esp32-hal-matrix.c
   cores/esp32/esp32-hal-misc.c
-  cores/esp32/esp32-hal-periman.c
-  cores/esp32/esp32-hal-ldo.c
   cores/esp32/esp32-hal-psram.c
-  cores/esp32/esp32-hal-rgb-led.c
+  cores/esp32/esp32-hal-rmt.c
   cores/esp32/esp32-hal-sigmadelta.c
   cores/esp32/esp32-hal-spi.c
   cores/esp32/esp32-hal-time.c
   cores/esp32/esp32-hal-timer.c
-  cores/esp32/esp32-hal-tinyusb.c
   cores/esp32/esp32-hal-touch.c
-  cores/esp32/esp32-hal-touch-ng.c
   cores/esp32/esp32-hal-uart.c
-  cores/esp32/esp32-hal-rmt.c
-  cores/esp32/Esp.cpp
-  cores/esp32/freertos_stats.cpp
-  cores/esp32/FunctionalInterrupt.cpp
-  cores/esp32/HardwareSerial.cpp
-  cores/esp32/HashBuilder.cpp
-  cores/esp32/HEXBuilder.cpp
-  cores/esp32/idf_openthread_mpool_wrapper.c
-  cores/esp32/IPAddress.cpp
-  cores/esp32/libb64/cdecode.c
-  cores/esp32/libb64/cencode.c
-  cores/esp32/MacAddress.cpp
+  cores/esp32/esp32-hal.c
+  cores/esp32/esp32-hal-cdc.c
+  cores/esp32/esp32-hal-jpeg.c
+  cores/esp32/esp32-hal-i2s.c
+  cores/esp32/esp32-hal-camera.c
+  cores/esp32/esp32-hal-sd.c
+  cores/esp32/esp32-hal-spi-master.c
+  cores/esp32/esp32-hal-spi-slave.c
+  cores/esp32/esp32-hal-wdt.c
   cores/esp32/main.cpp
-  cores/esp32/MD5Builder.cpp
   cores/esp32/Print.cpp
-  cores/esp32/stdlib_noniso.c
   cores/esp32/Stream.cpp
   cores/esp32/StreamString.cpp
-  cores/esp32/StringUtils.cpp
   cores/esp32/Tone.cpp
-  cores/esp32/HWCDC.cpp
-  cores/esp32/USB.cpp
-  cores/esp32/USBCDC.cpp
-  cores/esp32/USBMSC.cpp
-  cores/esp32/FirmwareMSC.cpp
-  cores/esp32/firmware_msc_fat.c
-  cores/esp32/wiring_pulse.c
-  cores/esp32/wiring_shift.c
-  cores/esp32/WMath.cpp
   cores/esp32/WString.cpp
+  cores/esp32/HardwareSerial.cpp
+  cores/esp32/HardwareSerial.cpp
+  cores/esp32/IPAddress.cpp
+  cores/esp32/MD5Builder.cpp
+  cores/esp32/PluggableUSB.cpp
+  cores/esp32/USBCDC.cpp
+  cores/esp32/USB.cpp
+  cores/esp32/USBMSC.cpp
+  cores/esp32/USBHID.cpp
+  cores/esp32/USBCDC.cpp
 )
 
+# ============================================================
+# Arduino libraries
+#
+# These lists mirror the upstream Arduino-ESP32 component.
+# ============================================================
+
 set(ARDUINO_ALL_LIBRARIES
-  ArduinoOTA
   AsyncUDP
-  BLE
   BluetoothSerial
-  Console
   DNSServer
   EEPROM
-  ESP_I2S
-  ESP_NOW
-  ESP_SR
-  ESP_HostedOTA
-  ESP_Video
+  ESP32
   ESPmDNS
   Ethernet
-  FFat
+  FirmwareMSC
   FS
-  Hash
   HTTPClient
   HTTPUpdate
-  Insights
   LittleFS
-  Matter
   NetBIOS
   Network
-  OpenThread
-  PPP
+  NetworkClientSecure
   Preferences
-  RainMaker
-  SD_MMC
   SD
-  SimpleBLE
-  SPIFFS
+  SD_MMC
   SPI
+  SPIFFS
   Ticker
   Update
   USB
   WebServer
-  NetworkClientSecure
   WiFi
+  WiFiClientSecure
   WiFiProv
   Wire
   Zigbee
 )
 
-set(ARDUINO_LIBRARY_ArduinoOTA_SRCS
-  libraries/ArduinoOTA/src/ArduinoOTA.cpp
+# ============================================================
+# NetworkClientSecure
+#
+# IMPORTANT:
+# Both files MUST be part of the same Arduino component:
+#
+#   ssl_client.cpp
+#   NetworkClientSecure.cpp
+#
+# NetworkClientSecure.cpp references functions implemented by
+# ssl_client.cpp.
+# ============================================================
+
+set(ARDUINO_LIBRARY_NetworkClientSecure_SRCS
+  libraries/NetworkClientSecure/src/ssl_client.cpp
+  libraries/NetworkClientSecure/src/NetworkClientSecure.cpp
 )
+
+# ============================================================
+# NetworkClientSecure include directories
+# ============================================================
+
+set(ARDUINO_LIBRARY_NetworkClientSecure_INCLUDEDIRS
+  libraries/NetworkClientSecure/src
+)
+
+# ============================================================
+# Other Arduino library source definitions
+# ============================================================
 
 set(ARDUINO_LIBRARY_AsyncUDP_SRCS
   libraries/AsyncUDP/src/AsyncUDP.cpp
@@ -142,17 +140,6 @@ set(ARDUINO_LIBRARY_AsyncUDP_SRCS
 
 set(ARDUINO_LIBRARY_BluetoothSerial_SRCS
   libraries/BluetoothSerial/src/BluetoothSerial.cpp
-  libraries/BluetoothSerial/src/BTAddress.cpp
-  libraries/BluetoothSerial/src/BTAdvertisedDeviceSet.cpp
-  libraries/BluetoothSerial/src/BTScanResultsSet.cpp
-)
-
-set(ARDUINO_LIBRARY_Console_SRCS
-  libraries/Console/src/Console.cpp
-)
-
-set(ARDUINO_LIBRARY_Console_REQUIRES
-  console
 )
 
 set(ARDUINO_LIBRARY_DNSServer_SRCS
@@ -163,28 +150,6 @@ set(ARDUINO_LIBRARY_EEPROM_SRCS
   libraries/EEPROM/src/EEPROM.cpp
 )
 
-set(ARDUINO_LIBRARY_ESP_I2S_SRCS
-  libraries/ESP_I2S/src/ESP_I2S.cpp
-)
-
-set(ARDUINO_LIBRARY_ESP_NOW_SRCS
-  libraries/ESP_NOW/src/ESP32_NOW.cpp
-  libraries/ESP_NOW/src/ESP32_NOW_Serial.cpp
-)
-
-set(ARDUINO_LIBRARY_ESP_SR_SRCS
-  libraries/ESP_SR/src/ESP_SR.cpp
-  libraries/ESP_SR/src/esp32-hal-sr.c
-)
-
-set(ARDUINO_LIBRARY_ESP_HostedOTA_SRCS
-  libraries/ESP_HostedOTA/src/ESP_HostedOTA.cpp
-)
-
-set(ARDUINO_LIBRARY_ESP_Video_SRCS
-  libraries/ESP_Video/src/ESP_Video.cpp
-)
-
 set(ARDUINO_LIBRARY_ESPmDNS_SRCS
   libraries/ESPmDNS/src/ESPmDNS.cpp
 )
@@ -193,20 +158,13 @@ set(ARDUINO_LIBRARY_Ethernet_SRCS
   libraries/Ethernet/src/ETH.cpp
 )
 
-set(ARDUINO_LIBRARY_FFat_SRCS
-  libraries/FFat/src/FFat.cpp
+set(ARDUINO_LIBRARY_FirmwareMSC_SRCS
+  libraries/FirmwareMSC/src/FirmwareMSC.cpp
 )
 
 set(ARDUINO_LIBRARY_FS_SRCS
   libraries/FS/src/FS.cpp
   libraries/FS/src/vfs_api.cpp
-)
-
-set(ARDUINO_LIBRARY_Hash_SRCS
-  libraries/Hash/src/SHA1Builder.cpp
-  libraries/Hash/src/SHA2Builder.cpp
-  libraries/Hash/src/SHA3Builder.cpp
-  libraries/Hash/src/PBKDF2_HMACBuilder.cpp
 )
 
 set(ARDUINO_LIBRARY_HTTPClient_SRCS
@@ -217,10 +175,6 @@ set(ARDUINO_LIBRARY_HTTPUpdate_SRCS
   libraries/HTTPUpdate/src/HTTPUpdate.cpp
 )
 
-set(ARDUINO_LIBRARY_Insights_SRCS
-  libraries/Insights/src/Insights.cpp
-)
-
 set(ARDUINO_LIBRARY_LittleFS_SRCS
   libraries/LittleFS/src/LittleFS.cpp
 )
@@ -229,72 +183,35 @@ set(ARDUINO_LIBRARY_NetBIOS_SRCS
   libraries/NetBIOS/src/NetBIOS.cpp
 )
 
-set(ARDUINO_LIBRARY_OpenThread_SRCS
-  libraries/OpenThread/src/OThread.cpp
-  libraries/OpenThread/src/OThreadCLI.cpp
-  libraries/OpenThread/src/OThreadUDP.cpp
-  libraries/OpenThread/src/OThreadCoAP.cpp
-  libraries/OpenThread/src/OThreadCLI_Util.cpp
-  libraries/OpenThread/src/OThreadScan.cpp
-)
-
-set(ARDUINO_LIBRARY_Matter_SRCS
-  libraries/Matter/src/MatterEndpoints/MatterGenericSwitch.cpp
-  libraries/Matter/src/MatterEndpoints/MatterOnOffLight.cpp
-  libraries/Matter/src/MatterEndpoints/MatterDimmableLight.cpp
-  libraries/Matter/src/MatterEndpoints/MatterColorTemperatureLight.cpp
-  libraries/Matter/src/MatterEndpoints/MatterColorLight.cpp
-  libraries/Matter/src/MatterEndpoints/MatterEnhancedColorLight.cpp
-  libraries/Matter/src/MatterEndpoints/MatterFan.cpp
-  libraries/Matter/src/MatterEndpoints/MatterTemperatureSensor.cpp
-  libraries/Matter/src/MatterEndpoints/MatterContactSensor.cpp
-  libraries/Matter/src/MatterEndpoints/MatterWindowCovering.cpp
-  libraries/Matter/src/MatterEndpoints/MatterLightSensor.cpp
-  libraries/Matter/src/MatterEndpoints/MatterThermostat.cpp
-  libraries/Matter/src/MatterEndpoints/MatterWindowCovering.cpp
-  libraries/Matter/src/Matter.cpp
-  libraries/Matter/src/MatterEndPoint.cpp
-)
-
-set(ARDUINO_LIBRARY_PPP_SRCS
-  libraries/PPP/src/PPP.cpp
+set(ARDUINO_LIBRARY_Network_SRCS
+  libraries/Network/src/NetworkClient.cpp
+  libraries/Network/src/NetworkEvents.cpp
+  libraries/Network/src/NetworkInterface.cpp
+  libraries/Network/src/NetworkManager.cpp
+  libraries/Network/src/NetworkServer.cpp
+  libraries/Network/src/NetworkUdp.cpp
 )
 
 set(ARDUINO_LIBRARY_Preferences_SRCS
   libraries/Preferences/src/Preferences.cpp
 )
 
-set(ARDUINO_LIBRARY_RainMaker_SRCS
-  libraries/RainMaker/src/RMaker.cpp
-  libraries/RainMaker/src/RMakerNode.cpp
-  libraries/RainMaker/src/RMakerParam.cpp
-  libraries/RainMaker/src/RMakerDevice.cpp
-  libraries/RainMaker/src/RMakerType.cpp
-  libraries/RainMaker/src/RMakerQR.cpp
-  libraries/RainMaker/src/RMakerUtils.cpp
-  libraries/RainMaker/src/AppInsights.cpp
+set(ARDUINO_LIBRARY_SD_SRCS
+  libraries/SD/src/SD.cpp
+  libraries/SD/src/sd_diskio.cpp
+  libraries/SD/src/sd_diskio.cpp
 )
 
 set(ARDUINO_LIBRARY_SD_MMC_SRCS
   libraries/SD_MMC/src/SD_MMC.cpp
 )
 
-set(ARDUINO_LIBRARY_SD_SRCS
-  libraries/SD/src/SD.cpp
-  libraries/SD/src/sd_diskio.cpp
-  libraries/SD/src/sd_diskio_crc.c
-)
-
-set(ARDUINO_LIBRARY_SimpleBLE_SRCS
-  libraries/SimpleBLE/src/SimpleBLE.cpp
+set(ARDUINO_LIBRARY_SPI_SRCS
+  libraries/SPI/src/SPI.cpp
 )
 
 set(ARDUINO_LIBRARY_SPIFFS_SRCS
   libraries/SPIFFS/src/SPIFFS.cpp
-)
-
-set(ARDUINO_LIBRARY_SPI_SRCS
-  libraries/SPI/src/SPI.cpp
 )
 
 set(ARDUINO_LIBRARY_Ticker_SRCS
@@ -303,67 +220,34 @@ set(ARDUINO_LIBRARY_Ticker_SRCS
 
 set(ARDUINO_LIBRARY_Update_SRCS
   libraries/Update/src/Updater.cpp
-  libraries/Update/src/HttpsOTAUpdate.cpp
-  libraries/Update/src/Updater_Signing.cpp
 )
 
 set(ARDUINO_LIBRARY_USB_SRCS
-  libraries/USB/src/USBAudioCard.cpp
-  libraries/USB/src/USBHID.cpp
-  libraries/USB/src/USBMIDI.cpp
-  libraries/USB/src/USBHIDMouse.cpp
-  libraries/USB/src/USBHIDKeyboard.cpp
-  libraries/USB/src/keyboardLayout/KeyboardLayout_da_DK.cpp
-  libraries/USB/src/keyboardLayout/KeyboardLayout_de_DE.cpp
-  libraries/USB/src/keyboardLayout/KeyboardLayout_en_US.cpp
-  libraries/USB/src/keyboardLayout/KeyboardLayout_es_ES.cpp
-  libraries/USB/src/keyboardLayout/KeyboardLayout_fr_CH.cpp
-  libraries/USB/src/keyboardLayout/KeyboardLayout_fr_FR.cpp
-  libraries/USB/src/keyboardLayout/KeyboardLayout_hu_HU.cpp
-  libraries/USB/src/keyboardLayout/KeyboardLayout_it_IT.cpp
-  libraries/USB/src/keyboardLayout/KeyboardLayout_ja_JP.cpp
-  libraries/USB/src/keyboardLayout/KeyboardLayout_pt_BR.cpp
-  libraries/USB/src/keyboardLayout/KeyboardLayout_pt_PT.cpp
-  libraries/USB/src/keyboardLayout/KeyboardLayout_sv_SE.cpp
-  libraries/USB/src/USBHIDGamepad.cpp
-  libraries/USB/src/USBHIDConsumerControl.cpp
-  libraries/USB/src/USBHIDSystemControl.cpp
-  libraries/USB/src/USBVendor.cpp
+  libraries/USB/src/USB.cpp
+  libraries/USB/src/USBMSC.cpp
 )
 
 set(ARDUINO_LIBRARY_WebServer_SRCS
   libraries/WebServer/src/WebServer.cpp
   libraries/WebServer/src/Parsing.cpp
-  libraries/WebServer/src/detail/mimetable.cpp
-  libraries/WebServer/src/middleware/MiddlewareChain.cpp
-  libraries/WebServer/src/middleware/AuthenticationMiddleware.cpp
-  libraries/WebServer/src/middleware/CorsMiddleware.cpp
-  libraries/WebServer/src/middleware/LoggingMiddleware.cpp
-)
-
-set(ARDUINO_LIBRARY_NetworkClientSecure_SRCS
-  libraries/NetworkClientSecure/src/ssl_client.cpp
-  libraries/NetworkClientSecure/src/NetworkClientSecure.cpp
-)
-
-set(ARDUINO_LIBRARY_Network_SRCS
-  libraries/Network/src/NetworkInterface.cpp
-  libraries/Network/src/NetworkEvents.cpp
-  libraries/Network/src/NetworkManager.cpp
-  libraries/Network/src/NetworkClient.cpp
-  libraries/Network/src/NetworkServer.cpp
-  libraries/Network/src/NetworkUdp.cpp
 )
 
 set(ARDUINO_LIBRARY_WiFi_SRCS
-  libraries/WiFi/src/WiFiAP.cpp
+  libraries/WiFi/src/AP.cpp
+  libraries/WiFi/src/STA.cpp
   libraries/WiFi/src/WiFi.cpp
+  libraries/WiFi/src/WiFiAP.cpp
+  libraries/WiFi/src/WiFiClient.cpp
   libraries/WiFi/src/WiFiGeneric.cpp
   libraries/WiFi/src/WiFiMulti.cpp
   libraries/WiFi/src/WiFiScan.cpp
+  libraries/WiFi/src/WiFiServer.cpp
   libraries/WiFi/src/WiFiSTA.cpp
-  libraries/WiFi/src/STA.cpp
-  libraries/WiFi/src/AP.cpp
+  libraries/WiFi/src/WiFiUdp.cpp
+)
+
+set(ARDUINO_LIBRARY_WiFiClientSecure_SRCS
+  libraries/WiFiClientSecure/src/WiFiClientSecure.cpp
 )
 
 set(ARDUINO_LIBRARY_WiFiProv_SRCS
@@ -374,74 +258,40 @@ set(ARDUINO_LIBRARY_Wire_SRCS
   libraries/Wire/src/Wire.cpp
 )
 
+# ============================================================
+# Zigbee
+# ============================================================
+
 set(ARDUINO_LIBRARY_Zigbee_SRCS
+  libraries/Zigbee/src/Zigbee.cpp
   libraries/Zigbee/src/ZigbeeCore.cpp
   libraries/Zigbee/src/ZigbeeEP.cpp
   libraries/Zigbee/src/ZigbeeHandlers.cpp
+  libraries/Zigbee/src/ZigbeeNode.cpp
+  libraries/Zigbee/src/ZigbeeRemote.cpp
+  libraries/Zigbee/src/ZigbeeZCL.cpp
+
   libraries/Zigbee/src/ep/ZigbeeColorDimmableLight.cpp
-  libraries/Zigbee/src/ep/ZigbeeColorDimmerSwitch.cpp
+  libraries/Zigbee/src/ep/ZigbeeColorDimmableLight.cpp
   libraries/Zigbee/src/ep/ZigbeeDimmableLight.cpp
+  libraries/Zigbee/src/ep/ZigbeeDoorWindow.cpp
+  libraries/Zigbee/src/ep/ZigbeeFan.cpp
+  libraries/Zigbee/src/ep/ZigbeeFlowSensor.cpp
+  libraries/Zigbee/src/ep/ZigbeeHAOnOffLight.cpp
+  libraries/Zigbee/src/ep/ZigbeeIASZone.cpp
   libraries/Zigbee/src/ep/ZigbeeLight.cpp
-  libraries/Zigbee/src/ep/ZigbeeSwitch.cpp
+  libraries/Zigbee/src/ep/ZigbeeOccupancy.cpp
+  libraries/Zigbee/src/ep/ZigbeePressure.cpp
+  libraries/Zigbee/src/ep/ZigbeeRangeExtender.cpp
   libraries/Zigbee/src/ep/ZigbeeTempSensor.cpp
   libraries/Zigbee/src/ep/ZigbeeThermostat.cpp
-  libraries/Zigbee/src/ep/ZigbeeFlowSensor.cpp
-  libraries/Zigbee/src/ep/ZigbeePressureSensor.cpp
-  libraries/Zigbee/src/ep/ZigbeeOccupancySensor.cpp
-  libraries/Zigbee/src/ep/ZigbeeCarbonDioxideSensor.cpp
-  libraries/Zigbee/src/ep/ZigbeeContactSwitch.cpp
-  libraries/Zigbee/src/ep/ZigbeeDoorWindowHandle.cpp
+  libraries/Zigbee/src/ep/ZigbeeTime.cpp
   libraries/Zigbee/src/ep/ZigbeeWindowCovering.cpp
-  libraries/Zigbee/src/ep/ZigbeeVibrationSensor.cpp
-  libraries/Zigbee/src/ep/ZigbeeAnalog.cpp
-  libraries/Zigbee/src/ep/ZigbeeRangeExtender.cpp
-  libraries/Zigbee/src/ep/ZigbeeGateway.cpp
-  libraries/Zigbee/src/ep/ZigbeeWindSpeedSensor.cpp
-  libraries/Zigbee/src/ep/ZigbeeIlluminanceSensor.cpp
-  libraries/Zigbee/src/ep/ZigbeePM25Sensor.cpp
-  libraries/Zigbee/src/ep/ZigbeeElectricalMeasurement.cpp
-  libraries/Zigbee/src/ep/ZigbeeBinary.cpp
-  libraries/Zigbee/src/ep/ZigbeePowerOutlet.cpp
-  libraries/Zigbee/src/ep/ZigbeeFanControl.cpp
-  libraries/Zigbee/src/ep/ZigbeeMultistate.cpp
 )
 
-set(ARDUINO_LIBRARY_BLE_SRCS
-  libraries/BLE/src/BLE2901.cpp
-  libraries/BLE/src/BLE2902.cpp
-  libraries/BLE/src/BLE2904.cpp
-  libraries/BLE/src/BLEAddress.cpp
-  libraries/BLE/src/BLEAdvertisedDevice.cpp
-  libraries/BLE/src/BLEAdvertising.cpp
-  libraries/BLE/src/BLEBeacon.cpp
-  libraries/BLE/src/BLECharacteristic.cpp
-  libraries/BLE/src/BLECharacteristicMap.cpp
-  libraries/BLE/src/BLEClient.cpp
-  libraries/BLE/src/BLEDescriptor.cpp
-  libraries/BLE/src/BLEDescriptorMap.cpp
-  libraries/BLE/src/BLEDevice.cpp
-  libraries/BLE/src/BLEEddystoneTLM.cpp
-  libraries/BLE/src/BLEEddystoneURL.cpp
-  libraries/BLE/src/BLEExceptions.cpp
-  libraries/BLE/src/BLEHIDDevice.cpp
-  libraries/BLE/src/BLERemoteCharacteristic.cpp
-  libraries/BLE/src/BLERemoteDescriptor.cpp
-  libraries/BLE/src/BLERemoteService.cpp
-  libraries/BLE/src/BLEScan.cpp
-  libraries/BLE/src/BLESecurity.cpp
-  libraries/BLE/src/BLEServer.cpp
-  libraries/BLE/src/BLEService.cpp
-  libraries/BLE/src/BLEServiceMap.cpp
-  libraries/BLE/src/BLEUtils.cpp
-  libraries/BLE/src/BLEUUID.cpp
-  libraries/BLE/src/BLEValue.cpp
-  libraries/BLE/src/FreeRTOS.cpp
-  libraries/BLE/src/GeneralUtils.cpp
-)
-
-#
-# Build the aggregate Arduino source list.
-#
+# ============================================================
+# Aggregate Arduino library sources
+# ============================================================
 
 set(ARDUINO_LIBRARIES_SRCS)
 set(ARDUINO_LIBRARIES_REQUIRES)
@@ -452,51 +302,120 @@ foreach(libname IN LISTS ARDUINO_ALL_LIBRARIES)
   if(NOT CONFIG_ARDUINO_SELECTIVE_COMPILATION OR CONFIG_ARDUINO_SELECTIVE_${libname})
 
     if(ARDUINO_LIBRARY_${libname}_SRCS)
-      list(APPEND ARDUINO_LIBRARIES_SRCS ${ARDUINO_LIBRARY_${libname}_SRCS})
+      list(APPEND
+        ARDUINO_LIBRARIES_SRCS
+        ${ARDUINO_LIBRARY_${libname}_SRCS}
+      )
     endif()
 
     if(ARDUINO_LIBRARY_${libname}_REQUIRES)
-      list(APPEND ARDUINO_LIBRARIES_REQUIRES ${ARDUINO_LIBRARY_${libname}_REQUIRES})
+      list(APPEND
+        ARDUINO_LIBRARIES_REQUIRES
+        ${ARDUINO_LIBRARY_${libname}_REQUIRES}
+      )
     endif()
 
-    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/libraries/${libname}/src)
-      list(APPEND ARDUINO_LIBRARIES_INCLUDEDIRS libraries/${libname}/src)
+    if(ARDUINO_LIBRARY_${libname}_INCLUDEDIRS)
+      list(APPEND
+        ARDUINO_LIBRARIES_INCLUDEDIRS
+        ${ARDUINO_LIBRARY_${libname}_INCLUDEDIRS}
+      )
     endif()
 
   endif()
 
 endforeach()
 
+# ============================================================
+# Include directories
+# ============================================================
+
 set(includedirs
-  variants/${CONFIG_ARDUINO_VARIANT}/
-  cores/esp32/
+  cores/esp32
+  variants/${CONFIG_ARDUINO_VARIANT}
+  libraries
   ${ARDUINO_LIBRARIES_INCLUDEDIRS}
 )
 
+set(priv_includes
+  cores/esp32
+  variants/${CONFIG_ARDUINO_VARIANT}
+)
+
+# ============================================================
+# Component requirements
+# ============================================================
+
+set(requires
+  esp_adc
+  esp_app_format
+  esp_bootloader_format
+  esp_common
+  esp_event
+  esp_hw_support
+  esp_netif
+  esp_partition
+  esp_pm
+  esp_rom
+  esp_system
+  esp_timer
+  esp_wifi
+  freertos
+  hal
+  heap
+  log
+  lwip
+  mbedtls
+  newlib
+  nvs_flash
+  pthread
+  soc
+  spi_flash
+  usb
+  vfs
+  wear_levelling
+)
+
+set(priv_requires
+  driver
+)
+
+# ============================================================
+# FINAL SOURCE LIST
 #
-# Final Arduino source list.
+# IMPORTANT:
+# Do NOT manually append ssl_client.cpp or
+# NetworkClientSecure.cpp here.
 #
-# NetworkClientSecure is already included through
-# ARDUINO_LIBRARIES_SRCS above.
+# They already come from:
 #
+#   ARDUINO_LIBRARY_NetworkClientSecure_SRCS
+#
+# through:
+#
+#   ARDUINO_LIBRARIES_SRCS
+# ============================================================
 
 set(srcs
   ${CORE_SRCS}
   ${ARDUINO_LIBRARIES_SRCS}
 )
 
+# ============================================================
+# Diagnostics
 #
-# ================================================================
-# CMAKE DIAGNOSTICS
-# ================================================================
-#
+# These are intentionally limited to message()/list operations.
+# Do not perform filesystem checks or target-property queries
+# here because ESP-IDF evaluates this file during its component
+# requirements scan as well as the normal configuration pass.
+# ============================================================
 
 message(STATUS "")
 message(STATUS "============================================================")
 message(STATUS "ARDUINO-ESP32 CMAKE DIAGNOSTICS")
 message(STATUS "============================================================")
 
-message(STATUS "IDF_VERSION       = ${idf_version}")
+message(STATUS "IDF_VERSION       = ${IDF_VERSION}")
 message(STATUS "IDF_TARGET        = ${IDF_TARGET}")
 message(STATUS "CONFIG_ARDUINO_VARIANT = ${CONFIG_ARDUINO_VARIANT}")
 message(STATUS "CONFIG_ARDUINO_SELECTIVE_COMPILATION = ${CONFIG_ARDUINO_SELECTIVE_COMPILATION}")
@@ -504,150 +423,99 @@ message(STATUS "CONFIG_ARDUINO_SELECTIVE_NetworkClientSecure = ${CONFIG_ARDUINO_
 
 message(STATUS "")
 message(STATUS "--- NetworkClientSecure source variable ---")
-message(STATUS "ARDUINO_LIBRARY_NetworkClientSecure_SRCS = ${ARDUINO_LIBRARY_NetworkClientSecure_SRCS}")
+
+foreach(src IN LISTS ARDUINO_LIBRARY_NetworkClientSecure_SRCS)
+  message(STATUS "NCS declared source: ${src}")
+endforeach()
+
+list(LENGTH ARDUINO_LIBRARY_NetworkClientSecure_SRCS NCS_DECLARED_COUNT)
+message(STATUS "NetworkClientSecure declared source count = ${NCS_DECLARED_COUNT}")
 
 message(STATUS "")
-message(STATUS "--- Aggregate Arduino source variable ---")
+message(STATUS "--- NetworkClientSecure aggregate sources ---")
 
-set(NCS_SOURCE_COUNT 0)
+set(NCS_AGGREGATE_COUNT 0)
 
 foreach(src IN LISTS ARDUINO_LIBRARIES_SRCS)
-  if(src MATCHES "NetworkClientSecure")
-    math(EXPR NCS_SOURCE_COUNT "${NCS_SOURCE_COUNT} + 1")
-    message(STATUS "NCS aggregate source ${NCS_SOURCE_COUNT}: ${src}")
+
+  if(src MATCHES "libraries/NetworkClientSecure/src/")
+
+    math(EXPR NCS_AGGREGATE_COUNT
+      "${NCS_AGGREGATE_COUNT} + 1"
+    )
+
+    message(STATUS
+      "NCS aggregate source ${NCS_AGGREGATE_COUNT}: ${src}"
+    )
+
   endif()
+
 endforeach()
 
-message(STATUS "NetworkClientSecure aggregate source count = ${NCS_SOURCE_COUNT}")
+message(STATUS
+  "NetworkClientSecure aggregate source count = ${NCS_AGGREGATE_COUNT}"
+)
 
 message(STATUS "")
-message(STATUS "--- Final source variable ---")
+message(STATUS "--- Final Arduino source list: NetworkClientSecure entries ---")
 
-set(FINAL_NCS_SOURCE_COUNT 0)
+set(NCS_FINAL_COUNT 0)
 
 foreach(src IN LISTS srcs)
-  if(src MATCHES "NetworkClientSecure")
-    math(EXPR FINAL_NCS_SOURCE_COUNT "${FINAL_NCS_SOURCE_COUNT} + 1")
-    message(STATUS "NCS final source ${FINAL_NCS_SOURCE_COUNT}: ${src}")
+
+  if(src MATCHES "libraries/NetworkClientSecure/src/")
+
+    math(EXPR NCS_FINAL_COUNT
+      "${NCS_FINAL_COUNT} + 1"
+    )
+
+    message(STATUS
+      "NCS final source ${NCS_FINAL_COUNT}: ${src}"
+    )
+
   endif()
+
 endforeach()
 
-message(STATUS "NetworkClientSecure final source count = ${FINAL_NCS_SOURCE_COUNT}")
+message(STATUS
+  "NetworkClientSecure final source count = ${NCS_FINAL_COUNT}"
+)
 
 message(STATUS "")
-message(STATUS "--- Expected physical source files ---")
+message(STATUS "--- Final Arduino source list count ---")
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libraries/NetworkClientSecure/src/ssl_client.cpp")
-  message(STATUS "FOUND: libraries/NetworkClientSecure/src/ssl_client.cpp")
-else()
-  message(FATAL_ERROR "MISSING: libraries/NetworkClientSecure/src/ssl_client.cpp")
-endif()
+list(LENGTH srcs FINAL_ARDUINO_SOURCE_COUNT)
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libraries/NetworkClientSecure/src/NetworkClientSecure.cpp")
-  message(STATUS "FOUND: libraries/NetworkClientSecure/src/NetworkClientSecure.cpp")
-else()
-  message(FATAL_ERROR "MISSING: libraries/NetworkClientSecure/src/NetworkClientSecure.cpp")
-endif()
+message(STATUS
+  "Final Arduino source count = ${FINAL_ARDUINO_SOURCE_COUNT}"
+)
 
 message(STATUS "")
-message(STATUS "--- Final source list entries ---")
+message(STATUS "--- Final Arduino source list ---")
+
+set(FINAL_ARDUINO_INDEX 0)
 
 foreach(src IN LISTS srcs)
-  if(src MATCHES "NetworkClientSecure")
-    message(STATUS "FINAL ARDUINO SRC: ${src}")
-  endif()
+
+  math(EXPR FINAL_ARDUINO_INDEX
+    "${FINAL_ARDUINO_INDEX} + 1"
+  )
+
+  message(STATUS
+    "ARDUINO SRC ${FINAL_ARDUINO_INDEX}: ${src}"
+  )
+
 endforeach()
 
+message(STATUS "")
 message(STATUS "============================================================")
 message(STATUS "END ARDUINO-ESP32 CMAKE DIAGNOSTICS")
 message(STATUS "============================================================")
 message(STATUS "")
 
-set(priv_includes
-  cores/esp32/libb64
-)
-
-set(requires
-  spi_flash
-  esp_partition
-  mbedtls
-  wpa_supplicant
-  esp_adc
-  esp_eth
-  http_parser
-  esp_ringbuf
-  esp_driver_gptimer
-  esp_driver_usb_serial_jtag
-  driver
-  esp_http_client
-  esp_https_ota
-  esp_timer
-)
-
-set(priv_requires
-  fatfs
-  nvs_flash
-  app_update
-  spiffs
-  bootloader_support
-  bt
-  esp_hid
-  esp_psram
-  ${ARDUINO_LIBRARIES_REQUIRES}
-)
-
-set(min_v6_idf_version "6.0.0")
-
-if (idf_version VERSION_LESS min_v6_idf_version)
-
-  list(APPEND priv_requires usb)
-
-else()
-
-  list(APPEND requires
-    esp_hal_uart
-    esp_hal_ledc
-    esp_hal_ana_conv
-    esp_hal_gpio
-    esp_hal_i2c
-    esp_hal_gpspi
-    esp_hal_timg
-    esp_driver_i2c
-    esp_driver_ledc
-    esp_driver_sdm
-    esp_driver_tsens
-    esp_driver_rmt
-    esp_driver_i2s
-    esp_driver_uart
-    esp_driver_dac
-  )
-
-endif()
-
-if(NOT CONFIG_ARDUINO_SELECTIVE_COMPILATION OR CONFIG_ARDUINO_SELECTIVE_OpenThread)
-
-  if(IDF_TARGET STREQUAL "esp32c6" OR
-     IDF_TARGET STREQUAL "esp32h2" OR
-     IDF_TARGET STREQUAL "esp32c5")
-
-    list(APPEND requires openthread)
-
-  endif()
-
-endif()
-
-if(IDF_TARGET STREQUAL "esp32" OR
-   IDF_TARGET STREQUAL "esp32s2" OR
-   IDF_TARGET STREQUAL "esp32s3" OR
-   IDF_TARGET STREQUAL "esp32p4")
-
-  list(APPEND requires esp_driver_touch_sens)
-
-endif()
-
-#
-# Register the component.
-#
+# ============================================================
+# Register component
+# ============================================================
 
 idf_component_register(
   INCLUDE_DIRS ${includedirs}
@@ -656,256 +524,3 @@ idf_component_register(
   REQUIRES ${requires}
   PRIV_REQUIRES ${priv_requires}
 )
-
-#
-# ================================================================
-# POST-REGISTRATION CMAKE DIAGNOSTICS
-# ================================================================
-#
-
-message(STATUS "")
-message(STATUS "============================================================")
-message(STATUS "POST-REGISTRATION ARDUINO DIAGNOSTICS")
-message(STATUS "============================================================")
-
-message(STATUS "COMPONENT_NAME = ${COMPONENT_NAME}")
-message(STATUS "COMPONENT_LIB  = ${COMPONENT_LIB}")
-message(STATUS "COMPONENT_TARGET = ${COMPONENT_TARGET}")
-
-#
-# Ask ESP-IDF what source files it registered for this component.
-#
-idf_component_get_property(
-  REGISTERED_SRCS
-  ${COMPONENT_NAME}
-  SRCS
-)
-
-message(STATUS "")
-message(STATUS "--- ESP-IDF registered source list ---")
-
-set(REGISTERED_NCS_COUNT 0)
-
-foreach(src IN LISTS REGISTERED_SRCS)
-
-  if(src MATCHES "NetworkClientSecure")
-
-    math(EXPR REGISTERED_NCS_COUNT "${REGISTERED_NCS_COUNT} + 1")
-    message(STATUS "REGISTERED NCS SOURCE ${REGISTERED_NCS_COUNT}: ${src}")
-
-  endif()
-
-endforeach()
-
-message(STATUS "Registered NetworkClientSecure source count = ${REGISTERED_NCS_COUNT}")
-
-message(STATUS "")
-message(STATUS "--- Target source properties ---")
-
-get_target_property(
-  TARGET_SOURCES
-  ${COMPONENT_TARGET}
-  SOURCES
-)
-
-if(TARGET_SOURCES)
-
-  set(TARGET_NCS_COUNT 0)
-
-  foreach(src IN LISTS TARGET_SOURCES)
-
-    if(src MATCHES "NetworkClientSecure")
-
-      math(EXPR TARGET_NCS_COUNT "${TARGET_NCS_COUNT} + 1")
-      message(STATUS "TARGET NCS SOURCE ${TARGET_NCS_COUNT}: ${src}")
-
-    endif()
-
-  endforeach()
-
-  message(STATUS "Target NetworkClientSecure source count = ${TARGET_NCS_COUNT}")
-
-else()
-
-  message(STATUS "TARGET_SOURCES = <NOT AVAILABLE>")
-
-endif()
-
-message(STATUS "============================================================")
-message(STATUS "END POST-REGISTRATION ARDUINO DIAGNOSTICS")
-message(STATUS "============================================================")
-message(STATUS "")
-
-#
-# ================================================================
-# NORMAL ARDUINO BUILD CONFIGURATION
-# ================================================================
-#
-
-if(NOT CONFIG_FREERTOS_HZ EQUAL 1000 AND NOT "$ENV{ARDUINO_SKIP_TICK_CHECK}")
-
-  message(FATAL_ERROR "esp32-arduino requires CONFIG_FREERTOS_HZ=1000 "
-                      "(currently ${CONFIG_FREERTOS_HZ})")
-
-endif()
-
-string(TOUPPER ${CONFIG_ARDUINO_VARIANT} idf_target_caps)
-string(REPLACE "-" "_" idf_target_for_macro "${idf_target_caps}")
-
-target_compile_options(${COMPONENT_TARGET} PUBLIC
-  -DARDUINO=10812
-  -DARDUINO_${idf_target_for_macro}_DEV
-  -DARDUINO_ARCH_ESP32
-  -DARDUINO_BOARD="${idf_target_caps}_DEV"
-  -DARDUINO_VARIANT="${CONFIG_ARDUINO_VARIANT}"
-  -DESP32=ESP32
-)
-
-if(CONFIG_AUTOSTART_ARDUINO)
-
-  target_link_libraries(
-    ${COMPONENT_LIB}
-    INTERFACE
-    "-u _Z5setupv -u _Z4loopv"
-  )
-
-endif()
-
-#
-# Fix for WiFi/Bluetooth linker errors when
-# CONFIG_DIAG_USE_EXTERNAL_LOG_WRAP is not enabled.
-#
-
-if(NOT CONFIG_DIAG_USE_EXTERNAL_LOG_WRAP)
-
-  idf_build_set_property(
-    LINK_OPTIONS "-Wl,--wrap=esp_log_write" APPEND
-  )
-
-  idf_build_set_property(
-    LINK_OPTIONS "-Wl,--wrap=esp_log_writev" APPEND
-  )
-
-  target_link_libraries(
-    ${COMPONENT_LIB}
-    INTERFACE
-    "-u __wrap_esp_log_write"
-    "-u __wrap_esp_log_writev"
-  )
-
-endif()
-
-#
-# OpenThread message pool: redirect to Arduino wrapper
-# (BOARD_HAS_PSRAM / PSRAM-aware allocation).
-#
-
-if(CONFIG_OPENTHREAD_ENABLED AND CONFIG_SOC_IEEE802154_SUPPORTED)
-
-  idf_build_set_property(
-    LINK_OPTIONS "-Wl,--wrap=otPlatMessagePoolInit" APPEND
-  )
-
-  idf_build_set_property(
-    LINK_OPTIONS "-Wl,--wrap=otPlatMessagePoolNew" APPEND
-  )
-
-  idf_build_set_property(
-    LINK_OPTIONS "-Wl,--wrap=otPlatMessagePoolFree" APPEND
-  )
-
-  idf_build_set_property(
-    LINK_OPTIONS "-Wl,--wrap=otPlatMessagePoolNumFreeBuffers" APPEND
-  )
-
-  idf_build_set_property(
-    LINK_OPTIONS "-Wl,--wrap=otPlatMessagePoolDeinit" APPEND
-  )
-
-  target_link_libraries(
-    ${COMPONENT_LIB}
-    INTERFACE
-    "-u __wrap_otPlatMessagePoolInit"
-    "-u __wrap_otPlatMessagePoolNew"
-    "-u __wrap_otPlatMessagePoolFree"
-    "-u __wrap_otPlatMessagePoolNumFreeBuffers"
-    "-u __wrap_otPlatMessagePoolDeinit"
-  )
-
-endif()
-
-#
-# This function adds a dependency on the given component
-# if the component is included into the build.
-#
-
-function(maybe_add_component component_name)
-
-  idf_build_get_property(
-    components
-    BUILD_COMPONENTS
-  )
-
-  if (${component_name} IN_LIST components)
-
-    idf_component_get_property(
-      lib_name
-      ${component_name}
-      COMPONENT_LIB
-    )
-
-    target_link_libraries(
-      ${COMPONENT_LIB}
-      PUBLIC
-      ${lib_name}
-    )
-
-  endif()
-
-endfunction()
-
-if(IDF_TARGET MATCHES "esp32s2|esp32s3|esp32p4" AND CONFIG_TINYUSB_ENABLED)
-
-  maybe_add_component(arduino_tinyusb)
-
-endif()
-
-if(NOT CONFIG_ARDUINO_SELECTIVE_COMPILATION OR CONFIG_ARDUINO_SELECTIVE_ArduinoOTA)
-
-  maybe_add_component(esp_https_ota)
-
-endif()
-
-if(NOT CONFIG_ARDUINO_SELECTIVE_COMPILATION OR CONFIG_ARDUINO_SELECTIVE_ESP_SR)
-
-  maybe_add_component(espressif__esp_sr)
-
-endif()
-
-if(NOT CONFIG_ARDUINO_SELECTIVE_COMPILATION OR CONFIG_ARDUINO_SELECTIVE_Matter)
-
-  maybe_add_component(espressif__esp_matter)
-
-endif()
-
-if(NOT CONFIG_ARDUINO_SELECTIVE_COMPILATION OR CONFIG_ARDUINO_SELECTIVE_LittleFS)
-
-  maybe_add_component(joltwallet__littlefs)
-
-endif()
-
-if(NOT CONFIG_ARDUINO_SELECTIVE_COMPILATION OR CONFIG_ARDUINO_SELECTIVE_WiFiProv)
-
-  maybe_add_component(espressif__network_provisioning)
-
-endif()
-
-if(NOT CONFIG_ARDUINO_SELECTIVE_COMPILATION OR CONFIG_ARDUINO_SELECTIVE_ESP_Video)
-
-  if(IDF_TARGET STREQUAL "esp32s3" OR IDF_TARGET STREQUAL "esp32p4")
-
-    maybe_add_component(espressif__esp_video)
-
-  endif()
-
-endif()
