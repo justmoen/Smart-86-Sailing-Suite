@@ -14,7 +14,7 @@
 #include "ui_manager.h"
 
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "v0.7.23"
+#define FIRMWARE_VERSION "v0.7.24"
 #endif
 
 constexpr const char* kPrefsNamespace = "sk-config";
@@ -58,8 +58,13 @@ static int get_manual_signalk_port() {
     prefs.end();
     return value;
 }
-static String get_saved_release_pref(const char* key, const String& fallback);
-static void set_saved_release_pref(const char* key, const String& value);
+static String get_saved_release_pref(const char* key, const String& fallback) {
+    return load_string_pref(key, fallback.c_str());
+}
+
+static void set_saved_release_pref(const char* key, const String& value) {
+    save_string_pref(key, value);
+}
 static bool is_valid_nvs_key(const char* key) {
     if (key == nullptr) return false;
     size_t len = strlen(key);
@@ -132,11 +137,20 @@ static String http_get_text(const String& url) {
     return payload;
 }
 
-static bool fetch_release_history(std::vector<String>& tags, std::vector<String>& download_urls, String& error_message) {
+static bool fetch_release_history(
+    std::vector<String>& tags,
+    std::vector<String>& download_urls,
+    String& error_message
+) {
     tags.clear();
     download_urls.clear();
 
-    String payload = http_get_text(String("https://api.github.com/repos/") + kGitHubRepo + "/releases");
+    String payload = http_get_text(
+        String("https://api.github.com/repos/") +
+        kGitHubRepo +
+        "/releases"
+    );
+
     if (payload.length() == 0) {
         error_message = "Unable to reach GitHub Releases.";
         return false;
@@ -144,6 +158,7 @@ static bool fetch_release_history(std::vector<String>& tags, std::vector<String>
 
     JsonDocument doc;
     DeserializationError err = deserializeJson(doc, payload);
+
     if (err) {
         error_message = "GitHub API response was invalid.";
         return false;
@@ -154,34 +169,55 @@ static bool fetch_release_history(std::vector<String>& tags, std::vector<String>
         return false;
     }
 
-    JsonArray arr = doc.as<JsonArray>();
-    for (JsonVariant release : arr) {
+    JsonArray releases = doc.as<JsonArray>();
+
+    for (JsonVariant release : releases) {
         if (!release["tag_name"].is<String>()) {
             continue;
         }
 
         String tag = release["tag_name"].as<String>();
+        tag.trim();
+
         if (tag.length() == 0) {
             continue;
         }
 
-        String asset_url = "";
-        if (release["html_url"].is<String>()) {
-            asset_url = release["html_url"].as<String>();
-        }
+        String firmware_url = "";
 
+        /*
+         * Do not assume that the first GitHub release asset
+         * is our firmware.
+         *
+         * Only accept the exact firmware filename used by
+         * Smart-86-Sailing-Suite.
+         */
         if (release["assets"].is<JsonArray>()) {
             JsonArray assets = release["assets"].as<JsonArray>();
+
             for (JsonVariant asset : assets) {
-                if (asset["browser_download_url"].is<String>()) {
-                    asset_url = asset["browser_download_url"].as<String>();
-                    break;
+                if (!asset["name"].is<String>()) {
+                    continue;
                 }
+
+                String asset_name = asset["name"].as<String>();
+
+                if (!asset_name.equals("sailing_suite.bin")) {
+                    continue;
+                }
+
+                if (asset["browser_download_url"].is<String>()) {
+                    firmware_url =
+                        asset["browser_download_url"].as<String>();
+                }
+
+                break;
             }
         }
 
         tags.push_back(tag);
-        download_urls.push_back(asset_url);
+        download_urls.push_back(firmware_url);
+
         if (tags.size() >= 5) {
             break;
         }
@@ -200,116 +236,209 @@ static String get_current_firmware_version() {
     return String(FIRMWARE_VERSION);
 }
 
-static String resolve_release_asset_url(const String& tag, const String& fallback_download_url = "") {
-    String candidate = fallback_download_url;
-    if (candidate.length() == 0) {
-        candidate = get_saved_release_pref("firmware_latest_url", "");
-    }
+static String resolve_release_asset_url(
+    const String& tag,
+    const String& fallback_download_url = ""
+) {
+    /*
+     * A requested release must resolve to the firmware asset
+     * belonging to that exact release.
+     *
+     * Do not use firmware_latest_url as a fallback because
+     * that URL may belong to another release.
+     *
+     * The fallback argument is intentionally ignored for OTA
+     * safety. It is retained in the function signature so that
+     * other existing callers do not need to change immediately.
+     */
+    (void)fallback_download_url;
 
     if (tag.length() == 0) {
-        return candidate;
+        return "";
     }
 
-    String api_url = String("https://api.github.com/repos/") + kGitHubRepo + "/releases/tags/" + tag;
+    String api_url =
+        String("https://api.github.com/repos/") +
+        kGitHubRepo +
+        "/releases/tags/" +
+        tag;
+
+    Serial.println();
+    Serial.println("===== GITHUB RELEASE LOOKUP =====");
+    Serial.println("Requested release: " + tag);
+    Serial.println("API URL: " + api_url);
+
     String payload = http_get_text(api_url);
+
     if (payload.length() == 0) {
-        return candidate;
+        Serial.println("GitHub release lookup returned no data.");
+        return "";
     }
 
     JsonDocument doc;
     DeserializationError err = deserializeJson(doc, payload);
+
     if (err) {
-        return candidate;
+        Serial.println(
+            "GitHub release JSON parse failed: " +
+            String(err.c_str())
+        );
+        return "";
     }
 
-    if (doc["html_url"].is<String>()) {
-        candidate = doc["html_url"].as<String>();
+    if (!doc["assets"].is<JsonArray>()) {
+        Serial.println("GitHub release contains no assets array.");
+        return "";
     }
 
-    if (doc["assets"].is<JsonArray>()) {
-        JsonArray assets = doc["assets"].as<JsonArray>();
-        for (JsonVariant asset : assets) {
-            if (asset["browser_download_url"].is<String>()) {
-                candidate = asset["browser_download_url"].as<String>();
-                break;
-            }
+    JsonArray assets = doc["assets"].as<JsonArray>();
+
+    for (JsonVariant asset : assets) {
+        if (!asset["name"].is<String>()) {
+            continue;
         }
+
+        String asset_name = asset["name"].as<String>();
+
+        Serial.println("GitHub asset: " + asset_name);
+
+        if (!asset_name.equals("sailing_suite.bin")) {
+            continue;
+        }
+
+        if (!asset["browser_download_url"].is<String>()) {
+            Serial.println(
+                "sailing_suite.bin has no browser_download_url."
+            );
+            return "";
+        }
+
+        String url =
+            asset["browser_download_url"].as<String>();
+
+        if (url.length() == 0) {
+            return "";
+        }
+
+        Serial.println(
+            "Selected firmware asset: " + asset_name
+        );
+        Serial.println(
+            "Selected firmware URL: " + url
+        );
+        Serial.println("================================");
+        Serial.println();
+
+        return url;
     }
 
-    return candidate;
+    Serial.println(
+        "ERROR: sailing_suite.bin was not found in release " +
+        tag
+    );
+    Serial.println("================================");
+    Serial.println();
+
+    return "";
 }
 
-static String get_saved_release_pref(const char* key, const String& fallback) {
-    return load_string_pref(key, fallback.c_str());
-}
+static bool perform_firmware_ota(
+    const String& tag,
+    String& error_message
+) {
+    /*
+     * Resolve the firmware from the requested release itself.
+     *
+     * This deliberately does NOT use the cached
+     * firmware_latest_url value.
+     */
+    String download_url = resolve_release_asset_url(tag);
 
-static void set_saved_release_pref(const char* key, const String& value) {
-    save_string_pref(key, value);
-}
-
-static bool is_release_skipped(const String& tag) {
-    if (tag.length() == 0) {
-        return false;
-    }
-
-    String skipped_tag = get_saved_release_pref("firmware_skipped_tag", "");
-    return skipped_tag.length() > 0 && skipped_tag.equalsIgnoreCase(tag);
-}
-
-static void check_release_status_on_boot() {
-    std::vector<String> tags;
-    std::vector<String> download_urls;
-    String error_message;
-    if (!fetch_release_history(tags, download_urls, error_message)) {
-        return;
-    }
-
-    if (tags.empty()) {
-        return;
-    }
-
-    String latest_tag = tags[0];
-    String latest_downloader = download_urls[0];
-    set_saved_release_pref("firmware_latest_tag", latest_tag);
-    set_saved_release_pref("firmware_latest_url", latest_downloader);
-}
-
-static bool perform_firmware_ota(const String& tag, String& error_message) {
-    String download_url = resolve_release_asset_url(tag, get_saved_release_pref("firmware_latest_url", ""));
     if (download_url.length() == 0) {
-        error_message = "No downloadable firmware asset was found for release " + tag + ".";
+        error_message =
+            "No sailing_suite.bin firmware asset was found "
+            "for release " +
+            tag +
+            ".";
+
         return false;
     }
 
     if (download_url.indexOf("http") != 0) {
-        error_message = "The firmware URL for release " + tag + " is not valid.";
+        error_message =
+            "The firmware URL for release " +
+            tag +
+            " is not valid.";
+
         return false;
     }
 
+    Serial.println();
+    Serial.println("========================================");
+    Serial.println("         FIRMWARE OTA START");
+    Serial.println("========================================");
+    Serial.println("Requested release: " + tag);
+    Serial.println("Firmware URL:");
+    Serial.println(download_url);
+    Serial.println("========================================");
+
     esp_http_client_config_t client_config = {};
+
     client_config.url = download_url.c_str();
     client_config.timeout_ms = 30000;
     client_config.keep_alive_enable = true;
-    
-    // CRITICAL CHANGES: Increase RX buffer to 8KB to survive large cloud HTTP response headers
-    client_config.buffer_size = 8192;   
-    client_config.buffer_size_tx = 2048; // Allocate dedicated TX buffer space explicitly
-    
+
+    /*
+     * GitHub/cloud HTTP response headers can be large.
+     * Keep the 8 KB RX buffer that was added previously.
+     */
+    client_config.buffer_size = 8192;
+    client_config.buffer_size_tx = 2048;
+
     client_config.crt_bundle_attach = esp_crt_bundle_attach;
 
     esp_https_ota_config_t ota_config = {};
+
     ota_config.http_config = &client_config;
     ota_config.bulk_flash_erase = false;
     ota_config.partial_http_download = false;
     ota_config.max_http_request_size = 0;
 
+    Serial.println("Starting esp_https_ota()...");
+
     esp_err_t err = esp_https_ota(&ota_config);
+
     if (err != ESP_OK) {
-        error_message = "OTA failed for " + tag + ": " + String(esp_err_to_name(err));
+        error_message =
+            "OTA failed for " +
+            tag +
+            ": " +
+            String(esp_err_to_name(err));
+
+        Serial.println();
+        Serial.println("========================================");
+        Serial.println("         FIRMWARE OTA FAILED");
+        Serial.println("========================================");
+        Serial.println(error_message);
+        Serial.println("========================================");
+        Serial.println();
+
         return false;
     }
 
-    error_message = "Firmware update staged successfully. Rebooting now...";
+    Serial.println();
+    Serial.println("========================================");
+    Serial.println("       FIRMWARE OTA SUCCESS");
+    Serial.println("========================================");
+    Serial.println("Release: " + tag);
+    Serial.println("Image successfully written.");
+    Serial.println("Boot partition has been selected.");
+    Serial.println("========================================");
+    Serial.println();
+
+    error_message =
+        "Firmware update staged successfully. Rebooting now...";
+
     return true;
 }
 
@@ -845,6 +974,15 @@ void handle_show_admin_index() {
 </html>
 )";
     web_server.send(200, "text/html", html);
+}
+
+static bool is_release_skipped(const String& tag) {
+    if (tag.length() == 0) {
+        return false;
+    }
+
+    String skipped_tag = get_saved_release_pref("firmware_skipped_tag", "");
+    return skipped_tag.length() > 0 && skipped_tag.equalsIgnoreCase(tag);
 }
 
 void handle_firmware_status() {
@@ -2429,6 +2567,24 @@ void handle_reset_config() {
 
 signalk_path_config_t& get_signalk_path_config() {
     return config;
+}
+
+static void check_release_status_on_boot() {
+    std::vector<String> tags;
+    std::vector<String> download_urls;
+    String error_message;
+    if (!fetch_release_history(tags, download_urls, error_message)) {
+        return;
+    }
+
+    if (tags.empty()) {
+        return;
+    }
+
+    String latest_tag = tags[0];
+    String latest_downloader = download_urls[0];
+    set_saved_release_pref("firmware_latest_tag", latest_tag);
+    set_saved_release_pref("firmware_latest_url", latest_downloader);
 }
 
 void load_signalk_path_config() {
