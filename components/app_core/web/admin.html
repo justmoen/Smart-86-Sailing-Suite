@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Configuration Administration</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+    .container {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        overflow: hidden;
+        max-width: 600px;
+        width: 100%;
+    }
+    .header {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        color: white;
+        padding: 40px 30px;
+        text-align: center;
+    }
+    .header h1 { font-size: 2em; margin-bottom: 10px; }
+    .header p { opacity: 0.9; }
+    .content {
+        padding: 40px 30px;
+    }
+    .menu-item {
+        display: block;
+        padding: 20px;
+        margin: 15px 0;
+        background: #f5f5f5;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        text-decoration: none;
+        color: #333;
+        font-size: 1.1em;
+        font-weight: 600;
+        transition: all 0.2s;
+        cursor: pointer;
+        text-align: center;
+    }
+    .menu-item:hover {
+        background: #e8f4f8;
+        border-color: #2a5298;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(42, 82, 152, 0.2);
+    }
+    .menu-item.signalk { border-left: 4px solid #2196F3; }
+    .menu-item.display { border-left: 4px solid #4CAF50; }
+    .menu-item.firmware { border-left: 4px solid #ff9800; }
+    .description {
+        font-size: 0.85em;
+        color: #666;
+        margin-top: 5px;
+        font-weight: normal;
+    }
+</style>
+</head>
+<body>
+<div class='container'>
+    <div class='header'>
+        <h1>⚙️ Configuration</h1>
+        <p>Select an option to configure</p>
+    </div>
+    <div class='content'>
+        <a href='/signalk-config' class='menu-item signalk'>
+            Signal K Path Configuration
+            <div class='description'>Configure data paths from your Signal K server</div>
+        </a>
+        <a href='/display-config' class='menu-item display'>
+            Display Settings
+            <div class='description'>Customize gauges, units, and chart history</div>
+        </a>
+        <a href='/firmware' class='menu-item firmware'>
+            Firmware Updates
+            <div class='description'>Check GitHub releases, update, and rollback to older versions</div>
+        </a>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Display Configuration</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: linear-gradient(135deg, #2a5298 0%, #1e3c72 100%);
+        color: #333;
+        min-height: 100vh;
+        padding: 20px;
+    }
+    .container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        overflow: hidden;
+    }
+    .header {
+        background: linear-gradient(135deg, #2a5298 0%, #1e3c72 100%);
+        color: white;
+        padding: 30px;
+        text-align: center;
+    }
+    .header h1 { font-size: 2em; margin-bottom: 10px; }
+    .content { padding: 30px; }
+    .section {
+        margin: 25px 0;
+        padding: 20px;
+        background: #f5f5f5;
+        border-radius: 8px;
+        border-left: 4px solid #4CAF50;
+    }
+    .section h2 {
+        font-size: 1.2em;
+        margin-bottom: 15px;
+        color: #333;
+    }
+    .form-group {
+        margin-bottom: 15px;
+    }
+    label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 5px;
+        color: #333;
+        font-size: 0.95em;
+    }
+    input[type="text"],
+    input[type="number"],
+    select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 0.95em;
+    }
+    input:focus,
+    select:focus {
+        outline: none;
+        border-color: #2a5298;
+        box-shadow: 0 0 0 3px rgba(42, 82, 152, 0.1);
+    }
+    .actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 30px;
+        flex-wrap: wrap;
+    }
+    button, a.back-link {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 6px;
+        font-size: 1em;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .btn-save {
+        background: #4CAF50;
+        color: white;
+    }
+    .btn-save:hover { background: #45a049; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3); }
+    .back-link {
+        display: inline-block;
+        background: #f5f5f5;
+        border: 1px solid #ddd;
+        text-decoration: none;
+        color: #333;
+    }
+    .back-link:hover { background: #efefef; }
+</style>
+</head>
+<body>
+<div class='container'>
+    <div class='header'>
+        <h1>Display Settings</h1>
+        <p>Customize gauges, units, and historical data display</p>
+    </div>
+    <div class='content'>
+        <form id='displayForm'>
+            <div class='section'>
+                <h2>Unit of Measurement</h2>
+                <div class='form-group'>
+                    <label>Distance Unit:</label>
+                    <select name='dist_unit'>
+                        <option value='0' {{DIST_METERS_SELECTED}}>Meters</option>
+                        <option value='1' {{DIST_FEET_SELECTED}}>Feet</option>
+                    </select>
+                </div>
+                <div class='form-group'>
+                    <label>Temperature Unit:</label>
+                    <select name='temp_unit'>
+                        <option value='0' {{TEMP_CELSIUS_SELECTED}}>Celsius (°C)</option>
+                        <option value='1' {{TEMP_FAHRENHEIT_SELECTED}}>Fahrenheit (°F)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class='section'>
+                <h2>Engine Gauges</h2>
+                <div class='form-group'><label>Number of Engines:</label><input type='number' name='num_engines' value='{{NUM_ENGINES}}' min='1' max='8'></div>
+                <div class='form-group'>
+                    <label style='display:flex; align-items:center; gap:10px;'>
+                        <input type='checkbox' name='eng_oil_enabled' value='true' {{ENG_OIL_ENABLED_CHECKED}}> Show Oil Pressure Gauge
+                    </label>
+                </div>
+                <div class='form-group'>
+                    <label style='display:flex; align-items:center; gap:10px;'>
+                        <input type='checkbox' name='eng_top_left_enabled' value='true' {{ENG_TOP_LEFT_ENABLED_CHECKED}}> Show Top Left Engine Metric
+                    </label>
+                    <select name='eng_top_left_metric'>
+                        <option value='0' {{TOP_LEFT_SOG_SELECTED}}>SOG (kt)</option>
+                        <option value='1' {{TOP_LEFT_THROTTLE_SELECTED}}>Throttle (%)</option>
+                    </select>
+                </div>
+                <div class='form-group'>
+                    <label style='display:flex; align-items:center; gap:10px;'>
+                        <input type='checkbox' name='eng_top_right_enabled' value='true' {{ENG_TOP_RIGHT_ENABLED_CHECKED}}> Show Top Right Engine Metric
+                    </label>
+                    <select name='eng_top_right_metric'>
+                        <option value='0' {{TOP_RIGHT_ALT_SELECTED}}>Alternator Voltage</option>
+                        <option value='1' {{TOP_RIGHT_BATTERY_SELECTED}}>Battery Voltage</option>
+                    </select>
+                </div>
+                <div id='oilPressureZoneFields' class='form-group' style='{{OIL_MIN_STYLE}}'>
+                    <label>Oil Pressure Green Zone Minimum (PSI):</label><input type='number' name='eng_oil_min' value='{{ENGINE_OIL_PRESSURE_MIN}}' step='0.1'>
+                </div>
+                <div id='oilPressureZoneMaxFields' class='form-group' style='{{OIL_MAX_STYLE}}'>
+                    <label>Oil Pressure Green Zone Maximum (PSI):</label><input type='number' name='eng_oil_max' value='{{ENGINE_OIL_PRESSURE_MAX}}' step='0.1'>
+                </div>
+                <div class='form-group'><label>Temperature Redline (°C):</label><input type='number' name='eng_temp_red' value='{{ENGINE_TEMP_REDLINE}}' step='0.1'></div>
+            </div>
+
+            <div class='section'>
+                <h2>Tank Display</h2>
+                <div class='form-group'><label>Number of Tanks:</label><input type='number' name='num_tanks' value='{{NUM_TANKS}}' min='1' max='8'></div>
+                <p style='font-size: 0.9em; color: #666;'>Tank bar dimensions are automatically calculated based on the number of tanks configured.</p>
+            </div>
+
+            <div class='section'>
+                <h2>Historical Chart Data</h2>
+                <div class='form-group'><label>Depth Chart Duration (minutes):</label><input type='number' name='depth_chart_min' value='{{DEPTH_CHART_DURATION}}' min='5' max='120'></div>
+                <div class='form-group'><label>Speed Chart Duration (minutes):</label><input type='number' name='speed_chart_min' value='{{SPEED_CHART_DURATION}}' min='5' max='120'></div>
+                <p style='font-size: 0.9em; color: #666;'><strong>The full chart width will display the configured duration of historical data.</strong></p>
+            </div><div class='section'>
+                <h2>Screens</h2>{{ENGINE_SCREENS}}{{STATIC_SCREENS}}<div>
+        </div>
+        </form>
+        <div class='actions'>
+            <a class='back-link' href='/'>← Back to Administration</a>
+            <button type='button' id='submitBtn' class='btn-save' onclick='saveDisplayConfig()' disabled>No changes to save</button>
+        </div>
+    </div>
+</div>
+<script>
+let originalValues = {};
+let changeCount = 0;
+
+function getValue(input) {
+    if (input.type === 'checkbox') {
+        return input.checked;  // boolean
+    } else if (input.type === 'number') {
+        return parseFloat(input.value);  // number
+    } else if (input.tagName === 'SELECT') {
+        return input.value;  // string (consistent)
+    } else {
+        return input.value.trim();  // string
+    }
+}
+
+function updateOilPressureZoneVisibility() {
+  const oilCheckbox = document.querySelector('input[name="eng_oil_enabled"]');
+  const zoneFields = document.getElementById('oilPressureZoneFields');
+  const zoneMaxFields = document.getElementById('oilPressureZoneMaxFields');
+
+  if (!oilCheckbox || !zoneFields || !zoneMaxFields) return;
+
+  const shouldShow = oilCheckbox.checked;
+  zoneFields.style.display = shouldShow ? '' : 'none';
+  zoneMaxFields.style.display = shouldShow ? '' : 'none';
+}
+
+function syncMetricCheckboxes() {
+  const topLeftEnabled = document.querySelector('input[name="eng_top_left_enabled"]');
+  const topLeftMetric = document.querySelector('select[name="eng_top_left_metric"]');
+  const topRightEnabled = document.querySelector('input[name="eng_top_right_enabled"]');
+  const topRightMetric = document.querySelector('select[name="eng_top_right_metric"]');
+
+  if (topLeftEnabled && topLeftMetric) {
+    const metricSelected = topLeftMetric.value === '1';
+    const derivedChecked = topLeftEnabled.checked || metricSelected;
+    topLeftEnabled.checked = derivedChecked;
+    topLeftMetric.disabled = !topLeftEnabled.checked;
+  }
+
+  if (topRightEnabled && topRightMetric) {
+    const metricSelected = topRightMetric.value === '1';
+    const derivedChecked = topRightEnabled.checked || metricSelected;
+    topRightEnabled.checked = derivedChecked;
+    topRightMetric.disabled = !topRightEnabled.checked;
+  }
+}
+
+function initChangeTracking() {
+  originalValues = {};
+  const inputs = document.querySelectorAll('input, select');
+  inputs.forEach((input, idx) => {
+    const name = input.name;
+    if (name) {
+      originalValues[name] = getValue(input);
+      input.addEventListener('change', () => {
+        syncMetricCheckboxes();
+        updateSubmitButton();
+      });
+      input.style.borderColor = '#ddd';
+    }
+  });
+
+  const oilCheckbox = document.querySelector('input[name="eng_oil_enabled"]');
+  if (oilCheckbox) {
+    oilCheckbox.addEventListener('change', updateOilPressureZoneVisibility);
+  }
+
+  syncMetricCheckboxes();
+  updateOilPressureZoneVisibility();
+  updateSubmitButton();
+}
+
+function hasChanges() {
+    const inputs = document.querySelectorAll('input, select');
+
+    for (let input of inputs) {
+        const name = input.name;
+        if (!name) continue;
+
+        if (getValue(input) !== originalValues[name]) {
+        return true;
+        }
+    }
+    return false;
+}
+
+function updateSubmitButton() {
+  const btn = document.getElementById('submitBtn');
+  if (!btn) return;
+  const has = hasChanges();
+  btn.disabled = !has;
+  let count = 0;
+  const inputs = document.querySelectorAll('input, select');
+  for (let input of inputs) {
+    const name = input.name;
+    if (getValue(input) !== originalValues[name]) {
+      count++;
+    }
+  }
+  btn.textContent = has ? `Save ${count} change${count>1?'s':''}` : 'No changes (disabled)';
+  inputs.forEach(input => {
+    const name = input.name;
+    if (!name) return;
+
+    let changed;
+    if (input.type === 'checkbox') {
+      changed = input.checked !== originalValues[name];
+    } else if (input.type === 'number') {
+      changed = parseFloat(input.value) !== parseFloat(originalValues[name]);
+    } else {
+      changed = input.value.trim() !== originalValues[name];
+    }
+
+    if (changed) {
+      input.style.borderColor = '#4CAF50';
+      input.style.boxShadow = '0 0 0 2px rgba(76,175,80,0.2)';
+    } else {
+      input.style.borderColor = '#ddd';
+      input.style.boxShadow = 'none';
+    }
+  });
+}
+
+initChangeTracking();
+
+async function saveDisplayConfig() {
+    const changedData = {};
+    const inputs = document.querySelectorAll('input, select');
+
+    syncMetricCheckboxes();
+    const topLeftCheckbox = document.querySelector('input[name="eng_top_left_enabled"]');
+    const topLeftMetric = document.querySelector('select[name="eng_top_left_metric"]');
+    const topRightCheckbox = document.querySelector('input[name="eng_top_right_enabled"]');
+    const topRightMetric = document.querySelector('select[name="eng_top_right_metric"]');
+
+    for (let input of inputs) {
+        const name = input.name;
+        if (!name) continue;
+
+        let value = getValue(input);
+        if (name === 'eng_top_left_enabled' && topLeftCheckbox) {
+            value = topLeftCheckbox.checked;
+        }
+        if (name === 'eng_top_left_metric' && topLeftMetric) {
+            value = topLeftMetric.value;
+        }
+        if (name === 'eng_top_right_enabled' && topRightCheckbox) {
+            value = topRightCheckbox.checked;
+        }
+        if (name === 'eng_top_right_metric' && topRightMetric) {
+            value = topRightMetric.value;
+        }
+
+        if (value !== originalValues[name]) {
+            changedData[name] = value;
+        }
+    }
+
+    if (Object.keys(changedData).length === 0) {
+        alert('No changes to save!');
+        return;
+    }
+    
+    try {
+        const json = JSON.stringify(changedData);
+
+        const response = await fetch('/display-config/save', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: json
+        });
+        if (response.ok) {
+            alert(`Saved ${Object.keys(changedData).length} changed field${Object.keys(changedData).length > 1 ? 's' : ''} successfully!`);
+            location.reload();
+        } else {
+            const text = await response.text();
+            alert('Error saving settings: ' + response.status + ' ' + text);
+            console.error('Save error:', response.status, text);
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+        console.error('Fetch error:', error);
+    }
+}
+</script>
+</body>
+</html>

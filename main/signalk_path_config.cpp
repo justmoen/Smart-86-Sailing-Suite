@@ -5,6 +5,7 @@
 #include <Preferences.h>
 #include <WebServer.h>
 #include <vector>
+#include <stdint.h>
 #include <esp_https_ota.h>
 #include <esp_crt_bundle.h>
 #include <esp_system.h>
@@ -13,8 +14,36 @@
 #include "screen_config.h"
 #include "ui_manager.h"
 
+extern const uint8_t _binary_web_admin_html_start[] asm("_binary_admin_html_start");
+extern const uint8_t _binary_web_firmware_html_start[] asm("_binary_firmware_html_start");
+extern const uint8_t _binary_web_signalk_config_html_start[] asm("_binary_signalk_config_html_start");
+extern const uint8_t _binary_web_display_config_html_start[] asm("_binary_display_config_html_start");
+
+static String html_escape(const String& value) {
+    String escaped;
+    escaped.reserve(value.length() + 16);
+    for (size_t i = 0; i < value.length(); ++i) {
+        switch (value.charAt(i)) {
+            case '&': escaped += "&amp;"; break;
+            case '<': escaped += "&lt;"; break;
+            case '>': escaped += "&gt;"; break;
+            case '\"': escaped += "&quot;"; break;
+            case '\'': escaped += "&#39;"; break;
+            default: escaped += value.charAt(i); break;
+        }
+    }
+    return escaped;
+}
+
+static void apply_template_value(String& html, const char* token, const String& value) {
+    String placeholder = "{{";
+    placeholder += token;
+    placeholder += "}}";
+    html.replace(placeholder, value);
+}
+
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "v0.7.24"
+#define FIRMWARE_VERSION "v0.7.25"
 #endif
 
 constexpr const char* kPrefsNamespace = "sk-config";
@@ -881,98 +910,7 @@ void export_config_to_json(JsonDocument& doc) {
 
 // Handle web home page - Tree-based expandable UI
 void handle_show_admin_index() {
-    String html = R"(<!DOCTYPE html>
-<html>
-<head>
-<meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'>
-<title>Configuration Administration</title>
-<style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 20px;
-    }
-    .container {
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        overflow: hidden;
-        max-width: 600px;
-        width: 100%;
-    }
-    .header {
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-        color: white;
-        padding: 40px 30px;
-        text-align: center;
-    }
-    .header h1 { font-size: 2em; margin-bottom: 10px; }
-    .header p { opacity: 0.9; }
-    .content {
-        padding: 40px 30px;
-    }
-    .menu-item {
-        display: block;
-        padding: 20px;
-        margin: 15px 0;
-        background: #f5f5f5;
-        border: 2px solid #e0e0e0;
-        border-radius: 8px;
-        text-decoration: none;
-        color: #333;
-        font-size: 1.1em;
-        font-weight: 600;
-        transition: all 0.2s;
-        cursor: pointer;
-        text-align: center;
-    }
-    .menu-item:hover {
-        background: #e8f4f8;
-        border-color: #2a5298;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(42, 82, 152, 0.2);
-    }
-    .menu-item.signalk { border-left: 4px solid #2196F3; }
-    .menu-item.display { border-left: 4px solid #4CAF50; }
-    .menu-item.firmware { border-left: 4px solid #ff9800; }
-    .description {
-        font-size: 0.85em;
-        color: #666;
-        margin-top: 5px;
-        font-weight: normal;
-    }
-</style>
-</head>
-<body>
-<div class='container'>
-    <div class='header'>
-        <h1>⚙️ Configuration</h1>
-        <p>Select an option to configure</p>
-    </div>
-    <div class='content'>
-        <a href='/signalk-config' class='menu-item signalk'>
-            Signal K Path Configuration
-            <div class='description'>Configure data paths from your Signal K server</div>
-        </a>
-        <a href='/display-config' class='menu-item display'>
-            Display Settings
-            <div class='description'>Customize gauges, units, and chart history</div>
-        </a>
-        <a href='/firmware' class='menu-item firmware'>
-            Firmware Updates
-            <div class='description'>Check GitHub releases, update, and rollback to older versions</div>
-        </a>
-    </div>
-</div>
-</body>
-</html>
-)";
+    String html(reinterpret_cast<const char*>(_binary_web_admin_html_start));
     web_server.send(200, "text/html", html);
 }
 
@@ -1137,1215 +1075,136 @@ void handle_firmware_rollback() {
 }
 
 void handle_show_firmware_page() {
-    String html;
-    html.reserve(20000);
-    html += R"(<!DOCTYPE html>
-<html>
-<head>
-<meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'>
-<title>Firmware Updates</title>
-<style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-        color: #333;
-        min-height: 100vh;
-        padding: 20px;
-    }
-    .container {
-        max-width: 900px;
-        margin: 0 auto;
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        overflow: hidden;
-    }
-    .header {
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-        color: white;
-        padding: 30px;
-        text-align: center;
-    }
-    .header h1 { font-size: 2em; margin-bottom: 10px; }
-    .content { padding: 30px; }
-    .section {
-        margin: 25px 0;
-        padding: 20px;
-        background: #f5f5f5;
-        border-radius: 8px;
-        border-left: 4px solid #ff9800;
-    }
-    .section h2 { margin-bottom: 12px; font-size: 1.2em; }
-    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
-    button, select {
-        padding: 12px 18px;
-        border-radius: 6px;
-        border: 1px solid #ddd;
-        font-size: 1em;
-    }
-    button {
-        background: #ff9800;
-        color: white;
-        border: none;
-        font-weight: 600;
-        cursor: pointer;
-    }
-    button.secondary {
-        background: #2196F3;
-    }
-    button.danger {
-        background: #e53935;
-    }
-    .status {
-        background: #fff8e1;
-        border-left: 4px solid #ffb300;
-        padding: 12px 14px;
-        border-radius: 6px;
-        margin-top: 12px;
-        color: #5d4700;
-    }
-    .meta {
-        font-size: 0.9em;
-        color: #666;
-        margin-top: 8px;
-    }
-    .back-link {
-        display: inline-block;
-        margin-bottom: 20px;
-        padding: 8px 16px;
-        background: #f5f5f5;
-        border-radius: 6px;
-        text-decoration: none;
-        color: #333;
-        font-weight: 600;
-        border: 1px solid #ddd;
-    }
-    select {
-        min-width: 220px;
-        background: white;
-    }
-</style>
-</head>
-<body>
-<div class='container'>
-    <div class='header'>
-        <h1>Firmware Updates</h1>
-        <p>Check for software releases and choose a rollback target</p>
-    </div>
-    <div class='content'>
-        <a class='back-link' href='/'>← Back to Administration</a>
-
-        <div class='section'>
-            <h2>Current Firmware</h2>
-            <div class='meta'>Current version: <strong id='currentVersion'>loading...</strong></div>
-            <div class='meta'>Latest release found: <strong id='latestVersion'>checking...</strong></div>
-            <div id='statusBox' class='status'>Checking GitHub for the most recent release...</div>
-            <div class='row'>
-                <button class='secondary' id='checkBtn' type='button'>Check for Updates</button>
-                <button id='updateBtn' type='button'>Update to Latest Release</button>
-                <button class='secondary' id='skipBtn' type='button'>Skip This Release</button>
-            </div>
-        </div>
-
-        <div class='section'>
-            <h2>Rollback to a Recent Release</h2>
-            <div class='row'>
-                <select id='rollbackSelect'>
-                    <option value=''>Loading recent releases...</option>
-                </select>
-                <button class='danger' id='rollbackBtn' type='button'>Install Selected Rollback</button>
-            </div>
-            <div class='meta'>This keeps the last five public GitHub release tags available for user-selected rollback and will flash the chosen release only when you confirm.</div>
-        </div>
-    </div>
-</div>
-<script>
-const currentVersionEl = document.getElementById('currentVersion');
-const latestVersionEl = document.getElementById('latestVersion');
-const statusBoxEl = document.getElementById('statusBox');
-const rollbackSelectEl = document.getElementById('rollbackSelect');
-
-async function loadStatus() {
-    try {
-        const res = await fetch('/firmware/status');
-        const data = await res.json();
-        currentVersionEl.textContent = data.currentVersion || 'unknown';
-        latestVersionEl.textContent = data.latestVersion || 'unknown';
-        statusBoxEl.textContent = data.message || 'No status available.';
-
-        const options = [];
-        if (Array.isArray(data.releases)) {
-            data.releases.forEach((release) => {
-                if (release && release.tag) {
-                    options.push(`<option value='${release.tag}'>${release.tag}</option>`);
-                }
-            });
-        }
-
-        if (options.length > 0) {
-            rollbackSelectEl.innerHTML = '<option value="">Select a prior release</option>' + options.join('');
-        } else {
-            rollbackSelectEl.innerHTML = '<option value="">No releases available</option>';
-        }
-
-        const updateBtn = document.getElementById('updateBtn');
-        const skipBtn = document.getElementById('skipBtn');
-        if (data.hasUpdate) {
-            updateBtn.disabled = false;
-            updateBtn.textContent = `Update to ${data.latestVersion}`;
-            skipBtn.disabled = false;
-            skipBtn.textContent = `Skip ${data.latestVersion}`;
-        } else if (data.skipThisRelease) {
-            updateBtn.disabled = true;
-            updateBtn.textContent = 'Skipped release';
-            skipBtn.disabled = true;
-            skipBtn.textContent = 'Release skipped';
-        } else {
-            updateBtn.disabled = true;
-            updateBtn.textContent = 'No update available';
-            skipBtn.disabled = true;
-            skipBtn.textContent = 'Skip This Release';
-        }
-    } catch (err) {
-        statusBoxEl.textContent = 'Error contacting the firmware update endpoint.';
-        console.error(err);
-    }
-}
-
-document.getElementById('checkBtn').addEventListener('click', loadStatus);
-
-document.getElementById('updateBtn').addEventListener('click', async () => {
-    const latestTag = document.getElementById('latestVersion').textContent.trim();
-    if (!latestTag || latestTag === 'unknown' || latestTag === 'checking...') {
-        statusBoxEl.textContent = 'There is no newer release to install yet.';
-        return;
-    }
-
-    statusBoxEl.textContent = 'Requesting update confirmation for ' + latestTag + '...';
-    const res = await fetch('/firmware/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tag: latestTag })
-    });
-    const data = await res.json();
-    statusBoxEl.textContent = data.message || 'Update request sent.';
-    await loadStatus();
-});
-
-document.getElementById('skipBtn').addEventListener('click', async () => {
-    const latestTag = document.getElementById('latestVersion').textContent.trim();
-    if (!latestTag || latestTag === 'unknown' || latestTag === 'checking...') {
-        statusBoxEl.textContent = 'There is no release to skip yet.';
-        return;
-    }
-
-    statusBoxEl.textContent = 'Skipping release ' + latestTag + '...';
-    const res = await fetch('/firmware/skip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tag: latestTag })
-    });
-    const data = await res.json();
-    statusBoxEl.textContent = data.message || 'Release skipped.';
-    await loadStatus();
-});
-
-document.getElementById('rollbackBtn').addEventListener('click', async () => {
-    const tag = rollbackSelectEl.value;
-    if (!tag) {
-        statusBoxEl.textContent = 'Choose a release from the list before saving the rollback target.';
-        return;
-    }
-
-    const res = await fetch('/firmware/rollback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tag })
-    });
-    const data = await res.json();
-    statusBoxEl.textContent = data.message || 'Rollback target saved.';
-});
-
-loadStatus();
-</script>
-</body>
-</html>
-)";
+    String html(reinterpret_cast<const char*>(_binary_web_firmware_html_start));
     web_server.send(200, "text/html", html);
 }
-
 void handle_show_signalk_config_page() {
-    String html;
-    html.reserve(16000);
-    html += R"(<!DOCTYPE html>
-<html>
-<head>
-<meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'>
-<title>Signal K Path Configuration</title>
-<style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-        color: #333;
-        min-height: 100vh;
-        padding: 20px;
-    }
-    .container {
-        max-width: 1000px;
-        margin: 0 auto;
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        overflow: hidden;
-    }
-    .header {
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-        color: white;
-        padding: 30px;
-        text-align: center;
-    }
-    .header h1 { font-size: 2em; margin-bottom: 10px; }
-    .header p { opacity: 0.9; font-size: 0.95em; }
-    .content { padding: 30px; }
-    .tree-item {
-        margin: 10px 0;
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        overflow: hidden;
-    }
-    .tree-toggle {
-        display: flex;
-        align-items: center;
-        padding: 15px;
-        background: #f5f5f5;
-        cursor: pointer;
-        user-select: none;
-        border: none;
-        width: 100%;
-        text-align: left;
-        font-size: 1em;
-        font-weight: 600;
-        color: #333;
-        transition: background 0.2s;
-    }
-    .tree-toggle:hover { background: #efefef; }
-    .tree-toggle.expanded { background: #e8f4f8; }
-    .tree-toggle::before {
-        content: '▶';
-        display: inline-block;
-        margin-right: 10px;
-        transition: transform 0.2s;
-    }
-    .tree-toggle.expanded::before { transform: rotate(90deg); }
-    .tree-content {
-        display: none;
-        padding: 20px;
-        background: white;
-        border-top: 1px solid #e0e0e0;
-    }
-    .tree-content.expanded { display: block; }
-    .nested-toggle {
-        display: flex;
-        align-items: center;
-        padding: 12px;
-        background: #fafafa;
-        cursor: pointer;
-        user-select: none;
-        border: none;
-        width: 100%;
-        text-align: left;
-        font-size: 0.95em;
-        font-weight: 600;
-        color: #555;
-        transition: background 0.2s;
-        border-left: 3px solid #ddd;
-        margin: 15px 0 10px 0;
-    }
-    .nested-toggle:hover { background: #f0f0f0; }
-    .nested-toggle.expanded { background: #e8f4f8; }
-    .nested-toggle::before {
-        content: '▶';
-        display: inline-block;
-        margin-right: 8px;
-        transition: transform 0.2s;
-        font-size: 0.8em;
-    }
-    .nested-toggle.expanded::before { transform: rotate(90deg); }
-    .nested-content {
-        display: none;
-        padding: 15px;
-        margin-left: 15px;
-        background: #fafafa;
-        border-left: 2px solid #ddd;
-    }
-    .nested-content.expanded { display: block; }
-    .form-group {
-        margin-bottom: 15px;
-    }
-    label {
-        display: block;
-        font-weight: 600;
-        margin-bottom: 5px;
-        color: #333;
-        font-size: 0.95em;
-    }
-    input[type="text"],
-    input[type="number"] {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ddd;
-        border-radius: 6px;
-        font-size: 0.95em;
-        font-family: 'Monaco', 'Courier New', monospace;
-    }
-    input:focus {
-        outline: none;
-        border-color: #2a5298;
-        box-shadow: 0 0 0 3px rgba(42, 82, 152, 0.1);
-    }
-    .actions {
-        display: flex;
-        gap: 12px;
-        margin-top: 30px;
-        flex-wrap: wrap;
-    }
-    button {
-        padding: 12px 24px;
-        border: none;
-        border-radius: 6px;
-        font-size: 1em;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-    .btn-save {
-        background: #4CAF50;
-        color: white;
-    }
-    .btn-save:hover { background: #45a049; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3); }
-    .btn-export {
-        background: #2196F3;
-        color: white;
-    }
-    .btn-export:hover { background: #0b7dda; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3); }
-    .btn-reset {
-        background: #f44336;
-        color: white;
-    }
-    .btn-reset:hover { background: #d32f2f; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3); }
-    .info-text {
-        background: #e3f2fd;
-        border-left: 4px solid #2196F3;
-        padding: 15px;
-        margin: 20px 0;
-        border-radius: 4px;
-        color: #1565c0;
-        font-size: 0.95em;
-    }
-    .info-text {
-        background: #e3f2fd;
-        border-left: 4px solid #2196F3;
-        padding: 15px;
-        margin: 20px 0;
-        border-radius: 4px;
-        color: #1565c0;
-        font-size: 0.95em;
-    }
-    .back-link {
-        display: inline-block;
-        margin-bottom: 20px;
-        padding: 8px 16px;
-        background: #f5f5f5;
-        border-radius: 6px;
-        text-decoration: none;
-        color: #333;
-        font-weight: 600;
-        border: 1px solid #ddd;
-    }
-    .back-link:hover {
-        background: #efefef;
-    }
-</style>
-</head>
-<body>
-<div class='container'>
-    <div class='header'>
-        <h1>Signal K Configuration</h1>
-        <p>Manage Signal K data paths and display thresholds</p>
-    </div>
-    <div class='content'>
-        <div class='info-text'>
-            Configure Signal K paths for your boat's data model. Sections can be expanded to view and edit paths.
-        </div>
-        <div class='tree-item'>
-            <button type='button' class='tree-toggle expanded' onclick='toggleTree(this)'>Signal K Connection</button>
-            <div class='tree-content expanded'>
-                <div class='info-text'>
-                    If mDNS is unavailable on your network, set a fixed IP address and port here for the Signal K server.
-                </div>)";
-    html += "<div class='form-group'><label>Signal K Server IP / Host:</label><input type='text' name='signalk_override_host' value='";
-    html += get_manual_signalk_host();
-    html += "'></div>";
-    html += "<div class='form-group'><label>Signal K Server Port:</label><input type='number' name='signalk_override_port' value='";
-    html += String(get_manual_signalk_port());
-    html += R"(' min='1' max='65535'></div>
-            </div>
-        </div>
-        <form id='configForm'>
-)";
+    String html(reinterpret_cast<const char*>(_binary_web_signalk_config_html_start));
+    apply_template_value(html, "SIGNALK_HOST", html_escape(get_manual_signalk_host()));
+    apply_template_value(html, "SIGNALK_PORT", String(get_manual_signalk_port()));
+    apply_template_value(html, "NAVIGATION_RATE_OF_TURN", html_escape(config.navigation_rate_of_turn));
+    apply_template_value(html, "NAVIGATION_HEADING_MAGNETIC", html_escape(config.navigation_heading_magnetic));
+    apply_template_value(html, "NAVIGATION_POSITION", html_escape(config.navigation_position));
+    apply_template_value(html, "NAVIGATION_SPEED_OVER_GROUND", html_escape(config.navigation_speed_over_ground));
+    apply_template_value(html, "NAVIGATION_SPEED_THROUGH_WATER", html_escape(config.navigation_speed_through_water));
+    apply_template_value(html, "NAVIGATION_COURSE_OVER_GROUND_TRUE", html_escape(config.navigation_course_over_ground_true));
+    apply_template_value(html, "NAVIGATION_COURSE_RHUMBLINE_CROSS_TRACK_ERROR", html_escape(config.navigation_course_rhumbline_cross_track_error));
+    apply_template_value(html, "NAVIGATION_COURSE_RHUMBLINE_BEARING_TRACK_TRUE", html_escape(config.navigation_course_rhumbline_bearing_track_true));
+    apply_template_value(html, "NAVIGATION_COURSE_RHUMBLINE_NEXT_POINT_DISTANCE", html_escape(config.navigation_course_rhumbline_next_point_distance));
+    apply_template_value(html, "NAVIGATION_COURSE_RHUMBLINE_NEXT_POINT_VELOCITY_MADE_GOOD", html_escape(config.navigation_course_rhumbline_next_point_velocity_made_good));
+    apply_template_value(html, "NAVIGATION_STATE", html_escape(config.navigation_state));
+    apply_template_value(html, "NAVIGATION_ATTITUDE_ROLL", html_escape(config.navigation_attitude_roll));
+    apply_template_value(html, "NAVIGATION_ATTITUDE_PITCH", html_escape(config.navigation_attitude_pitch));
+    apply_template_value(html, "ENVIRONMENT_WIND_ANGLE_APPARENT", html_escape(config.environment_wind_angle_apparent));
+    apply_template_value(html, "ENVIRONMENT_WIND_ANGLE_TRUE_GROUND", html_escape(config.environment_wind_angle_true_ground));
+    apply_template_value(html, "ENVIRONMENT_WIND_ANGLE_TRUE_WATER", html_escape(config.environment_wind_angle_true_water));
+    apply_template_value(html, "ENVIRONMENT_WIND_SPEED_APPARENT", html_escape(config.environment_wind_speed_apparent));
+    apply_template_value(html, "ENVIRONMENT_WIND_SPEED_OVER_GROUND", html_escape(config.environment_wind_speed_over_ground));
+    apply_template_value(html, "ENVIRONMENT_WIND_SPEED_TRUE", html_escape(config.environment_wind_speed_true));
+    apply_template_value(html, "ENVIRONMENT_DEPTH_BELOW_KEEL", html_escape(config.environment_depth_below_keel));
+    apply_template_value(html, "ENVIRONMENT_DEPTH_BELOW_TRANSDUCER", html_escape(config.environment_depth_below_transducer));
+    apply_template_value(html, "ENVIRONMENT_DEPTH_BELOW_SURFACE", html_escape(config.environment_depth_below_surface));
+    apply_template_value(html, "ENVIRONMENT_OUTSIDE_PRESSURE", html_escape(config.environment_outside_pressure));
+    apply_template_value(html, "ENVIRONMENT_OUTSIDE_HUMIDITY", html_escape(config.environment_outside_humidity));
+    apply_template_value(html, "ENVIRONMENT_OUTSIDE_TEMPERATURE", html_escape(config.environment_outside_temperature));
+    apply_template_value(html, "ENVIRONMENT_OUTSIDE_ILLUMINANCE", html_escape(config.environment_outside_illuminance));
+    apply_template_value(html, "STEERING_RUDDER_ANGLE", html_escape(config.steering_rudder_angle));
+    apply_template_value(html, "VESSEL_DESIGN_BEAM_API", html_escape(config.vessel_design_beam_api));
+    apply_template_value(html, "VESSEL_DESIGN_AIR_HEIGHT_API", html_escape(config.vessel_design_air_height_api));
+    apply_template_value(html, "VESSEL_DESIGN_DRAFT_API", html_escape(config.vessel_design_draft_api));
+    apply_template_value(html, "VESSEL_DESIGN_LENGTH_API", html_escape(config.vessel_design_length_api));
+    apply_template_value(html, "VESSEL_NAME_API", html_escape(config.vessel_name_api));
+    apply_template_value(html, "VESSEL_MMSI_API", html_escape(config.vessel_mmsi_api));
+    apply_template_value(html, "VESSEL_NAVIGATION_STATE_API", html_escape(config.vessel_navigation_state_api));
 
-    // Navigation section
-    html += R"(
-            <div class='tree-item'>
-                <button type='button' class='tree-toggle expanded' onclick='toggleTree(this)'>Navigation</button>
-                <div class='tree-content expanded'>
-)";
-    html += "<div class='form-group'><label>Rate of Turn:</label><input type='text' name='nav_rot' value='" + config.navigation_rate_of_turn + "'></div>";
-    html += "<div class='form-group'><label>Heading Magnetic:</label><input type='text' name='nav_hdg' value='" + config.navigation_heading_magnetic + "'></div>";
-    html += "<div class='form-group'><label>Position:</label><input type='text' name='nav_pos' value='" + config.navigation_position + "'></div>";
-    html += "<div class='form-group'><label>Speed Over Ground:</label><input type='text' name='nav_sog' value='" + config.navigation_speed_over_ground + "'></div>";
-    html += "<div class='form-group'><label>Speed Through Water:</label><input type='text' name='nav_stw' value='" + config.navigation_speed_through_water + "'></div>";
-    html += "<div class='form-group'><label>Course Over Ground True:</label><input type='text' name='nav_cog' value='" + config.navigation_course_over_ground_true + "'></div>";
-    html += "<button type='button' class='nested-toggle expanded' onclick='toggleNested(event)'>Rhumbline Course</button>";
-    html += "<div class='nested-content expanded'>";
-    html += "<div class='form-group'><label>Cross Track Error:</label><input type='text' name='nav_xte' value='" + config.navigation_course_rhumbline_cross_track_error + "'></div>";
-    html += "<div class='form-group'><label>Bearing Track True:</label><input type='text' name='nav_brg' value='" + config.navigation_course_rhumbline_bearing_track_true + "'></div>";
-    html += "<div class='form-group'><label>Next Point Distance:</label><input type='text' name='nav_dist' value='" + config.navigation_course_rhumbline_next_point_distance + "'></div>";
-    html += "<div class='form-group'><label>Next Point VMG:</label><input type='text' name='nav_vmg' value='" + config.navigation_course_rhumbline_next_point_velocity_made_good + "'></div>";
-    html += "</div>";
-    html += "<div class='form-group'><label>Navigation State:</label><input type='text' name='nav_state' value='" + config.navigation_state + "'></div>";
-    html += "<button type='button' class='nested-toggle expanded' onclick='toggleNested(event)'>Attitude</button>";
-    html += "<div class='nested-content expanded'>";
-    html += "<div class='form-group'><label>Roll:</label><input type='text' name='nav_roll' value='" + config.navigation_attitude_roll + "'></div>";
-    html += "<div class='form-group'><label>Pitch:</label><input type='text' name='nav_pitch' value='" + config.navigation_attitude_pitch + "'></div>";
-    html += "</div>";
-    html += "                </div></div>";
-
-    // Environment section
-    html += R"(
-            <div class='tree-item'>
-                <button type='button' class='tree-toggle expanded' onclick='toggleTree(this)'>Environment</button>
-                <div class='tree-content expanded'>
-)";
-    html += "<button type='button' class='nested-toggle expanded' onclick='toggleNested(event)'>Wind</button>";
-    html += "<div class='nested-content expanded'>";
-    html += "<div class='form-group'><label>Angle Apparent:</label><input type='text' name='env_waa' value='" + config.environment_wind_angle_apparent + "'></div>";
-    html += "<div class='form-group'><label>Angle True Ground:</label><input type='text' name='env_watg' value='" + config.environment_wind_angle_true_ground + "'></div>";
-    html += "<div class='form-group'><label>Angle True Water:</label><input type='text' name='env_watw' value='" + config.environment_wind_angle_true_water + "'></div>";
-    html += "<div class='form-group'><label>Speed Apparent:</label><input type='text' name='env_wsa' value='" + config.environment_wind_speed_apparent + "'></div>";
-    html += "<div class='form-group'><label>Speed Over Ground:</label><input type='text' name='env_wsog' value='" + config.environment_wind_speed_over_ground + "'></div>";
-    html += "<div class='form-group'><label>Speed True:</label><input type='text' name='env_wst' value='" + config.environment_wind_speed_true + "'></div>";
-    html += "</div>";
-
-    html += "<button type='button' class='nested-toggle expanded' onclick='toggleNested(event)'>Depth</button>";
-    html += "<div class='nested-content expanded'>";
-    html += "<div class='form-group'><label>Below Keel:</label><input type='text' name='env_dbk' value='" + config.environment_depth_below_keel + "'></div>";
-    html += "<div class='form-group'><label>Below Transducer:</label><input type='text' name='env_dbt' value='" + config.environment_depth_below_transducer + "'></div>";
-    html += "<div class='form-group'><label>Below Surface:</label><input type='text' name='env_dbs' value='" + config.environment_depth_below_surface + "'></div>";
-    html += "</div>";
-
-    html += "<button type='button' class='nested-toggle expanded' onclick='toggleNested(event)'>Outside</button>";
-    html += "<div class='nested-content expanded'>";
-    html += "<div class='form-group'><label>Pressure:</label><input type='text' name='env_press' value='" + config.environment_outside_pressure + "'></div>";
-    html += "<div class='form-group'><label>Humidity:</label><input type='text' name='env_humid' value='" + config.environment_outside_humidity + "'></div>";
-    html += "<div class='form-group'><label>Temperature:</label><input type='text' name='env_temp' value='" + config.environment_outside_temperature + "'></div>";
-    html += "<div class='form-group'><label>Illuminance:</label><input type='text' name='env_illum' value='" + config.environment_outside_illuminance + "'></div>";
-    html += "</div>";
-    html += "                </div></div>";
-
-    // Steering section
-    html += R"(
-            <div class='tree-item'>
-                <button type='button' class='tree-toggle expanded' onclick='toggleTree(this)'>Steering</button>
-                <div class='tree-content expanded'>
-)";
-    html += "<div class='form-group'><label>Rudder Angle:</label><input type='text' name='steer_rudder' value='" + config.steering_rudder_angle + "'></div>";
-    html += "                </div></div>";
-
-    // Vessel section
-    html += R"(
-            <div class='tree-item'>
-                <button type='button' class='tree-toggle expanded' onclick='toggleTree(this)'>Vessel</button>
-                <div class='tree-content expanded'>
-)";
-    html += "<button type='button' class='nested-toggle expanded' onclick='toggleNested(event)'>Design</button>";
-    html += "<div class='nested-content expanded'>";
-    html += "<div class='form-group'><label>Beam API:</label><input type='text' name='vessel_beam' value='" + config.vessel_design_beam_api + "'></div>";
-    html += "<div class='form-group'><label>Air Height API:</label><input type='text' name='vessel_air' value='" + config.vessel_design_air_height_api + "'></div>";
-    html += "<div class='form-group'><label>Draft API:</label><input type='text' name='vessel_draft' value='" + config.vessel_design_draft_api + "'></div>";
-    html += "<div class='form-group'><label>Length API:</label><input type='text' name='vessel_len' value='" + config.vessel_design_length_api + "'></div>";
-    html += "</div>";
-    html += "<div class='form-group'><label>Name API:</label><input type='text' name='vessel_name' value='" + config.vessel_name_api + "'></div>";
-    html += "<div class='form-group'><label>MMSI API:</label><input type='text' name='vessel_mmsi' value='" + config.vessel_mmsi_api + "'></div>";
-    html += "<div class='form-group'><label>Navigation State API:</label><input type='text' name='vessel_nav' value='" + config.vessel_navigation_state_api + "'></div>";
-    html += "                </div></div>";
-
-    // Propulsion/Engines section
-    html += R"(
-            <div class='tree-item'>
-                <button type='button' class='tree-toggle expanded' onclick='toggleTree(this)'>Propulsion/Engines</button>
-                <div class='tree-content expanded'>
-)";
-    for (int i = 0; i < 2; i++) {
-        html += "<div class='form-group'><label>Engine " + String(i) + " Path:</label><input type='text' name='eng_path_" + String(i) + "' value='" + config.engine_paths[i] + "'></div>";
+    String enginePaths;
+    for (int i = 0; i < 2; ++i) {
+        enginePaths += "<div class='form-group'><label>Engine ";
+        enginePaths += String(i);
+        enginePaths += " Path:</label><input type='text' name='eng_path_";
+        enginePaths += String(i);
+        enginePaths += "' value='";
+        enginePaths += html_escape(config.engine_paths[i]);
+        enginePaths += "'></div>";
     }
-    html += "                </div></div>";
+    apply_template_value(html, "ENGINE_PATHS", enginePaths);
 
-    // Tanks section - Signal K paths only
-    html += R"(
-            <div class='tree-item'>
-                <button type='button' class='tree-toggle expanded' onclick='toggleTree(this)'>Tanks</button>
-                <div class='tree-content expanded'>
-                    <div class='info-text'>
-                        Tank paths: tanks.{fluid}.{index}.currentLevel<br>
-                        Fluid keywords (lowercase): fuel, fresh_water/fresh, waste_water/grey_water/grey, black_water/black, lubrication/lube, live_well/livewell, gas
-                    </div>
-)";
-    for (int i = 0; i < config.num_tanks; i++) {
-        html += "<div class='form-group'>";
-        html += "<label>Tank " + String(i) + " Path:</label>";
-        html += "<input type='text' name='tank_path_" + String(i) + "' placeholder='e.g., tanks.fuel.0.currentLevel' value='" + config.tank_paths[i] + "'>";
-        html += "</div>";
+    String tankPaths;
+    for (int i = 0; i < config.num_tanks; ++i) {
+        tankPaths += "<div class='form-group'>";
+        tankPaths += "<label>Tank ";
+        tankPaths += String(i);
+        tankPaths += " Path:</label>";
+        tankPaths += "<input type='text' name='tank_path_";
+        tankPaths += String(i);
+        tankPaths += "' placeholder='e.g., tanks.fuel.0.currentLevel' value='";
+        tankPaths += html_escape(config.tank_paths[i]);
+        tankPaths += "'>";
+        tankPaths += "</div>";
     }
-    html += "                </div></div>";
-
-    html += R"(
-        </form>
-        <div class='actions'>
-            <a class='back-link' href='/'>← Back to Administration</a>
-            <button type='button' id='submitBtn' class='btn-save' onclick='saveConfig()' disabled>No changes to save</button>
-            <button class='btn-export' onclick='exportConfig()'>Export JSON</button>
-            <button class='btn-reset' onclick='if(confirm("Reset all to defaults?")) resetConfig()'>Reset to Defaults</button>
-        </div>
-    </div>
-</div>
-<script>
-function toggleTree(button) {
-    event.preventDefault();
-    button.classList.toggle('expanded');
-    const content = button.nextElementSibling;
-    content.classList.toggle('expanded');
-}
-
-function toggleNested(event) {
-    event.preventDefault();
-    const button = event.target;
-    button.classList.toggle('expanded');
-    const content = button.nextElementSibling;
-    content.classList.toggle('expanded');
-}
-
-window.originalValues = {};
-window.changeCount = 0;
-window.initChangeTracking = function() {
-  console.log('initChangeTracking called');
-  originalValues = {};
-  const inputs = document.querySelectorAll('input, select');
-  console.log('Found inputs:', inputs.length);
-  inputs.forEach((input, idx) => {
-    const name = input.name;
-    if (name) {
-      originalValues[name] = input.value.trim();
-      console.log('Input', idx, name, ':', originalValues[name]);
-      input.addEventListener('input', updateSubmitButton);
-      input.addEventListener('change', updateSubmitButton);
-      // Visual feedback
-      input.style.borderColor = '#ddd';
-    }
-  });
-  updateSubmitButton();
-}
-
-window.hasChanges = function() {
-  const inputs = document.querySelectorAll('input, select');
-  for (let input of inputs) {
-    const name = input.name;
-    if (name && input.value.trim() !== originalValues[name]) {
-      return true;
-    }
-  }
-  return false;
-}
-
-window.updateSubmitButton = function() {
-  console.log('updateSubmitButton called');
-  const btn = document.getElementById('submitBtn');
-  if (!btn) {
-    console.log('No submitBtn found');
-    return;
-  }
-  const has = window.hasChanges();
-  btn.disabled = !has;
-  // Count
-  let count = 0;
-  const inputs = document.querySelectorAll('input, select');
-  for (let input of inputs) {
-    const name = input.name;
-    if (name && input.value.trim() !== originalValues[name]) {
-      count++;
-      console.log('Changed:', name, input.value.trim(), 'vs', originalValues[name]);
-    }
-  }
-  console.log('Change count:', count, 'hasChanges:', has);
-  btn.textContent = has ? `Save ${count} change${count>1?'s':''}` : 'No changes (button disabled)';
-  // Visual: highlight changed inputs
-  inputs.forEach(input => {
-    const name = input.name;
-    if (name && input.value.trim() !== originalValues[name]) {
-      input.style.borderColor = '#4CAF50';
-      input.style.boxShadow = '0 0 0 2px rgba(76,175,80,0.2)';
-    } else {
-      input.style.borderColor = '#ddd';
-      input.style.boxShadow = 'none';
-    }
-  });
-}
-
-window.restoreOriginals = function() {
-  Object.keys(originalValues).forEach(name => {
-    const input = document.querySelector(`[name="${name}"]`);
-    if (input) {
-      input.value = originalValues[name];
-      input.dispatchEvent(new Event('input'));
-    }
-  });
-}
-
-async function saveConfig() {
-    const changedData = {};
-    const inputs = document.querySelectorAll('input, select');
-    for (let input of inputs) {
-        const name = input.name;
-        let changed;
-        changed = input.value.trim() !== originalValues[name];
-
-        if (name && changed) {
-            if (input.value.trim() !== originalValues[name]) {
-                changedData[name] = input.value;
-            }
-        }
-    }
-    if (Object.keys(changedData).length === 0) {
-        alert('No changes to save!');
-        return;
-    }
-    
-    try {
-        const response = await fetch('/signalk-config/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(changedData)
-        });
-        if (response.ok) {
-            alert(`Saved ${Object.keys(changedData).length} changed field${Object.keys(changedData).length > 1 ? 's' : ''} successfully!`);
-            location.reload();
-        } else {
-            const text = await response.text();
-            alert('Error saving configuration: ' + response.status + ' ' + text);
-            console.error('Save error:', response.status, text);
-        }
-    } catch (error) {
-        alert('Error: ' + error.message);
-        console.error('Fetch error:', error);
-    }
-}
-
-async function exportConfig() {
-    const response = await fetch('/signalk-config/export');
-    const data = await response.json();
-    const json = JSON.stringify(data, null, 2);
-    const blob = new Blob([json], {type: 'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'signalk-config.json';
-    a.click();
-}
-
-async function resetConfig() {
-    const response = await fetch('/signalk-config/reset', {method: 'POST'});
-    if (response.ok) {
-        location.reload();
-    }
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-  console.log('DOM loaded, initializing change tracking');
-  window.initChangeTracking();
-});
- </script>
- </body>
- </html>
- )";
+    apply_template_value(html, "TANK_PATHS", tankPaths);
 
     web_server.send(200, "text/html", html);
 }
-
 void handle_show_display_config_page() {
     ESP_LOGI("WS", "[DEBUG] handle_show_display_config_page: rendering display config page\n");
-    String html;
-    html.reserve(8000);
-    html += R"(<!DOCTYPE html>
-<html>
-<head>
-<meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'>
-<title>Display Configuration</title>
-<style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        background: linear-gradient(135deg, #2a5298 0%, #1e3c72 100%);
-        color: #333;
-        min-height: 100vh;
-        padding: 20px;
-    }
-    .container {
-        max-width: 800px;
-        margin: 0 auto;
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        overflow: hidden;
-    }
-    .header {
-        background: linear-gradient(135deg, #2a5298 0%, #1e3c72 100%);
-        color: white;
-        padding: 30px;
-        text-align: center;
-    }
-    .header h1 { font-size: 2em; margin-bottom: 10px; }
-    .content { padding: 30px; }
-    .section {
-        margin: 25px 0;
-        padding: 20px;
-        background: #f5f5f5;
-        border-radius: 8px;
-        border-left: 4px solid #4CAF50;
-    }
-    .section h2 {
-        font-size: 1.2em;
-        margin-bottom: 15px;
-        color: #333;
-    }
-    .form-group {
-        margin-bottom: 15px;
-    }
-    label {
-        display: block;
-        font-weight: 600;
-        margin-bottom: 5px;
-        color: #333;
-        font-size: 0.95em;
-    }
-    input[type="text"],
-    input[type="number"],
-    select {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ddd;
-        border-radius: 6px;
-        font-size: 0.95em;
-    }
-    input:focus,
-    select:focus {
-        outline: none;
-        border-color: #2a5298;
-        box-shadow: 0 0 0 3px rgba(42, 82, 152, 0.1);
-    }
-    .actions {
-        display: flex;
-        gap: 12px;
-        margin-top: 30px;
-        flex-wrap: wrap;
-    }
-    button, a.back-link {
-        padding: 12px 24px;
-        border: none;
-        border-radius: 6px;
-        font-size: 1em;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-    .btn-save {
-        background: #4CAF50;
-        color: white;
-    }
-    .btn-save:hover { background: #45a049; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3); }
-    .back-link {
-        display: inline-block;
-        background: #f5f5f5;
-        border: 1px solid #ddd;
-        text-decoration: none;
-        color: #333;
-    }
-    .back-link:hover { background: #efefef; }
-</style>
-</head>
-<body>
-<div class='container'>
-    <div class='header'>
-        <h1>Display Settings</h1>
-        <p>Customize gauges, units, and historical data display</p>
-    </div>
-    <div class='content'>
-        <form id='displayForm'>
-            <div class='section'>
-                <h2>Unit of Measurement</h2>
-                <div class='form-group'>
-                    <label>Distance Unit:</label>
-                    <select name='dist_unit'>
-                        <option value='0' )";
-    html += (config.distance_unit == DistanceUnit::Meters) ? "selected" : "";
-    html += R"(>Meters</option>
-                        <option value='1' )";
-    html += (config.distance_unit == DistanceUnit::Feet) ? "selected" : "";
-    html += R"(>Feet</option>
-                    </select>
-                </div>
-                <div class='form-group'>
-                    <label>Temperature Unit:</label>
-                    <select name='temp_unit'>
-                        <option value='0' )";
-    html += (config.temperature_unit == TemperatureUnit::Celsius) ? "selected" : "";
-    html += R"(>Celsius (°C)</option>
-                        <option value='1' )";
-    html += (config.temperature_unit == TemperatureUnit::Fahrenheit) ? "selected" : "";
-    html += R"(>Fahrenheit (°F)</option>
-                    </select>
-                </div>
-            </div>
+    String html(reinterpret_cast<const char*>(_binary_web_display_config_html_start));
 
-            <div class='section'>
-                <h2>Engine Gauges</h2>
-                <div class='form-group'><label>Number of Engines:</label><input type='number' name='num_engines' value=')";
-    html += String(config.num_engines);
-    html += R"(' min='1' max='8'></div>
-                <div class='form-group'>
-                    <label style='display:flex; align-items:center; gap:10px;'>
-                        <input type='checkbox' name='eng_oil_enabled' value='true' )";
-    html += config.engine_oil_pressure_enabled ? "checked" : "";
-    html += R"(> Show Oil Pressure Gauge
-                    </label>
-                </div>
-                <div class='form-group'>
-                    <label style='display:flex; align-items:center; gap:10px;'>
-                        <input type='checkbox' name='eng_top_left_enabled' value='true' )";
-    html += config.engine_top_left_enabled ? "checked" : "";
-    html += R"(> Show Top Left Engine Metric
-                    </label>
-                    <select name='eng_top_left_metric'>
-                        <option value='0' )";
-    html += config.engine_top_left_metric == EngineTopLeftMetric::SOG ? "selected" : "";
-    html += R"(>SOG (kt)</option>
-                        <option value='1' )";
-    html += config.engine_top_left_metric == EngineTopLeftMetric::ThrottlePercent ? "selected" : "";
-    html += R"(>Throttle (%)</option>
-                    </select>
-                </div>
-                <div class='form-group'>
-                    <label style='display:flex; align-items:center; gap:10px;'>
-                        <input type='checkbox' name='eng_top_right_enabled' value='true' )";
-    html += config.engine_top_right_enabled ? "checked" : "";
-    html += R"(> Show Top Right Engine Metric
-                    </label>
-                    <select name='eng_top_right_metric'>
-                        <option value='0' )";
-    html += config.engine_top_right_metric == EngineTopRightMetric::AlternatorVoltage ? "selected" : "";
-    html += R"(>Alternator Voltage</option>
-                        <option value='1' )";
-    html += config.engine_top_right_metric == EngineTopRightMetric::BatteryVoltage ? "selected" : "";
-    html += R"(>Battery Voltage</option>
-                    </select>
-                </div>
-                <div id='oilPressureZoneFields' class='form-group' style='" )";
-    html += config.engine_oil_pressure_enabled ? "" : "display:none;";
-    html += R"('>
-                    <label>Oil Pressure Green Zone Minimum (PSI):</label><input type='number' name='eng_oil_min' value=')";
-    html += String(config.engine_oil_pressure_min, 1);
-    html += R"(' step='0.1'>
-                </div>
-                <div id='oilPressureZoneMaxFields' class='form-group' style='" )";
-    html += config.engine_oil_pressure_enabled ? "" : "display:none;";
-    html += R"('>
-                    <label>Oil Pressure Green Zone Maximum (PSI):</label><input type='number' name='eng_oil_max' value=')";
-    html += String(config.engine_oil_pressure_max, 1);
-    html += R"(' step='0.1'>
-                </div>
-                <div class='form-group'><label>Temperature Redline (°C):</label><input type='number' name='eng_temp_red' value=')";
-    html += String(config.engine_temp_redline, 1);
-    html += R"(' step='0.1'></div>
-            </div>
+    apply_template_value(html, "DIST_METERS_SELECTED", (config.distance_unit == DistanceUnit::Meters) ? "selected" : "");
+    apply_template_value(html, "DIST_FEET_SELECTED", (config.distance_unit == DistanceUnit::Feet) ? "selected" : "");
+    apply_template_value(html, "TEMP_CELSIUS_SELECTED", (config.temperature_unit == TemperatureUnit::Celsius) ? "selected" : "");
+    apply_template_value(html, "TEMP_FAHRENHEIT_SELECTED", (config.temperature_unit == TemperatureUnit::Fahrenheit) ? "selected" : "");
+    apply_template_value(html, "NUM_ENGINES", String(config.num_engines));
+    apply_template_value(html, "ENG_OIL_ENABLED_CHECKED", config.engine_oil_pressure_enabled ? "checked" : "");
+    apply_template_value(html, "ENG_TOP_LEFT_ENABLED_CHECKED", config.engine_top_left_enabled ? "checked" : "");
+    apply_template_value(html, "TOP_LEFT_SOG_SELECTED", config.engine_top_left_metric == EngineTopLeftMetric::SOG ? "selected" : "");
+    apply_template_value(html, "TOP_LEFT_THROTTLE_SELECTED", config.engine_top_left_metric == EngineTopLeftMetric::ThrottlePercent ? "selected" : "");
+    apply_template_value(html, "ENG_TOP_RIGHT_ENABLED_CHECKED", config.engine_top_right_enabled ? "checked" : "");
+    apply_template_value(html, "TOP_RIGHT_ALT_SELECTED", config.engine_top_right_metric == EngineTopRightMetric::AlternatorVoltage ? "selected" : "");
+    apply_template_value(html, "TOP_RIGHT_BATTERY_SELECTED", config.engine_top_right_metric == EngineTopRightMetric::BatteryVoltage ? "selected" : "");
+    apply_template_value(html, "OIL_MIN_STYLE", config.engine_oil_pressure_enabled ? "" : "display:none;");
+    apply_template_value(html, "OIL_MAX_STYLE", config.engine_oil_pressure_enabled ? "" : "display:none;");
+    apply_template_value(html, "ENGINE_OIL_PRESSURE_MIN", String(config.engine_oil_pressure_min, 1));
+    apply_template_value(html, "ENGINE_OIL_PRESSURE_MAX", String(config.engine_oil_pressure_max, 1));
+    apply_template_value(html, "ENGINE_TEMP_REDLINE", String(config.engine_temp_redline, 1));
+    apply_template_value(html, "NUM_TANKS", String(config.num_tanks));
+    apply_template_value(html, "DEPTH_CHART_DURATION", String(config.depth_chart_duration));
+    apply_template_value(html, "SPEED_CHART_DURATION", String(config.speed_chart_duration));
 
-            <div class='section'>
-                <h2>Tank Display</h2>
-                <div class='form-group'><label>Number of Tanks:</label><input type='number' name='num_tanks' value=')";
-    html += String(config.num_tanks);
-    html += R"(' min='1' max='8'></div>
-                <p style='font-size: 0.9em; color: #666;'>Tank bar dimensions are automatically calculated based on the number of tanks configured.</p>
-            </div>
-
-            <div class='section'>
-                <h2>Historical Chart Data</h2>
-                <div class='form-group'><label>Depth Chart Duration (minutes):</label><input type='number' name='depth_chart_min' value=')";
-    html += String(config.depth_chart_duration);
-    html += R"(' min='5' max='120'></div>
-                <div class='form-group'><label>Speed Chart Duration (minutes):</label><input type='number' name='speed_chart_min' value=')";
-    html += String(config.speed_chart_duration);
-    html += R"(' min='5' max='120'></div>
-                <p style='font-size: 0.9em; color: #666;'><strong>The full chart width will display the configured duration of historical data.</strong></p>
-            </div>)";
-
-    html += R"(<div class='section'>
-                <h2>Screens</h2>)";
-
-    for (int i = 0; i < config.num_engines; i++) {
+    String engineScreens;
+    for (int i = 0; i < config.num_engines; ++i) {
         char id[20];
         sprintf(id, "engine_%d", i);
-
-        html += R"(<div>)";
-        html += R"(<input type='checkbox' name='screen_)" + String(id) + R"(' )";
-
+        engineScreens += "<div><input type='checkbox' name='screen_";
+        engineScreens += id;
+        engineScreens += "' ";
         if (is_screen_enabled(id)) {
-            html += R"(checked)";
+            engineScreens += "checked";
         }
-
-        html += R"(> Engine )";
-        html += String(i + 1);
-        html += R"(</div>)";
+        engineScreens += "> Engine ";
+        engineScreens += String(i + 1);
+        engineScreens += "</div>";
     }
+    apply_template_value(html, "ENGINE_SCREENS", engineScreens);
 
-    // Static screens
-    const char* static_screens[] = {
-        "wind", "depth", "speed", "compass", "gps", "tanks", "heel"
-    };
-
-    for (int i = 0; i < 7; i++) {
+    String staticScreens;
+    const char* static_screens[] = {"wind", "depth", "speed", "compass", "gps", "tanks", "heel"};
+    for (int i = 0; i < 7; ++i) {
         const char* id = static_screens[i];
-
-        html += R"(<div>)";
-        html += R"(<input type='checkbox' name='screen_)" + String(id) + R"(' )";
-
+        staticScreens += "<div><input type='checkbox' name='screen_";
+        staticScreens += id;
+        staticScreens += "' ";
         if (is_screen_enabled(id)) {
-            html += R"(checked)";
+            staticScreens += "checked";
         }
-
-        html += R"(> )";
-        html += id;
-        html += R"(</div>)";
+        staticScreens += "> ";
+        staticScreens += id;
+        staticScreens += "</div>";
     }
-
-    // Reboot (locked)
-    html += R"(<div>
-        </div>
-        </form>
-        <div class='actions'>
-            <a class='back-link' href='/'>← Back to Administration</a>
-            <button type='button' id='submitBtn' class='btn-save' onclick='saveDisplayConfig()' disabled>No changes to save</button>
-        </div>
-    </div>
-</div>
-<script>
-let originalValues = {};
-let changeCount = 0;
-
-function getValue(input) {
-    if (input.type === 'checkbox') {
-        return input.checked;  // boolean
-    } else if (input.type === 'number') {
-        return parseFloat(input.value);  // number
-    } else if (input.tagName === 'SELECT') {
-        return input.value;  // string (consistent)
-    } else {
-        return input.value.trim();  // string
-    }
-}
-
-function updateOilPressureZoneVisibility() {
-  const oilCheckbox = document.querySelector('input[name="eng_oil_enabled"]');
-  const zoneFields = document.getElementById('oilPressureZoneFields');
-  const zoneMaxFields = document.getElementById('oilPressureZoneMaxFields');
-
-  if (!oilCheckbox || !zoneFields || !zoneMaxFields) return;
-
-  const shouldShow = oilCheckbox.checked;
-  zoneFields.style.display = shouldShow ? '' : 'none';
-  zoneMaxFields.style.display = shouldShow ? '' : 'none';
-}
-
-function syncMetricCheckboxes() {
-  const topLeftEnabled = document.querySelector('input[name="eng_top_left_enabled"]');
-  const topLeftMetric = document.querySelector('select[name="eng_top_left_metric"]');
-  const topRightEnabled = document.querySelector('input[name="eng_top_right_enabled"]');
-  const topRightMetric = document.querySelector('select[name="eng_top_right_metric"]');
-
-  if (topLeftEnabled && topLeftMetric) {
-    const metricSelected = topLeftMetric.value === '1';
-    const derivedChecked = topLeftEnabled.checked || metricSelected;
-    topLeftEnabled.checked = derivedChecked;
-    topLeftMetric.disabled = !topLeftEnabled.checked;
-  }
-
-  if (topRightEnabled && topRightMetric) {
-    const metricSelected = topRightMetric.value === '1';
-    const derivedChecked = topRightEnabled.checked || metricSelected;
-    topRightEnabled.checked = derivedChecked;
-    topRightMetric.disabled = !topRightEnabled.checked;
-  }
-}
-
-function initChangeTracking() {
-  originalValues = {};
-  const inputs = document.querySelectorAll('input, select');
-  inputs.forEach((input, idx) => {
-    const name = input.name;
-    if (name) {
-      originalValues[name] = getValue(input);
-      input.addEventListener('change', () => {
-        syncMetricCheckboxes();
-        updateSubmitButton();
-      });
-      input.style.borderColor = '#ddd';
-    }
-  });
-
-  const oilCheckbox = document.querySelector('input[name="eng_oil_enabled"]');
-  if (oilCheckbox) {
-    oilCheckbox.addEventListener('change', updateOilPressureZoneVisibility);
-  }
-
-  syncMetricCheckboxes();
-  updateOilPressureZoneVisibility();
-  updateSubmitButton();
-}
-
-function hasChanges() {
-    const inputs = document.querySelectorAll('input, select');
-
-    for (let input of inputs) {
-        const name = input.name;
-        if (!name) continue;
-
-        if (getValue(input) !== originalValues[name]) {
-        return true;
-        }
-    }
-    return false;
-}
-
-function updateSubmitButton() {
-  const btn = document.getElementById('submitBtn');
-  if (!btn) return;
-  const has = hasChanges();
-  btn.disabled = !has;
-  let count = 0;
-  const inputs = document.querySelectorAll('input, select');
-  for (let input of inputs) {
-    const name = input.name;
-    if (getValue(input) !== originalValues[name]) {
-      count++;
-    }
-  }
-  btn.textContent = has ? `Save ${count} change${count>1?'s':''}` : 'No changes (disabled)';
-  inputs.forEach(input => {
-    const name = input.name;
-    if (!name) return;
-
-    let changed;
-    if (input.type === 'checkbox') {
-      changed = input.checked !== originalValues[name];
-    } else if (input.type === 'number') {
-      changed = parseFloat(input.value) !== parseFloat(originalValues[name]);
-    } else {
-      changed = input.value.trim() !== originalValues[name];
-    }
-
-    if (changed) {
-      input.style.borderColor = '#4CAF50';
-      input.style.boxShadow = '0 0 0 2px rgba(76,175,80,0.2)';
-    } else {
-      input.style.borderColor = '#ddd';
-      input.style.boxShadow = 'none';
-    }
-  });
-}
-
-initChangeTracking();
-
-async function saveDisplayConfig() {
-    const changedData = {};
-    const inputs = document.querySelectorAll('input, select');
-
-    syncMetricCheckboxes();
-    const topLeftCheckbox = document.querySelector('input[name="eng_top_left_enabled"]');
-    const topLeftMetric = document.querySelector('select[name="eng_top_left_metric"]');
-    const topRightCheckbox = document.querySelector('input[name="eng_top_right_enabled"]');
-    const topRightMetric = document.querySelector('select[name="eng_top_right_metric"]');
-
-    for (let input of inputs) {
-        const name = input.name;
-        if (!name) continue;
-
-        let value = getValue(input);
-        if (name === 'eng_top_left_enabled' && topLeftCheckbox) {
-            value = topLeftCheckbox.checked;
-        }
-        if (name === 'eng_top_left_metric' && topLeftMetric) {
-            value = topLeftMetric.value;
-        }
-        if (name === 'eng_top_right_enabled' && topRightCheckbox) {
-            value = topRightCheckbox.checked;
-        }
-        if (name === 'eng_top_right_metric' && topRightMetric) {
-            value = topRightMetric.value;
-        }
-
-        if (value !== originalValues[name]) {
-            changedData[name] = value;
-        }
-    }
-
-    if (Object.keys(changedData).length === 0) {
-        alert('No changes to save!');
-        return;
-    }
-    
-    try {
-        const json = JSON.stringify(changedData);
-
-        const response = await fetch('/display-config/save', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: json
-        });
-        if (response.ok) {
-            alert(`Saved ${Object.keys(changedData).length} changed field${Object.keys(changedData).length > 1 ? 's' : ''} successfully!`);
-            location.reload();
-        } else {
-            const text = await response.text();
-            alert('Error saving settings: ' + response.status + ' ' + text);
-            console.error('Save error:', response.status, text);
-        }
-    } catch (error) {
-        alert('Error: ' + error.message);
-        console.error('Fetch error:', error);
-    }
-}
-</script>
-</body>
-</html>
-)";
+    apply_template_value(html, "STATIC_SCREENS", staticScreens);
 
     web_server.send(200, "text/html", html);
 }
-
 void handle_save_config() {
     // Read JSON body from POST request
     // Get content length from server parameter

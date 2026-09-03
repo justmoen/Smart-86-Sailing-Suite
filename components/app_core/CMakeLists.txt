@@ -32,4 +32,10 @@ idf_component_register(
         waveshare__esp32_p4_wifi6_touch_lcd_4b
         ArduinoJson
         WebSockets
+
+    EMBED_TXTFILES
+        "web/admin.html"
+        "web/firmware.html"
+        "web/signalk_config.html"
+        "web/display_config.html"
 )

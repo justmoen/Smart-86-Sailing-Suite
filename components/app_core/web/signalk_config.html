@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Signal K Path Configuration</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        color: #333;
+        min-height: 100vh;
+        padding: 20px;
+    }
+    .container {
+        max-width: 1000px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        overflow: hidden;
+    }
+    .header {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        color: white;
+        padding: 30px;
+        text-align: center;
+    }
+    .header h1 { font-size: 2em; margin-bottom: 10px; }
+    .header p { opacity: 0.9; font-size: 0.95em; }
+    .content { padding: 30px; }
+    .tree-item {
+        margin: 10px 0;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .tree-toggle {
+        display: flex;
+        align-items: center;
+        padding: 15px;
+        background: #f5f5f5;
+        cursor: pointer;
+        user-select: none;
+        border: none;
+        width: 100%;
+        text-align: left;
+        font-size: 1em;
+        font-weight: 600;
+        color: #333;
+        transition: background 0.2s;
+    }
+    .tree-toggle:hover { background: #efefef; }
+    .tree-toggle.expanded { background: #e8f4f8; }
+    .tree-toggle::before {
+        content: '▶';
+        display: inline-block;
+        margin-right: 10px;
+        transition: transform 0.2s;
+    }
+    .tree-toggle.expanded::before { transform: rotate(90deg); }
+    .tree-content {
+        display: none;
+        padding: 20px;
+        background: white;
+        border-top: 1px solid #e0e0e0;
+    }
+    .tree-content.expanded { display: block; }
+    .nested-toggle {
+        display: flex;
+        align-items: center;
+        padding: 12px;
+        background: #fafafa;
+        cursor: pointer;
+        user-select: none;
+        border: none;
+        width: 100%;
+        text-align: left;
+        font-size: 0.95em;
+        font-weight: 600;
+        color: #555;
+        transition: background 0.2s;
+        border-left: 3px solid #ddd;
+        margin: 15px 0 10px 0;
+    }
+    .nested-toggle:hover { background: #f0f0f0; }
+    .nested-toggle.expanded { background: #e8f4f8; }
+    .nested-toggle::before {
+        content: '▶';
+        display: inline-block;
+        margin-right: 8px;
+        transition: transform 0.2s;
+        font-size: 0.8em;
+    }
+    .nested-toggle.expanded::before { transform: rotate(90deg); }
+    .nested-content {
+        display: none;
+        padding: 15px;
+        margin-left: 15px;
+        background: #fafafa;
+        border-left: 2px solid #ddd;
+    }
+    .nested-content.expanded { display: block; }
+    .form-group {
+        margin-bottom: 15px;
+    }
+    label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 5px;
+        color: #333;
+        font-size: 0.95em;
+    }
+    input[type="text"],
+    input[type="number"] {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 0.95em;
+        font-family: 'Monaco', 'Courier New', monospace;
+    }
+    input:focus {
+        outline: none;
+        border-color: #2a5298;
+        box-shadow: 0 0 0 3px rgba(42, 82, 152, 0.1);
+    }
+    .actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 30px;
+        flex-wrap: wrap;
+    }
+    button {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 6px;
+        font-size: 1em;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .btn-save {
+        background: #4CAF50;
+        color: white;
+    }
+    .btn-save:hover { background: #45a049; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3); }
+    .btn-export {
+        background: #2196F3;
+        color: white;
+    }
+    .btn-export:hover { background: #0b7dda; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3); }
+    .btn-reset {
+        background: #f44336;
+        color: white;
+    }
+    .btn-reset:hover { background: #d32f2f; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3); }
+    .info-text {
+        background: #e3f2fd;
+        border-left: 4px solid #2196F3;
+        padding: 15px;
+        margin: 20px 0;
+        border-radius: 4px;
+        color: #1565c0;
+        font-size: 0.95em;
+    }
+    .info-text {
+        background: #e3f2fd;
+        border-left: 4px solid #2196F3;
+        padding: 15px;
+        margin: 20px 0;
+        border-radius: 4px;
+        color: #1565c0;
+        font-size: 0.95em;
+    }
+    .back-link {
+        display: inline-block;
+        margin-bottom: 20px;
+        padding: 8px 16px;
+        background: #f5f5f5;
+        border-radius: 6px;
+        text-decoration: none;
+        color: #333;
+        font-weight: 600;
+        border: 1px solid #ddd;
+    }
+    .back-link:hover {
+        background: #efefef;
+    }
+</style>
+</head>
+<body>
+<div class='container'>
+    <div class='header'>
+        <h1>Signal K Configuration</h1>
+        <p>Manage Signal K data paths and display thresholds</p>
+    </div>
+    <div class='content'>
+        <div class='info-text'>
+            Configure Signal K paths for your boat's data model. Sections can be expanded to view and edit paths.
+        </div>
+        <div class='tree-item'>
+            <button type='button' class='tree-toggle expanded' onclick='toggleTree(this)'>Signal K Connection</button>
+            <div class='tree-content expanded'>
+                <div class='info-text'>
+                    If mDNS is unavailable on your network, set a fixed IP address and port here for the Signal K server.
+                </div><div class='form-group'><label>Signal K Server IP / Host:</label><input type='text' name='signalk_override_host' value='{{SIGNALK_HOST}}'></div><div class='form-group'><label>Signal K Server Port:</label><input type='number' name='signalk_override_port' value='{{SIGNALK_PORT}}' min='1' max='65535'></div>
+            </div>
+        </div>
+        <form id='configForm'>
+
+            <div class='tree-item'>
+                <button type='button' class='tree-toggle expanded' onclick='toggleTree(this)'>Navigation</button>
+                <div class='tree-content expanded'>
+<div class='form-group'><label>Rate of Turn:</label><input type='text' name='nav_rot' value='{{NAVIGATION_RATE_OF_TURN}}'></div><div class='form-group'><label>Heading Magnetic:</label><input type='text' name='nav_hdg' value='{{NAVIGATION_HEADING_MAGNETIC}}'></div><div class='form-group'><label>Position:</label><input type='text' name='nav_pos' value='{{NAVIGATION_POSITION}}'></div><div class='form-group'><label>Speed Over Ground:</label><input type='text' name='nav_sog' value='{{NAVIGATION_SPEED_OVER_GROUND}}'></div><div class='form-group'><label>Speed Through Water:</label><input type='text' name='nav_stw' value='{{NAVIGATION_SPEED_THROUGH_WATER}}'></div><div class='form-group'><label>Course Over Ground True:</label><input type='text' name='nav_cog' value='{{NAVIGATION_COURSE_OVER_GROUND_TRUE}}'></div><button type='button' class='nested-toggle expanded' onclick='toggleNested(event)'>Rhumbline Course</button><div class='nested-content expanded'><div class='form-group'><label>Cross Track Error:</label><input type='text' name='nav_xte' value='{{NAVIGATION_COURSE_RHUMBLINE_CROSS_TRACK_ERROR}}'></div><div class='form-group'><label>Bearing Track True:</label><input type='text' name='nav_brg' value='{{NAVIGATION_COURSE_RHUMBLINE_BEARING_TRACK_TRUE}}'></div><div class='form-group'><label>Next Point Distance:</label><input type='text' name='nav_dist' value='{{NAVIGATION_COURSE_RHUMBLINE_NEXT_POINT_DISTANCE}}'></div><div class='form-group'><label>Next Point VMG:</label><input type='text' name='nav_vmg' value='{{NAVIGATION_COURSE_RHUMBLINE_NEXT_POINT_VELOCITY_MADE_GOOD}}'></div></div><div class='form-group'><label>Navigation State:</label><input type='text' name='nav_state' value='{{NAVIGATION_STATE}}'></div><button type='button' class='nested-toggle expanded' onclick='toggleNested(event)'>Attitude</button><div class='nested-content expanded'><div class='form-group'><label>Roll:</label><input type='text' name='nav_roll' value='{{NAVIGATION_ATTITUDE_ROLL}}'></div><div class='form-group'><label>Pitch:</label><input type='text' name='nav_pitch' value='{{NAVIGATION_ATTITUDE_PITCH}}'></div></div>                </div></div>
+            <div class='tree-item'>
+                <button type='button' class='tree-toggle expanded' onclick='toggleTree(this)'>Environment</button>
+                <div class='tree-content expanded'>
+<button type='button' class='nested-toggle expanded' onclick='toggleNested(event)'>Wind</button><div class='nested-content expanded'><div class='form-group'><label>Angle Apparent:</label><input type='text' name='env_waa' value='{{ENVIRONMENT_WIND_ANGLE_APPARENT}}'></div><div class='form-group'><label>Angle True Ground:</label><input type='text' name='env_watg' value='{{ENVIRONMENT_WIND_ANGLE_TRUE_GROUND}}'></div><div class='form-group'><label>Angle True Water:</label><input type='text' name='env_watw' value='{{ENVIRONMENT_WIND_ANGLE_TRUE_WATER}}'></div><div class='form-group'><label>Speed Apparent:</label><input type='text' name='env_wsa' value='{{ENVIRONMENT_WIND_SPEED_APPARENT}}'></div><div class='form-group'><label>Speed Over Ground:</label><input type='text' name='env_wsog' value='{{ENVIRONMENT_WIND_SPEED_OVER_GROUND}}'></div><div class='form-group'><label>Speed True:</label><input type='text' name='env_wst' value='{{ENVIRONMENT_WIND_SPEED_TRUE}}'></div></div><button type='button' class='nested-toggle expanded' onclick='toggleNested(event)'>Depth</button><div class='nested-content expanded'><div class='form-group'><label>Below Keel:</label><input type='text' name='env_dbk' value='{{ENVIRONMENT_DEPTH_BELOW_KEEL}}'></div><div class='form-group'><label>Below Transducer:</label><input type='text' name='env_dbt' value='{{ENVIRONMENT_DEPTH_BELOW_TRANSDUCER}}'></div><div class='form-group'><label>Below Surface:</label><input type='text' name='env_dbs' value='{{ENVIRONMENT_DEPTH_BELOW_SURFACE}}'></div></div><button type='button' class='nested-toggle expanded' onclick='toggleNested(event)'>Outside</button><div class='nested-content expanded'><div class='form-group'><label>Pressure:</label><input type='text' name='env_press' value='{{ENVIRONMENT_OUTSIDE_PRESSURE}}'></div><div class='form-group'><label>Humidity:</label><input type='text' name='env_humid' value='{{ENVIRONMENT_OUTSIDE_HUMIDITY}}'></div><div class='form-group'><label>Temperature:</label><input type='text' name='env_temp' value='{{ENVIRONMENT_OUTSIDE_TEMPERATURE}}'></div><div class='form-group'><label>Illuminance:</label><input type='text' name='env_illum' value='{{ENVIRONMENT_OUTSIDE_ILLUMINANCE}}'></div></div>                </div></div>
+            <div class='tree-item'>
+                <button type='button' class='tree-toggle expanded' onclick='toggleTree(this)'>Steering</button>
+                <div class='tree-content expanded'>
+<div class='form-group'><label>Rudder Angle:</label><input type='text' name='steer_rudder' value='{{STEERING_RUDDER_ANGLE}}'></div>                </div></div>
+            <div class='tree-item'>
+                <button type='button' class='tree-toggle expanded' onclick='toggleTree(this)'>Vessel</button>
+                <div class='tree-content expanded'>
+<button type='button' class='nested-toggle expanded' onclick='toggleNested(event)'>Design</button><div class='nested-content expanded'><div class='form-group'><label>Beam API:</label><input type='text' name='vessel_beam' value='{{VESSEL_DESIGN_BEAM_API}}'></div><div class='form-group'><label>Air Height API:</label><input type='text' name='vessel_air' value='{{VESSEL_DESIGN_AIR_HEIGHT_API}}'></div><div class='form-group'><label>Draft API:</label><input type='text' name='vessel_draft' value='{{VESSEL_DESIGN_DRAFT_API}}'></div><div class='form-group'><label>Length API:</label><input type='text' name='vessel_len' value='{{VESSEL_DESIGN_LENGTH_API}}'></div></div><div class='form-group'><label>Name API:</label><input type='text' name='vessel_name' value='{{VESSEL_NAME_API}}'></div><div class='form-group'><label>MMSI API:</label><input type='text' name='vessel_mmsi' value='{{VESSEL_MMSI_API}}'></div><div class='form-group'><label>Navigation State API:</label><input type='text' name='vessel_nav' value='{{VESSEL_NAVIGATION_STATE_API}}'></div>                </div></div>
+            <div class='tree-item'>
+                <button type='button' class='tree-toggle expanded' onclick='toggleTree(this)'>Propulsion/Engines</button>
+                <div class='tree-content expanded'>
+{{ENGINE_PATHS}}                </div></div>
+            <div class='tree-item'>
+                <button type='button' class='tree-toggle expanded' onclick='toggleTree(this)'>Tanks</button>
+                <div class='tree-content expanded'>
+                    <div class='info-text'>
+                        Tank paths: tanks.{fluid}.{index}.currentLevel<br>
+                        Fluid keywords (lowercase): fuel, fresh_water/fresh, waste_water/grey_water/grey, black_water/black, lubrication/lube, live_well/livewell, gas
+                    </div>
+{{TANK_PATHS}}                </div></div>
+        </form>
+        <div class='actions'>
+            <a class='back-link' href='/'>← Back to Administration</a>
+            <button type='button' id='submitBtn' class='btn-save' onclick='saveConfig()' disabled>No changes to save</button>
+            <button class='btn-export' onclick='exportConfig()'>Export JSON</button>
+            <button class='btn-reset' onclick='if(confirm("Reset all to defaults?")) resetConfig()'>Reset to Defaults</button>
+        </div>
+    </div>
+</div>
+<script>
+function toggleTree(button) {
+    event.preventDefault();
+    button.classList.toggle('expanded');
+    const content = button.nextElementSibling;
+    content.classList.toggle('expanded');
+}
+
+function toggleNested(event) {
+    event.preventDefault();
+    const button = event.target;
+    button.classList.toggle('expanded');
+    const content = button.nextElementSibling;
+    content.classList.toggle('expanded');
+}
+
+window.originalValues = {};
+window.changeCount = 0;
+window.initChangeTracking = function() {
+  console.log('initChangeTracking called');
+  originalValues = {};
+  const inputs = document.querySelectorAll('input, select');
+  console.log('Found inputs:', inputs.length);
+  inputs.forEach((input, idx) => {
+    const name = input.name;
+    if (name) {
+      originalValues[name] = input.value.trim();
+      console.log('Input', idx, name, ':', originalValues[name]);
+      input.addEventListener('input', updateSubmitButton);
+      input.addEventListener('change', updateSubmitButton);
+      // Visual feedback
+      input.style.borderColor = '#ddd';
+    }
+  });
+  updateSubmitButton();
+}
+
+window.hasChanges = function() {
+  const inputs = document.querySelectorAll('input, select');
+  for (let input of inputs) {
+    const name = input.name;
+    if (name && input.value.trim() !== originalValues[name]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+window.updateSubmitButton = function() {
+  console.log('updateSubmitButton called');
+  const btn = document.getElementById('submitBtn');
+  if (!btn) {
+    console.log('No submitBtn found');
+    return;
+  }
+  const has = window.hasChanges();
+  btn.disabled = !has;
+  // Count
+  let count = 0;
+  const inputs = document.querySelectorAll('input, select');
+  for (let input of inputs) {
+    const name = input.name;
+    if (name && input.value.trim() !== originalValues[name]) {
+      count++;
+      console.log('Changed:', name, input.value.trim(), 'vs', originalValues[name]);
+    }
+  }
+  console.log('Change count:', count, 'hasChanges:', has);
+  btn.textContent = has ? `Save ${count} change${count>1?'s':''}` : 'No changes (button disabled)';
+  // Visual: highlight changed inputs
+  inputs.forEach(input => {
+    const name = input.name;
+    if (name && input.value.trim() !== originalValues[name]) {
+      input.style.borderColor = '#4CAF50';
+      input.style.boxShadow = '0 0 0 2px rgba(76,175,80,0.2)';
+    } else {
+      input.style.borderColor = '#ddd';
+      input.style.boxShadow = 'none';
+    }
+  });
+}
+
+window.restoreOriginals = function() {
+  Object.keys(originalValues).forEach(name => {
+    const input = document.querySelector(`[name="${name}"]`);
+    if (input) {
+      input.value = originalValues[name];
+      input.dispatchEvent(new Event('input'));
+    }
+  });
+}
+
+async function saveConfig() {
+    const changedData = {};
+    const inputs = document.querySelectorAll('input, select');
+    for (let input of inputs) {
+        const name = input.name;
+        let changed;
+        changed = input.value.trim() !== originalValues[name];
+
+        if (name && changed) {
+            if (input.value.trim() !== originalValues[name]) {
+                changedData[name] = input.value;
+            }
+        }
+    }
+    if (Object.keys(changedData).length === 0) {
+        alert('No changes to save!');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/signalk-config/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(changedData)
+        });
+        if (response.ok) {
+            alert(`Saved ${Object.keys(changedData).length} changed field${Object.keys(changedData).length > 1 ? 's' : ''} successfully!`);
+            location.reload();
+        } else {
+            const text = await response.text();
+            alert('Error saving configuration: ' + response.status + ' ' + text);
+            console.error('Save error:', response.status, text);
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+        console.error('Fetch error:', error);
+    }
+}
+
+async function exportConfig() {
+    const response = await fetch('/signalk-config/export');
+    const data = await response.json();
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'signalk-config.json';
+    a.click();
+}
+
+async function resetConfig() {
+    const response = await fetch('/signalk-config/reset', {method: 'POST'});
+    if (response.ok) {
+        location.reload();
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('DOM loaded, initializing change tracking');
+  window.initChangeTracking();
+});
+ </script>
+ </body>
+ </html>
+ 
