@@ -9,6 +9,7 @@
 #include <esp_https_ota.h>
 #include <esp_crt_bundle.h>
 #include <esp_system.h>
+#include <esp_heap_caps.h>
 #include "net_mdns.h"
 #include "net_signalk_http.h"
 #include "screen_config.h"
@@ -371,34 +372,22 @@ static String resolve_release_asset_url(
     return "";
 }
 
-static bool perform_firmware_ota(
-    const String& tag,
+static bool perform_firmware_ota_url(
+    const String& download_url,
+    const String& description,
     String& error_message
 ) {
-    /*
-     * Resolve the firmware from the requested release itself.
-     *
-     * This deliberately does NOT use the cached
-     * firmware_latest_url value.
-     */
-    String download_url = resolve_release_asset_url(tag);
-
     if (download_url.length() == 0) {
-        error_message =
-            "No sailing_suite.bin firmware asset was found "
-            "for release " +
-            tag +
-            ".";
-
+        error_message = "Firmware URL is empty.";
         return false;
     }
 
-    if (download_url.indexOf("http") != 0) {
+    if (
+        download_url.indexOf("http://") != 0 &&
+        download_url.indexOf("https://") != 0
+    ) {
         error_message =
-            "The firmware URL for release " +
-            tag +
-            " is not valid.";
-
+            "Firmware URL must begin with http:// or https://";
         return false;
     }
 
@@ -406,10 +395,48 @@ static bool perform_firmware_ota(
     Serial.println("========================================");
     Serial.println("         FIRMWARE OTA START");
     Serial.println("========================================");
-    Serial.println("Requested release: " + tag);
+    Serial.println("Description: " + description);
     Serial.println("Firmware URL:");
     Serial.println(download_url);
     Serial.println("========================================");
+
+    /*
+     * Capture memory state immediately before esp_https_ota().
+     *
+     * This is particularly important while diagnosing the
+     * esp_hosted mempool allocation failure.
+     */
+    Serial.println("OTA MEMORY BEFORE esp_https_ota():");
+
+    Serial.printf(
+        "  Internal free:    %u bytes\n",
+        heap_caps_get_free_size(MALLOC_CAP_INTERNAL)
+    );
+
+    Serial.printf(
+        "  Internal largest: %u bytes\n",
+        heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)
+    );
+
+    Serial.printf(
+        "  PSRAM free:       %u bytes\n",
+        heap_caps_get_free_size(MALLOC_CAP_SPIRAM)
+    );
+
+    Serial.printf(
+        "  PSRAM largest:    %u bytes\n",
+        heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM)
+    );
+
+    Serial.printf(
+        "  Total free:       %u bytes\n",
+        heap_caps_get_free_size(MALLOC_CAP_8BIT)
+    );
+
+    Serial.printf(
+        "  Total largest:    %u bytes\n",
+        heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)
+    );
 
     esp_http_client_config_t client_config = {};
 
@@ -418,12 +445,19 @@ static bool perform_firmware_ota(
     client_config.keep_alive_enable = true;
 
     /*
-     * GitHub/cloud HTTP response headers can be large.
-     * Keep the 8 KB RX buffer that was added previously.
+     * Keep the existing OTA buffer sizes unchanged.
+     *
+     * This is important for the diagnostic: we don't want the
+     * local OTA test to use a materially different OTA buffer
+     * configuration from the existing GitHub OTA.
      */
     client_config.buffer_size = 8192;
     client_config.buffer_size_tx = 2048;
 
+    /*
+     * The certificate bundle is used for HTTPS URLs.
+     * It is harmless for a local HTTP URL.
+     */
     client_config.crt_bundle_attach = esp_crt_bundle_attach;
 
     esp_https_ota_config_t ota_config = {};
@@ -440,7 +474,7 @@ static bool perform_firmware_ota(
     if (err != ESP_OK) {
         error_message =
             "OTA failed for " +
-            tag +
+            description +
             ": " +
             String(esp_err_to_name(err));
 
@@ -459,7 +493,7 @@ static bool perform_firmware_ota(
     Serial.println("========================================");
     Serial.println("       FIRMWARE OTA SUCCESS");
     Serial.println("========================================");
-    Serial.println("Release: " + tag);
+    Serial.println("Description: " + description);
     Serial.println("Image successfully written.");
     Serial.println("Boot partition has been selected.");
     Serial.println("========================================");
@@ -469,6 +503,46 @@ static bool perform_firmware_ota(
         "Firmware update staged successfully. Rebooting now...";
 
     return true;
+}
+
+static bool perform_firmware_ota(
+    const String& tag,
+    String& error_message
+) {
+    /*
+     * Resolve the firmware from the requested release itself.
+     *
+     * This deliberately does NOT use the cached
+     * firmware_latest_url value.
+     */
+    String download_url = resolve_release_asset_url(tag);
+
+    if (download_url.length() == 0) {
+        error_message =
+            "No sailing_suite.bin firmware asset was found "
+            "for release " +
+            tag +
+            ".";
+        return false;
+    }
+
+    if (
+        download_url.indexOf("http://") != 0 &&
+        download_url.indexOf("https://") != 0
+    ) {
+        error_message =
+            "The firmware URL for release " +
+            tag +
+            " is not valid.";
+
+        return false;
+    }
+
+    return perform_firmware_ota_url(
+        download_url,
+        tag,
+        error_message
+    );
 }
 
 signalk_path_config_t config;  // Global default-initialized, runtime prefs override in load_config_from_preferences()
@@ -1041,6 +1115,98 @@ void handle_firmware_update() {
     }
 }
 
+void handle_firmware_local() {
+    JsonDocument req;
+
+    String body = web_server.arg("plain");
+
+    if (body.length() > 0) {
+        DeserializationError error =
+            deserializeJson(req, body);
+
+        if (error) {
+            web_server.send(
+                400,
+                "application/json",
+                R"({"status":"error","message":"Invalid JSON request."})"
+            );
+            return;
+        }
+    }
+
+    String download_url =
+        req["url"].is<String>()
+            ? req["url"].as<String>()
+            : "";
+
+    download_url.trim();
+
+    if (download_url.length() == 0) {
+        web_server.send(
+            400,
+            "application/json",
+            R"({"status":"error","message":"No firmware URL was provided."})"
+        );
+        return;
+    }
+
+    if (
+        download_url.indexOf("http://") != 0 &&
+        download_url.indexOf("https://") != 0
+    ) {
+        web_server.send(
+            400,
+            "application/json",
+            R"({"status":"error","message":"Firmware URL must begin with http:// or https://."})"
+        );
+        return;
+    }
+
+    Serial.println();
+    Serial.println("========================================");
+    Serial.println("       LOCAL DEVELOPMENT OTA");
+    Serial.println("========================================");
+    Serial.println("URL: " + download_url);
+    Serial.println("========================================");
+
+    String error_message;
+
+    bool ok = perform_firmware_ota_url(
+        download_url,
+        "local development firmware",
+        error_message
+    );
+
+    JsonDocument out;
+
+    out["status"] =
+        ok ? "updating" : "error";
+
+    out["url"] =
+        download_url;
+
+    out["message"] =
+        ok
+            ? "Starting local firmware update. "
+              "The device will reboot when the update completes."
+            : error_message;
+
+    String payload;
+
+    serializeJson(out, payload);
+
+    web_server.send(
+        200,
+        "application/json",
+        payload
+    );
+
+    if (ok) {
+        delay(250);
+        esp_restart();
+    }
+}
+
 void handle_firmware_rollback() {
     JsonDocument req;
     String body = web_server.arg("plain");
@@ -1464,6 +1630,7 @@ void signalk_path_config_web_begin() {
     web_server.on("/firmware/skip", HTTP_POST, handle_firmware_skip);
     web_server.on("/firmware/update", HTTP_POST, handle_firmware_update);
     web_server.on("/firmware/rollback", HTTP_POST, handle_firmware_rollback);
+    web_server.on("/firmware/local", HTTP_POST, handle_firmware_local);
     
     // Signal K path configuration
     web_server.on("/signalk-config", HTTP_GET, handle_show_signalk_config_page);
