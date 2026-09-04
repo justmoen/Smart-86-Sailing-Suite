@@ -209,6 +209,153 @@ static void depth_update_cb(lv_updatable_screen_t *scr)
 
 }
 
+static float calculate_depth_chart_bottom(
+    const ChartDataPoint *points,
+    int point_count)
+{
+    if (point_count <= 0) {
+        return 20.0f;
+    }
+
+    float max_depth = 0.0f;
+
+    for (int i = 0; i < point_count; i++) {
+        max_depth = std::max(max_depth, points[i].value);
+    }
+
+    /*
+     * Add 10% headroom above the deepest retained reading.
+     */
+    float required_bottom = max_depth * 1.10f;
+
+    /*
+     * Use sensible instrument-style scale steps.
+     *
+     * 20 m is NOT a minimum. It is simply one of the available
+     * scale steps.
+     */
+    if (required_bottom <= 5.0f) {
+        return 5.0f;
+    }
+
+    if (required_bottom <= 10.0f) {
+        return 10.0f;
+    }
+
+    if (required_bottom <= 15.0f) {
+        return 15.0f;
+    }
+
+    if (required_bottom <= 20.0f) {
+        return 20.0f;
+    }
+
+    if (required_bottom <= 25.0f) {
+        return 25.0f;
+    }
+
+    if (required_bottom <= 30.0f) {
+        return 30.0f;
+    }
+
+    if (required_bottom <= 40.0f) {
+        return 40.0f;
+    }
+
+    if (required_bottom <= 50.0f) {
+        return 50.0f;
+    }
+
+    if (required_bottom <= 60.0f) {
+        return 60.0f;
+    }
+
+    if (required_bottom <= 80.0f) {
+        return 80.0f;
+    }
+
+    if (required_bottom <= 100.0f) {
+        return 100.0f;
+    }
+
+    /*
+     * Above 100 m, round upward to the next 20 m increment.
+     */
+    return std::ceil(required_bottom / 20.0f) * 20.0f;
+}
+
+static void rebuild_depth_chart_from_history()
+{
+    if (!depth_chart || !depth_series || !depth_history) {
+        return;
+    }
+
+    ChartDataPoint points[600];
+    int point_count = 0;
+
+    depth_history->get_points(points, point_count, 600);
+
+    /*
+     * Determine the scale from the complete retained history.
+     */
+    depth_chart_bottom =
+        calculate_depth_chart_bottom(points, point_count);
+
+    lv_chart_set_range(
+        depth_chart,
+        LV_CHART_AXIS_PRIMARY_Y,
+        0,
+        (int)depth_chart_bottom
+    );
+
+    uint32_t chart_count =
+        lv_chart_get_point_count(depth_chart);
+
+    /*
+     * Clear the chart using the public LVGL API.
+     */
+    for (uint32_t i = 0; i < chart_count; i++) {
+        lv_chart_set_value_by_id(
+            depth_chart,
+            depth_series,
+            i,
+            LV_CHART_POINT_NONE
+        );
+    }
+
+    /*
+     * Restore retained history using the current scale.
+     *
+     * Depth is inverted:
+     *
+     *     shallow depth -> higher on display
+     *     deep depth    -> lower on display
+     */
+    uint32_t count =
+        std::min((uint32_t)point_count, chart_count);
+
+    for (uint32_t i = 0; i < count; i++) {
+        float display_value =
+            depth_chart_bottom - points[i].value;
+
+        /*
+         * Clamp to the chart range. This protects against a
+         * reading slightly beyond the calculated scale.
+         */
+        display_value =
+            std::max(0.0f,
+                     std::min(depth_chart_bottom,
+                              display_value));
+
+        lv_chart_set_value_by_id(
+            depth_chart,
+            depth_series,
+            i,
+            (lv_coord_t)display_value
+        );
+    }
+}
+
 /* -------------------------------------------------- */
 /* Deferred Chart Updates (called outside display lock) */
 /* -------------------------------------------------- */
@@ -220,10 +367,9 @@ void depth_process_deferred_chart_updates()
     }
 
     /*
-     * Only touch the LVGL chart when Depth is the active screen.
+     * Only modify the LVGL chart when Depth is the active screen.
      *
-     * History collection continues in the background regardless of
-     * screen visibility.
+     * History collection continues regardless of screen visibility.
      */
     if (!ui_manager_is_current_screen(&depthScreen)) {
         return;
@@ -233,112 +379,29 @@ void depth_process_deferred_chart_updates()
         return;
     }
 
-    /*
-     * All LVGL access from the application task must be protected
-     * by the LVGL adapter lock.
-     */
     if (esp_lv_adapter_lock(-1) != ESP_OK) {
         return;
     }
 
     /*
-     * Load retained history into the chart once when the screen
-     * becomes active.
+     * First activation:
      *
-     * Depth is plotted inverted: deeper water appears lower on
-     * the display.
+     * Build the chart from all retained history.
      */
     if (!depth_chart_loaded) {
-        ChartDataPoint points[600];
-        int point_count = 0;
-
-        depth_history->get_points(points, point_count, 600);
-
-        /*
-         * Determine the chart scale from retained history.
-         */
-        float max_depth = 0.0f;
-
-        for (int i = 0; i < point_count; i++) {
-            max_depth = std::max(max_depth, points[i].value);
-        }
-
-        depth_chart_bottom =
-            std::max(20.0f, max_depth * 1.05f);
-
-        lv_chart_set_range(
-            depth_chart,
-            LV_CHART_AXIS_PRIMARY_Y,
-            0,
-            (int)depth_chart_bottom
-        );
-
-        uint32_t chart_count =
-            lv_chart_get_point_count(depth_chart);
-
-        /*
-         * Clear the chart using the public LVGL API.
-         */
-        for (uint32_t i = 0; i < chart_count; i++) {
-            lv_chart_set_value_by_id(
-                depth_chart,
-                depth_series,
-                i,
-                LV_CHART_POINT_NONE
-            );
-        }
-
-        /*
-         * Restore retained history in chronological order.
-         *
-         * Depth is inverted so that shallow water is higher on
-         * the display and deeper water is lower.
-         */
-        uint32_t count =
-            std::min((uint32_t)point_count, chart_count);
-
-        for (uint32_t i = 0; i < count; i++) {
-            float display_value =
-                depth_chart_bottom - points[i].value;
-
-            lv_chart_set_value_by_id(
-                depth_chart,
-                depth_series,
-                i,
-                (lv_coord_t)display_value
-            );
-        }
+        rebuild_depth_chart_from_history();
 
         depth_chart_loaded = true;
-
-        /*
-         * Any sample collected while the chart was being loaded is
-         * already represented by the retained history.
-         */
         pending_chart_add_point = false;
         pending_chart_range_update = false;
+
+        esp_lv_adapter_unlock();
+        return;
     }
 
     /*
-     * Add new live data.
-     */
-    if (pending_chart_add_point) {
-        pending_chart_add_point = false;
-
-        float chart_value =
-            depth_chart_bottom - pending_depth_val;
-
-        lv_chart_set_next_value(
-            depth_chart,
-            depth_series,
-            (lv_coord_t)chart_value
-        );
-    }
-
-    /*
-     * Update the range when new history has arrived.
-     *
-     * Deliberately no lv_chart_refresh().
+     * Determine whether the retained history requires a
+     * different Y-axis scale.
      */
     if (pending_chart_range_update) {
         pending_chart_range_update = false;
@@ -348,24 +411,47 @@ void depth_process_deferred_chart_updates()
 
         depth_history->get_points(points, point_count, 600);
 
-        if (point_count > 1) {
-            float max_depth = 0.0f;
+        float new_bottom =
+            calculate_depth_chart_bottom(points, point_count);
 
-            for (int i = 0; i < point_count; i++) {
-                max_depth =
-                    std::max(max_depth, points[i].value);
-            }
+        /*
+         * Only rebuild when the actual scale changes.
+         */
+        if ((int)new_bottom != (int)depth_chart_bottom) {
+            rebuild_depth_chart_from_history();
 
-            depth_chart_bottom =
-                std::max(20.0f, max_depth * 1.05f);
+            /*
+             * The rebuild includes the newest retained sample.
+             */
+            pending_chart_add_point = false;
 
-            lv_chart_set_range(
-                depth_chart,
-                LV_CHART_AXIS_PRIMARY_Y,
-                0,
-                (int)depth_chart_bottom
-            );
+            esp_lv_adapter_unlock();
+            return;
         }
+    }
+
+    /*
+     * Normal live update when the scale hasn't changed.
+     */
+    if (pending_chart_add_point) {
+        pending_chart_add_point = false;
+
+        float chart_value =
+            depth_chart_bottom - pending_depth_val;
+
+        /*
+         * Protect against values outside the current scale.
+         */
+        chart_value =
+            std::max(0.0f,
+                     std::min(depth_chart_bottom,
+                              chart_value));
+
+        lv_chart_set_next_value(
+            depth_chart,
+            depth_series,
+            (lv_coord_t)chart_value
+        );
     }
 
     esp_lv_adapter_unlock();

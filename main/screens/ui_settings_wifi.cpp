@@ -6,50 +6,32 @@
 #include "esp_log.h"
 
 static const char *TAG = "WIFI_CONFIG";
-static lv_obj_t *list_wifi;
 
-String wifi_ssid;      // Store the name of the wireless network.
-String wifi_password;  // Store the password of the wireless network.
+static lv_obj_t *list_wifi = NULL;
+static String wifi_selected_ssid;
+
+String wifi_ssid;
+String wifi_password;
 boolean settingMode;
 
 
 // -----------------------------------------------------------------------------
-// NVS KEY DEFINITIONS
+// NVS
+//
+// Only ONE Wi-Fi configuration is stored.
 //
 // ESP32 NVS keys have a maximum length of 15 characters.
-//
-// The previous keys:
-//
-//   WIFI_HIST_SSID_0
-//   WIFI_HIST_PASS_0
-//
-// were TOO LONG and caused:
-//
-//   nvs_set_str fail: KEY_TOO_LONG
-//
-// Keep these keys short.
 // -----------------------------------------------------------------------------
 
 static constexpr const char *KEY_SSID = "SSID";
 static constexpr const char *KEY_PASS = "PASS";
-static constexpr const char *KEY_HCNT = "HCNT";
 
-static String history_ssid_key(int index)
-{
-    return "HSS" + String(index);
-}
-
-static String history_pass_key(int index)
-{
-    return "HPS" + String(index);
-}
 
 // -----------------------------------------------------------------------------
-// DEBUG HELPERS
+// DEBUG
 // -----------------------------------------------------------------------------
 
-static void log_preferences_state(
-    const char *context)
+static void log_preferences_state(const char *context)
 {
     Preferences prefs;
 
@@ -67,376 +49,31 @@ static void log_preferences_state(
     String stored_pass =
         prefs.getString(KEY_PASS, "");
 
-    int count =
-        prefs.getInt(KEY_HCNT, 0);
+    ESP_LOGI(
+        TAG,
+        "[%s] Stored SSID='%s'",
+        context,
+        stored_ssid.c_str());
 
-    count = constrain(count, 0, 5);
-
-    for (int i = 0; i < count; ++i) {
-
-        String ssid_key =
-            history_ssid_key(i);
-
-        String pass_key =
-            history_pass_key(i);
-
-        String hist_ssid =
-            prefs.getString(
-                ssid_key.c_str(),
-                "");
-
-        String hist_pass =
-            prefs.getString(
-                pass_key.c_str(),
-                "");
-    }
+    ESP_LOGI(
+        TAG,
+        "[%s] Stored password length=%u",
+        context,
+        (unsigned)stored_pass.length());
 
     prefs.end();
 }
 
 
 // -----------------------------------------------------------------------------
-// SAVE CURRENT WIFI CREDENTIALS
+// SAVE WIFI CREDENTIALS
+//
+// This replaces whatever Wi-Fi credentials were previously stored.
+//
+// There is deliberately NO history.
 // -----------------------------------------------------------------------------
 
-static void save_wifi_history_entry(
-    const String &ssid,
-    const String &pass)
-{
-    if (ssid.length() == 0) {
-
-        ESP_LOGW(
-            TAG,
-            "History save aborted: SSID is empty");
-
-        return;
-    }
-
-    Preferences prefs;
-
-    if (!prefs.begin("wifi-config", false)) {
-
-        ESP_LOGE(
-            TAG,
-            "History: FAILED to open Preferences");
-
-        return;
-    }
-
-    int count =
-        prefs.getInt(
-            KEY_HCNT,
-            0);
-
-    ESP_LOGI(
-        TAG,
-        "Existing history count = %d",
-        count);
-
-
-    // -------------------------------------------------------------------------
-    // Protect against corrupted NVS.
-    // -------------------------------------------------------------------------
-
-    if (count < 0 || count > 5) {
-
-        ESP_LOGW(
-            TAG,
-            "Invalid history count %d; resetting to 0",
-            count);
-
-        count = 0;
-    }
-
-
-    // -------------------------------------------------------------------------
-    // Load the existing history into RAM.
-    //
-    // history[0] is the most recently used network.
-    // -------------------------------------------------------------------------
-
-    String old_ssids[5];
-    String old_passwords[5];
-
-    for (int i = 0; i < count; ++i) {
-
-        String key_ssid =
-            history_ssid_key(i);
-
-        String key_pass =
-            history_pass_key(i);
-
-        old_ssids[i] =
-            prefs.getString(
-                key_ssid.c_str(),
-                "");
-
-        old_passwords[i] =
-            prefs.getString(
-                key_pass.c_str(),
-                "");
-
-        ESP_LOGI(
-            TAG,
-            "OLD HISTORY[%d]: SSID='%s'",
-            i,
-            old_ssids[i].c_str());
-    }
-
-
-    // -------------------------------------------------------------------------
-    // Build the new history.
-    //
-    // The successfully connected network ALWAYS goes into slot 0.
-    //
-    // If it already existed, its old position is removed.
-    // Everything else moves down by one position.
-    // -------------------------------------------------------------------------
-
-    String new_ssids[5];
-    String new_passwords[5];
-
-    int new_count = 0;
-
-
-    // -------------------------------------------------------------------------
-    // Slot 0 = the network that just connected successfully.
-    // -------------------------------------------------------------------------
-
-    new_ssids[0] =
-        ssid;
-
-    new_passwords[0] =
-        pass;
-
-    new_count = 1;
-
-
-    // -------------------------------------------------------------------------
-    // Copy the remaining historical networks.
-    //
-    // Skip:
-    //
-    //   1. Empty entries
-    //   2. The SSID that was just connected
-    //
-    // This guarantees there are never duplicate SSIDs.
-    // -------------------------------------------------------------------------
-
-    for (int i = 0;
-         i < count &&
-         new_count < 5;
-         ++i) {
-
-        if (old_ssids[i].length() == 0) {
-            continue;
-        }
-
-        if (old_ssids[i].equals(ssid)) {
-
-            ESP_LOGI(
-                TAG,
-                "Moving existing SSID '%s' to HISTORY[0]",
-                ssid.c_str());
-
-            continue;
-        }
-
-
-        new_ssids[new_count] =
-            old_ssids[i];
-
-        new_passwords[new_count] =
-            old_passwords[i];
-
-        new_count++;
-    }
-
-
-    // -------------------------------------------------------------------------
-    // Write the complete new history.
-    // -------------------------------------------------------------------------
-
-    ESP_LOGI(
-        TAG,
-        "Writing updated Wi-Fi history:");
-
-    for (int i = 0;
-         i < new_count;
-         ++i) {
-
-        String key_ssid =
-            history_ssid_key(i);
-
-        String key_pass =
-            history_pass_key(i);
-
-        size_t ssid_result =
-            prefs.putString(
-                key_ssid.c_str(),
-                new_ssids[i]);
-
-        size_t pass_result =
-            prefs.putString(
-                key_pass.c_str(),
-                new_passwords[i]);
-
-
-        if (ssid_result == 0) {
-
-            ESP_LOGE(
-                TAG,
-                "FAILED to save HISTORY[%d] SSID",
-                i);
-
-        }
-
-        if (pass_result == 0) {
-
-            ESP_LOGE(
-                TAG,
-                "FAILED to save HISTORY[%d] PASSWORD",
-                i);
-
-        }
-
-
-        ESP_LOGI(
-            TAG,
-            "HISTORY[%d]: SSID='%s'",
-            i,
-            new_ssids[i].c_str());
-    }
-
-
-    // -------------------------------------------------------------------------
-    // Remove stale entries from the old history.
-    //
-    // Example:
-    //
-    // Old:
-    //   0 TULIP
-    //   1 GL-SFT1200-fad
-    //   2 OLD-NETWORK
-    //
-    // New:
-    //   0 TULIP
-    //   1 GL-SFT1200-fad
-    //
-    // HSS2/HPS2 must be removed.
-    // -------------------------------------------------------------------------
-
-    for (int i = new_count;
-         i < count;
-         ++i) {
-
-        String key_ssid =
-            history_ssid_key(i);
-
-        String key_pass =
-            history_pass_key(i);
-
-        prefs.remove(
-            key_ssid.c_str());
-
-        prefs.remove(
-            key_pass.c_str());
-    }
-
-
-    // -------------------------------------------------------------------------
-    // Store the new count.
-    // -------------------------------------------------------------------------
-
-    size_t count_result =
-        prefs.putInt(
-            KEY_HCNT,
-            new_count);
-
-    if (count_result == 0) {
-
-        ESP_LOGE(
-            TAG,
-            "FAILED to save history count");
-
-    } else {
-
-        ESP_LOGI(
-            TAG,
-            "History count updated: %d",
-            new_count);
-    }
-
-
-    prefs.end();
-
-
-    // -------------------------------------------------------------------------
-    // Verify the history after writing.
-    // -------------------------------------------------------------------------
-
-    Preferences verify;
-
-    if (!verify.begin("wifi-config", true)) {
-
-        ESP_LOGE(
-            TAG,
-            "History verification: FAILED to reopen Preferences");
-
-        return;
-    }
-
-
-    int verify_count =
-        verify.getInt(
-            KEY_HCNT,
-            0);
-
-    ESP_LOGI(
-        TAG,
-        "Verified history count = %d",
-        verify_count);
-
-
-    if (verify_count > 5) {
-        verify_count = 5;
-    }
-
-
-    for (int i = 0;
-         i < verify_count;
-         ++i) {
-
-        String key_ssid =
-            history_ssid_key(i);
-
-        String key_pass =
-            history_pass_key(i);
-
-        String verify_ssid =
-            verify.getString(
-                key_ssid.c_str(),
-                "");
-
-        String verify_pass =
-            verify.getString(
-                key_pass.c_str(),
-                "");
-
-        ESP_LOGI(
-            TAG,
-            "VERIFIED HISTORY[%d]: SSID='%s' PASSWORD='%s'",
-            i,
-            verify_ssid.c_str(),
-            verify_pass.c_str());
-    }
-
-
-    verify.end();
-}
-
-
-static void save_current_wifi_credentials(
+static bool save_current_wifi_credentials(
     const String &ssid,
     const String &password)
 {
@@ -448,14 +85,13 @@ static void save_current_wifi_credentials(
         TAG,
         "save_current_wifi_credentials()");
 
-
     if (ssid.length() == 0) {
 
         ESP_LOGW(
             TAG,
             "SAVE ABORTED: SSID is empty");
 
-        return;
+        return false;
     }
 
     Preferences prefs;
@@ -466,18 +102,20 @@ static void save_current_wifi_credentials(
             TAG,
             "FAILED to open wifi-config Preferences");
 
-        return;
+        return false;
     }
-
-
-    // -------------------------------------------------------------------------
-    // Save current SSID.
-    // -------------------------------------------------------------------------
 
     size_t ssid_result =
         prefs.putString(
             KEY_SSID,
             ssid);
+
+    size_t pass_result =
+        prefs.putString(
+            KEY_PASS,
+            password);
+
+    prefs.end();
 
     if (ssid_result == 0) {
 
@@ -485,24 +123,8 @@ static void save_current_wifi_credentials(
             TAG,
             "FAILED to save SSID");
 
-    } else {
-
-        ESP_LOGI(
-            TAG,
-            "SSID saved successfully: '%s' (%u bytes)",
-            ssid.c_str(),
-            (unsigned)ssid_result);
+        return false;
     }
-
-
-    // -------------------------------------------------------------------------
-    // Save current password.
-    // -------------------------------------------------------------------------
-
-    size_t pass_result =
-        prefs.putString(
-            KEY_PASS,
-            password);
 
     if (pass_result == 0) {
 
@@ -510,156 +132,158 @@ static void save_current_wifi_credentials(
             TAG,
             "FAILED to save PASSWORD");
 
-    } else {
-
-        ESP_LOGI(
-            TAG,
-            "PASSWORD saved successfully: '%s' (%u bytes)",
-            password.c_str(),
-            (unsigned)pass_result);
+        return false;
     }
 
+    ESP_LOGI(
+        TAG,
+        "SSID saved: '%s'",
+        ssid.c_str());
 
-    prefs.end();
+    ESP_LOGI(
+        TAG,
+        "Password saved: %u bytes",
+        (unsigned)password.length());
 
 
     // -------------------------------------------------------------------------
-    // Verify immediately after writing.
+    // Verify immediately.
     // -------------------------------------------------------------------------
 
     Preferences verify;
 
-    if (verify.begin("wifi-config", true)) {
-
-        String verify_ssid =
-            verify.getString(
-                KEY_SSID,
-                "");
-
-        String verify_pass =
-            verify.getString(
-                KEY_PASS,
-                "");
-
-        if (verify_ssid != ssid) {
-
-            ESP_LOGE(
-                TAG,
-                "SSID VERIFY FAILED!");
-
-        }
-
-        if (verify_pass != password) {
-
-            ESP_LOGE(
-                TAG,
-                "PASSWORD VERIFY FAILED!");
-
-        }
-
-        verify.end();
-
-    } else {
+    if (!verify.begin("wifi-config", true)) {
 
         ESP_LOGE(
             TAG,
             "Could not reopen Preferences for verification");
+
+        return false;
+    }
+
+    String verify_ssid =
+        verify.getString(
+            KEY_SSID,
+            "");
+
+    String verify_pass =
+        verify.getString(
+            KEY_PASS,
+            "");
+
+    verify.end();
+
+
+    bool valid =
+        (verify_ssid == ssid &&
+         verify_pass == password);
+
+    if (!valid) {
+
+        ESP_LOGE(
+            TAG,
+            "Wi-Fi credential verification FAILED");
+
+        ESP_LOGE(
+            TAG,
+            "SSID verification: %s",
+            verify_ssid == ssid ? "OK" : "FAILED");
+
+        ESP_LOGE(
+            TAG,
+            "Password verification: %s",
+            verify_pass == password ? "OK" : "FAILED");
+
+    } else {
+
+        ESP_LOGI(
+            TAG,
+            "Wi-Fi credentials verified successfully");
     }
 
 
-    // Dump everything currently stored.
     log_preferences_state(
         "AFTER SAVE");
 
     ESP_LOGI(
         TAG,
         "==================================================");
+
+    return valid;
 }
 
 
 // -----------------------------------------------------------------------------
-// LOAD WIFI HISTORY
+// LOAD WIFI CREDENTIALS
+//
+// Returns true only when an SSID has been stored.
+//
+// The password may legitimately be empty for an open network.
 // -----------------------------------------------------------------------------
 
-static int load_wifi_history(
-    String *ssids,
-    String *passwords,
-    int max_items)
+static bool load_wifi_credentials(
+    String &ssid,
+    String &password)
 {
-    ESP_LOGI(
-        TAG,
-        "Loading Wi-Fi history");
-
     Preferences prefs;
 
     if (!prefs.begin("wifi-config", true)) {
 
         ESP_LOGE(
             TAG,
-            "FAILED to open Preferences for history read");
+            "FAILED to open Preferences");
 
-        return 0;
+        return false;
     }
 
-    int count =
-        prefs.getInt(
-            KEY_HCNT,
-            0);
+    ssid =
+        prefs.getString(
+            KEY_SSID,
+            "");
 
-    ESP_LOGI(
-        TAG,
-        "Stored history count = %d",
-        count);
-
-    if (count < 0 || count > 5) {
-
-        ESP_LOGW(
-            TAG,
-            "Invalid stored history count: %d",
-            count);
-
-        count = 0;
-    }
-
-    count =
-        min(
-            count,
-            max_items);
-
-
-    for (int i = 0; i < count; ++i) {
-
-        String key_ssid =
-            history_ssid_key(i);
-
-        String key_pass =
-            history_pass_key(i);
-
-        ssids[i] =
-            prefs.getString(
-                key_ssid.c_str(),
-                "");
-
-        passwords[i] =
-            prefs.getString(
-                key_pass.c_str(),
-                "");
-    }
+    password =
+        prefs.getString(
+            KEY_PASS,
+            "");
 
     prefs.end();
 
-    return count;
+
+    ESP_LOGI(
+        TAG,
+        "Loaded saved Wi-Fi configuration:");
+
+    ESP_LOGI(
+        TAG,
+        "  SSID='%s'",
+        ssid.c_str());
+
+    ESP_LOGI(
+        TAG,
+        "  Password length=%u",
+        (unsigned)password.length());
+
+
+    return ssid.length() > 0;
 }
 
 
 // -----------------------------------------------------------------------------
 // RESTORE CONFIGURATION
+//
+// There is only one saved network.
+//
+// IMPORTANT:
+//
+// This function does NOT scan.
+//
+// The caller simply attempts the saved credentials. If the connection fails,
+// setupMode() performs a scan and lets the user choose a new network.
 // -----------------------------------------------------------------------------
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 
 boolean restoreConfig()
 {
@@ -671,86 +295,33 @@ boolean restoreConfig()
         TAG,
         "restoreConfig()");
 
-    // -------------------------------------------------------------------------
-    // Load current credentials from NVS.
-    // -------------------------------------------------------------------------
+    String stored_ssid;
+    String stored_password;
 
-    Preferences prefs;
+    if (!load_wifi_credentials(
+            stored_ssid,
+            stored_password)) {
 
-    if (!prefs.begin("wifi-config", true)) {
-
-        ESP_LOGE(
+        ESP_LOGW(
             TAG,
-            "FAILED to open wifi-config Preferences");
+            "No saved Wi-Fi credentials");
+
+        wifi_ssid = "";
+        wifi_password = "";
+
+        ESP_LOGI(
+            TAG,
+            "==================================================");
 
         return false;
     }
 
-    String stored_current_ssid =
-        prefs.getString(
-            KEY_SSID,
-            "");
 
-    String stored_current_password =
-        prefs.getString(
-            KEY_PASS,
-            "");
+    wifi_ssid =
+        stored_ssid;
 
-    int stored_count =
-        prefs.getInt(
-            KEY_HCNT,
-            0);
-
-    prefs.end();
-
-
-    ESP_LOGI(
-        TAG,
-        "CURRENT NVS CREDENTIALS:");
-
-    ESP_LOGI(
-        TAG,
-        "  SSID     = '%s'",
-        stored_current_ssid.c_str());
-
-    ESP_LOGI(
-        TAG,
-        "  PASSWORD = '%s'",
-        stored_current_password.c_str());
-
-    ESP_LOGI(
-        TAG,
-        "  HISTORY COUNT = %d",
-        stored_count);
-
-
-    // -------------------------------------------------------------------------
-    // Load Wi-Fi history.
-    // -------------------------------------------------------------------------
-
-    String historical_ssids[5];
-    String historical_passwords[5];
-
-    int history_count =
-        load_wifi_history(
-            historical_ssids,
-            historical_passwords,
-            5);
-
-
-    ESP_LOGI(
-        TAG,
-        "Loaded %d historical Wi-Fi networks",
-        history_count);
-
-    for (int i = 0; i < history_count; ++i) {
-
-        ESP_LOGI(
-            TAG,
-            "HISTORY[%d]: SSID='%s'",
-            i,
-            historical_ssids[i].c_str());
-    }
+    wifi_password =
+        stored_password;
 
 
     // -------------------------------------------------------------------------
@@ -768,327 +339,52 @@ boolean restoreConfig()
 
 
     // -------------------------------------------------------------------------
-    // IMPORTANT:
-    //
-    // Scan for networks BEFORE selecting credentials.
-    //
-    // We must not blindly call WiFi.begin() for every historical network.
-    // Only a saved SSID that is actually visible should be selected.
+    // Start the ONE saved connection attempt.
     // -------------------------------------------------------------------------
 
     ESP_LOGI(
         TAG,
-        "Scanning for available Wi-Fi networks...");
+        "Saved Wi-Fi network:");
+    
+    ESP_LOGI(
+        TAG,
+        "  SSID='%s'",
+        wifi_ssid.c_str());
+
+    ESP_LOGI(
+        TAG,
+        "Calling WiFi.begin() ONCE");
+
 
     WiFi.disconnect();
 
     delay(100);
 
-    int scan_count =
-        WiFi.scanNetworks();
+    WiFi.begin(
+        wifi_ssid.c_str(),
+        wifi_password.c_str());
+
 
     ESP_LOGI(
         TAG,
-        "Wi-Fi scan found %d networks",
-        scan_count);
+        "WiFi.begin() called");
 
 
-    // -------------------------------------------------------------------------
-    // First preference:
-    //
-    // If the CURRENT stored SSID is visible, use it.
-    //
-    // This preserves the user's current network when it is available.
-    // -------------------------------------------------------------------------
-
-    int selected_history_index = -1;
-    int selected_scan_index = -1;
-
-
-    if (stored_current_ssid.length() > 0) {
-
-        for (int scan_index = 0;
-             scan_index < scan_count;
-             ++scan_index) {
-
-            String found_ssid =
-                WiFi.SSID(scan_index);
-
-            ESP_LOGI(
-                TAG,
-                "SCAN[%d]: SSID='%s' RSSI=%d",
-                scan_index,
-                found_ssid.c_str(),
-                WiFi.RSSI(scan_index));
-
-            if (found_ssid.equals(stored_current_ssid)) {
-
-                ESP_LOGI(
-                    TAG,
-                    "Current stored SSID is visible: '%s'",
-                    stored_current_ssid.c_str());
-
-                selected_scan_index =
-                    scan_index;
-
-                break;
-            }
-        }
-    }
-
-
-    // -------------------------------------------------------------------------
-    // If the current SSID is not visible, search Wi-Fi history.
-    //
-    // History order is retained:
-    //
-    //   HISTORY[0] = most recently used
-    //   HISTORY[1] = next most recent
-    //   ...
-    //
-    // The first historical SSID that appears in the scan wins.
-    // -------------------------------------------------------------------------
-
-    if (selected_scan_index < 0) {
-
-        ESP_LOGI(
-            TAG,
-            "Current stored SSID is not visible.");
-
-        ESP_LOGI(
-            TAG,
-            "Searching Wi-Fi history for a visible network...");
-
-
-        for (int history_index = 0;
-             history_index < history_count;
-             ++history_index) {
-
-            if (historical_ssids[history_index].length() == 0) {
-                continue;
-            }
-
-
-            for (int scan_index = 0;
-                 scan_index < scan_count;
-                 ++scan_index) {
-
-                String found_ssid =
-                    WiFi.SSID(scan_index);
-
-                if (found_ssid.equals(
-                        historical_ssids[history_index])) {
-
-                    selected_history_index =
-                        history_index;
-
-                    selected_scan_index =
-                        scan_index;
-
-                    ESP_LOGI(
-                        TAG,
-                        "==================================================");
-
-                    ESP_LOGI(
-                        TAG,
-                        "VISIBLE SAVED NETWORK FOUND");
-
-                    ESP_LOGI(
-                        TAG,
-                        "History index = %d",
-                        history_index);
-
-                    ESP_LOGI(
-                        TAG,
-                        "Scan index = %d",
-                        scan_index);
-
-                    ESP_LOGI(
-                        TAG,
-                        "SSID = '%s'",
-                        historical_ssids[history_index].c_str());
-
-                    ESP_LOGI(
-                        TAG,
-                        "RSSI = %d",
-                        WiFi.RSSI(scan_index));
-
-                    ESP_LOGI(
-                        TAG,
-                        "==================================================");
-
-                    break;
-                }
-            }
-
-
-            if (selected_scan_index >= 0) {
-                break;
-            }
-        }
-    }
-
-
-    // -------------------------------------------------------------------------
-    // We found a visible network.
-    // -------------------------------------------------------------------------
-
-    if (selected_scan_index >= 0) {
-
-        String selected_ssid =
-            WiFi.SSID(selected_scan_index);
-
-        String selected_password;
-
-
-        // ---------------------------------------------------------------------
-        // If this SSID exists in history, use its historical password.
-        // ---------------------------------------------------------------------
-
-        for (int i = 0;
-             i < history_count;
-             ++i) {
-
-            if (historical_ssids[i].equals(
-                    selected_ssid)) {
-
-                selected_password =
-                    historical_passwords[i];
-
-                selected_history_index =
-                    i;
-
-                ESP_LOGI(
-                    TAG,
-                    "Using password from HISTORY[%d]",
-                    i);
-
-                break;
-            }
-        }
-
-
-        // ---------------------------------------------------------------------
-        // If the SSID wasn't in history, but is the current stored SSID,
-        // use the current stored password.
-        // ---------------------------------------------------------------------
-
-        if (selected_password.length() == 0 &&
-            selected_ssid.equals(
-                stored_current_ssid)) {
-
-            selected_password =
-                stored_current_password;
-
-            ESP_LOGI(
-                TAG,
-                "Using password from current NVS credentials");
-        }
-
-
-        // ---------------------------------------------------------------------
-        // Set the active credentials.
-        // ---------------------------------------------------------------------
-
-        wifi_ssid =
-            selected_ssid;
-
-        wifi_password =
-            selected_password;
-
-
-        ESP_LOGI(
-            TAG,
-            "==================================================");
-
-        ESP_LOGI(
-            TAG,
-            "SELECTED WIFI NETWORK");
-
-        ESP_LOGI(
-            TAG,
-            "SSID='%s'",
-            wifi_ssid.c_str());
-
-        ESP_LOGI(
-            TAG,
-            "History index=%d",
-            selected_history_index);
-
-        ESP_LOGI(
-            TAG,
-            "Calling WiFi.begin() ONCE");
-
-        ESP_LOGI(
-            TAG,
-            "==================================================");
-
-
-        // ---------------------------------------------------------------------
-        // Only attempt the network that was actually found.
-        // ---------------------------------------------------------------------
-
-        WiFi.begin(
-            wifi_ssid.c_str(),
-            wifi_password.c_str());
-
-
-        WiFi.scanDelete();
-
-        return true;
-    }
-
-
-    // -------------------------------------------------------------------------
-    // No saved network is currently visible.
-    //
-    // Do NOT start WiFi.begin() on an arbitrary historical network.
-    //
-    // Leave the credentials available for the caller, but report that there
-    // was no visible saved network.
-    // -------------------------------------------------------------------------
-
-    ESP_LOGW(
+    ESP_LOGI(
         TAG,
         "==================================================");
 
-    ESP_LOGW(
-        TAG,
-        "NO SAVED WIFI NETWORK FOUND IN SCAN");
-
-    ESP_LOGW(
-        TAG,
-        "Current stored SSID='%s'",
-        stored_current_ssid.c_str());
-
-    ESP_LOGW(
-        TAG,
-        "No WiFi.begin() will be issued.");
-
-    ESP_LOGW(
-        TAG,
-        "Entering Wi-Fi setup mode.");
-
-    ESP_LOGW(
-        TAG,
-        "==================================================");
-
-
-    wifi_ssid =
-        stored_current_ssid;
-
-    wifi_password =
-        stored_current_password;
-
-
-    WiFi.scanDelete();
-
-    return false;
+    // TRUE means "credentials were found and connection was started".
+    //
+    // It does NOT mean that Wi-Fi is already connected.
+    return true;
 }
 
 
 // -----------------------------------------------------------------------------
 // RESET WIFI SETTINGS
+//
+// Remove the ONLY stored SSID and password.
 // -----------------------------------------------------------------------------
 
 void btnResetWiFiSettings_event(
@@ -1102,11 +398,11 @@ void btnResetWiFiSettings_event(
 
     ESP_LOGW(
         TAG,
-        "RESET CURRENT WIFI SETTINGS");
+        "RESET WIFI SETTINGS");
 
-    // Show what is currently stored before removing it.
     log_preferences_state(
-        "BEFORE CURRENT WIFI RESET");
+        "BEFORE WIFI RESET");
+
 
     Preferences prefs;
 
@@ -1119,16 +415,6 @@ void btnResetWiFiSettings_event(
         return;
     }
 
-    // -------------------------------------------------------------------------
-    // Remove ONLY the currently configured Wi-Fi credentials.
-    //
-    // Do NOT call prefs.clear().
-    //
-    // Wi-Fi history remains untouched:
-    //   HCNT
-    //   HSS0 ... HSS4
-    //   HPS0 ... HPS4
-    // -------------------------------------------------------------------------
 
     bool ssid_removed =
         prefs.remove(KEY_SSID);
@@ -1141,34 +427,27 @@ void btnResetWiFiSettings_event(
 
     ESP_LOGI(
         TAG,
-        "Current SSID key removed: %s",
+        "SSID removed: %s",
         ssid_removed ? "YES" : "NO");
 
     ESP_LOGI(
         TAG,
-        "Current password key removed: %s",
+        "Password removed: %s",
         pass_removed ? "YES" : "NO");
 
 
-    // Clear the in-memory credentials too.
     wifi_ssid = "";
     wifi_password = "";
+    wifi_selected_ssid = "";
 
-
-    // -------------------------------------------------------------------------
-    // Verify that CURRENT credentials are gone while HISTORY remains.
-    // -------------------------------------------------------------------------
 
     log_preferences_state(
-        "AFTER CURRENT WIFI RESET");
+        "AFTER WIFI RESET");
+
 
     ESP_LOGW(
         TAG,
-        "Current Wi-Fi credentials cleared.");
-    
-    ESP_LOGW(
-        TAG,
-        "Wi-Fi history was NOT cleared.");
+        "Wi-Fi credentials cleared.");
 
     ESP_LOGW(
         TAG,
@@ -1177,6 +456,7 @@ void btnResetWiFiSettings_event(
     ESP_LOGW(
         TAG,
         "==================================================");
+
 
     delay(100);
 
@@ -1202,7 +482,9 @@ void wifi_connected(
             wifi_password);
     }
 
-    (*on_connected)();
+    if (on_connected != NULL) {
+        (*on_connected)();
+    }
 
     settingMode = false;
 }
@@ -1392,8 +674,12 @@ static void ta_password_event_cb(
 
     } else if (code == LV_EVENT_READY) {
 
+        // ---------------------------------------------------------------------
+        // The SSID was captured when the user selected the network.
+        // ---------------------------------------------------------------------
+
         String ssid =
-            WiFi.SSID(i);
+            wifi_selected_ssid;
 
         String pass =
             lv_textarea_get_text(ta);
@@ -1419,22 +705,67 @@ static void ta_password_event_cb(
 
         ESP_LOGI(
             TAG,
-            "PASSWORD = '%s'",
-            pass.c_str());
-
-        ESP_LOGI(
-            TAG,
             "PASSWORD LENGTH = %u",
             (unsigned)pass.length());
 
 
-        save_current_wifi_credentials(
-            ssid,
-            pass);
+        // ---------------------------------------------------------------------
+        // Do not allow an empty SSID to overwrite the configuration.
+        // ---------------------------------------------------------------------
+
+        if (ssid.length() == 0) {
+
+            ESP_LOGE(
+                TAG,
+                "PASSWORD SUBMISSION ABORTED: SSID is empty");
+
+            lv_msgbox(
+                "No Wi-Fi network selected");
+
+            return;
+        }
+
+
+        // ---------------------------------------------------------------------
+        // Save the new network.
+        //
+        // This completely replaces the previous network.
+        // ---------------------------------------------------------------------
+
+        if (!save_current_wifi_credentials(
+                ssid,
+                pass)) {
+
+            ESP_LOGE(
+                TAG,
+                "Failed to save Wi-Fi credentials");
+
+            lv_msgbox(
+                "Failed to save Wi-Fi settings");
+
+            return;
+        }
+
+
+        wifi_ssid =
+            ssid;
+
+        wifi_password =
+            pass;
+
+
+        ESP_LOGI(
+            TAG,
+            "New Wi-Fi configuration saved.");
+
+        ESP_LOGI(
+            TAG,
+            "The previous network has been replaced.");
 
 
         lv_msgbox(
-            "Password submitted");
+            "Wi-Fi settings saved");
+
 
         ESP_LOGI(
             TAG,
@@ -1589,10 +920,29 @@ void lv_connect_wifi_win(
         LV_PART_MAIN);
 
 
-    String title =
-        " Wi-Fi Password: " +
-        WiFi.SSID(i).substring(0, 9) +
-        "...";
+    // -------------------------------------------------------------------------
+    // The SSID was captured when the list button was pressed.
+    // -------------------------------------------------------------------------
+
+    String display_ssid =
+        wifi_selected_ssid;
+
+    String title;
+
+    if (display_ssid.length() > 9) {
+
+        title =
+            " Wi-Fi Password: " +
+            display_ssid.substring(0, 9) +
+            "...";
+
+    } else {
+
+        title =
+            " Wi-Fi Password: " +
+            display_ssid;
+    }
+
 
     lv_win_add_title(
         win,
@@ -1630,6 +980,7 @@ void lv_connect_wifi_win(
         lv_color_hex(0x1e1e1e),
         LV_PART_MAIN);
 
+
     lv_password_textarea(
         i,
         cont);
@@ -1646,20 +997,48 @@ static void event_handler_wifi(
     lv_event_code_t code =
         lv_event_get_code(e);
 
-    if (code == LV_EVENT_CLICKED) {
+    if (code != LV_EVENT_CLICKED) {
+        return;
+    }
 
-        int n =
-            (int)(intptr_t)
-            lv_event_get_user_data(e);
+    int n =
+        (int)(intptr_t)
+        lv_event_get_user_data(e);
+
+
+    // -------------------------------------------------------------------------
+    // Capture the SSID immediately.
+    //
+    // This is the only point where the scan index is needed.
+    // -------------------------------------------------------------------------
+
+    wifi_selected_ssid =
+        WiFi.SSID(n);
+
+
+    ESP_LOGI(
+        TAG,
+        "Wi-Fi selection:");
+
+    ESP_LOGI(
+        TAG,
+        "  scan index=%d",
+        n);
+
+    ESP_LOGI(
+        TAG,
+        "  SSID='%s'",
+        wifi_selected_ssid.c_str());
+
 
 #ifdef ENABLE_SCREEN_SERVER
 
-        screenServer0();
+    screenServer0();
 
 #endif
 
-        lv_connect_wifi_win(n);
-    }
+
+    lv_connect_wifi_win(n);
 }
 
 
@@ -1748,6 +1127,7 @@ void lv_list_wifi(
                 left_text.c_str(),
                 ssid_text.c_str());
 
+
         lv_obj_set_style_text_font(
             btn,
             &lv_font_montserrat_28,
@@ -1773,11 +1153,23 @@ void lv_list_wifi(
             lv_color_hex(0x404040),
             LV_PART_MAIN);
 
+
         lv_obj_add_event_cb(
             btn,
             event_handler_wifi,
             LV_EVENT_CLICKED,
             (void *)(intptr_t)i);
+
+
+        // ---------------------------------------------------------------------
+        // Give the FreeRTOS idle task an opportunity to run.
+        //
+        // This is intentional because the LVGL watchdog previously triggered
+        // while constructing this list.
+        // ---------------------------------------------------------------------
+
+        vTaskDelay(
+            pdMS_TO_TICKS(1));
     }
 }
 
@@ -1795,6 +1187,7 @@ static void setupMode(
         TAG,
         "Entering Wi-Fi setup mode");
 
+
     WiFi.mode(
         WIFI_STA);
 
@@ -1802,22 +1195,53 @@ static void setupMode(
 
     delay(100);
 
+
+    // -------------------------------------------------------------------------
+    // ONE scan for the setup screen.
+    //
+    // Do not call restoreConfig() here.
+    // Do not call WiFi.scanDelete() here.
+    //
+    // The scan results must remain available while the user selects a network.
+    // -------------------------------------------------------------------------
+
     int n =
         WiFi.scanNetworks();
+
 
     ESP_LOGI(
         TAG,
         "Wi-Fi scan found %d networks",
         n);
 
+
+    for (int i = 0;
+         i < n;
+         ++i) {
+
+        ESP_LOGI(
+            TAG,
+            "SCAN[%d]: SSID='%s' RSSI=%d",
+            i,
+            WiFi.SSID(i).c_str(),
+            WiFi.RSSI(i));
+    }
+
+
+    // -------------------------------------------------------------------------
+    // Display the scan results.
+    // -------------------------------------------------------------------------
+
     lv_list_wifi(
         lv_screen_active(),
         n);
 
 
-    // Allow reconnect while in setup mode.
-    restoreConfig();
-
+    // -------------------------------------------------------------------------
+    // When Wi-Fi connects, clean up and restart.
+    //
+    // The credentials were already stored when the password was submitted.
+    // -------------------------------------------------------------------------
 
     WiFi.onEvent(
         [](WiFiEvent_t event,
@@ -1830,6 +1254,7 @@ static void setupMode(
                 TAG,
                 "Wi-Fi STA_CONNECTED event");
 
+
             if (list_wifi != NULL) {
 
                 lv_obj_delete(
@@ -1838,11 +1263,11 @@ static void setupMode(
                 list_wifi = NULL;
             }
 
+
             delay(2000);
 
-            // wifi_connected(on_connected);
-            // Restart for a clean attempt.
             ESP.restart();
+
         },
         WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED);
 }
@@ -1860,17 +1285,21 @@ boolean checkConnection()
         TAG,
         "Checking Wi-Fi connection...");
 
+
     // 30 * 350 ms = approximately 10.5 seconds.
+
     while (count < 30) {
 
         wl_status_t status =
             WiFi.status();
+
 
         ESP_LOGI(
             TAG,
             "Wi-Fi status check %d/30: %d",
             count + 1,
             status);
+
 
         if (status ==
             WL_CONNECTED) {
@@ -1892,10 +1321,12 @@ boolean checkConnection()
             return true;
         }
 
+
         delay(350);
 
         count++;
     }
+
 
     ESP_LOGW(
         TAG,
@@ -1920,20 +1351,20 @@ void settingUpWiFi(
         TAG,
         "settingUpWiFi()");
 
+
     log_preferences_state(
         "BEFORE CONNECTION");
 
 
-    preferences.begin(
-        "wifi-config",
-        false);
-
+    // -------------------------------------------------------------------------
+    // Try the ONE saved network.
+    // -------------------------------------------------------------------------
 
     if (restoreConfig()) {
 
         ESP_LOGI(
             TAG,
-            "restoreConfig() returned TRUE");
+            "Saved Wi-Fi credentials found");
 
         if (checkConnection()) {
 
@@ -1947,17 +1378,25 @@ void settingUpWiFi(
             return;
         }
 
+
         ESP_LOGW(
             TAG,
-            "Stored credentials did not connect");
+            "Saved credentials did not connect");
     }
 
+
+    // -------------------------------------------------------------------------
+    // No saved network, or saved network failed.
+    //
+    // Let the user select a new network.
+    // -------------------------------------------------------------------------
 
     ESP_LOGI(
         TAG,
         "Entering Wi-Fi setting mode");
 
     settingMode = true;
+
 
     setupMode(
         on_connected);

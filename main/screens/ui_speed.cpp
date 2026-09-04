@@ -199,6 +199,68 @@ static void speed_update_cb(lv_updatable_screen_t *scr)
 
 }
 
+static void rebuild_speed_chart_from_history()
+{
+    if (!speed_chart || !speed_series || !speed_history) {
+        return;
+    }
+
+    ChartDataPoint points[600];
+    int point_count = 0;
+
+    speed_history->get_points(points, point_count, 600);
+
+    /*
+     * Determine the required Y-axis range from retained history.
+     */
+    float max_speed = 5.0f;
+
+    for (int i = 0; i < point_count; i++) {
+        if (points[i].value > max_speed) {
+            max_speed = points[i].value;
+        }
+    }
+
+    max_speed *= 1.2f;
+
+    lv_chart_set_range(
+        speed_chart,
+        LV_CHART_AXIS_PRIMARY_Y,
+        0,
+        (int)max_speed
+    );
+
+    uint32_t chart_count =
+        lv_chart_get_point_count(speed_chart);
+
+    /*
+     * Clear the chart using the public LVGL API.
+     */
+    for (uint32_t i = 0; i < chart_count; i++) {
+        lv_chart_set_value_by_id(
+            speed_chart,
+            speed_series,
+            i,
+            LV_CHART_POINT_NONE
+        );
+    }
+
+    /*
+     * Restore retained history.
+     */
+    uint32_t count =
+        std::min((uint32_t)point_count, chart_count);
+
+    for (uint32_t i = 0; i < count; i++) {
+        lv_chart_set_value_by_id(
+            speed_chart,
+            speed_series,
+            i,
+            (lv_coord_t)points[i].value
+        );
+    }
+}
+
 /* -------------------------------------------------- */
 /* Deferred Chart Updates (called outside display lock) */
 /* -------------------------------------------------- */
@@ -210,10 +272,9 @@ void speed_process_deferred_chart_updates()
     }
 
     /*
-     * Only touch the LVGL chart when Speed is the active screen.
+     * Only modify the LVGL chart when Speed is the active screen.
      *
-     * History collection continues in the background regardless of
-     * screen visibility.
+     * History collection continues regardless of screen visibility.
      */
     if (!ui_manager_is_current_screen(&speedScreen)) {
         return;
@@ -223,59 +284,37 @@ void speed_process_deferred_chart_updates()
         return;
     }
 
-    /*
-     * All LVGL access from the application task must be protected
-     * by the LVGL adapter lock.
-     */
     if (esp_lv_adapter_lock(-1) != ESP_OK) {
         return;
     }
 
     /*
-     * Load retained history into the chart once when the screen
-     * becomes active.
+     * First activation:
      *
-     * Use the public LVGL chart API rather than directly modifying
-     * the chart's internal Y array.
+     * Build the chart from all retained history.
      */
     if (!speed_chart_loaded) {
+        rebuild_speed_chart_from_history();
+
+        speed_chart_loaded = true;
+        pending_chart_add_point = false;
+        pending_chart_range_update = false;
+
+        esp_lv_adapter_unlock();
+        return;
+    }
+
+    /*
+     * Check whether the required Y-axis range changed.
+     */
+    if (pending_chart_range_update) {
+        pending_chart_range_update = false;
+
         ChartDataPoint points[600];
         int point_count = 0;
 
         speed_history->get_points(points, point_count, 600);
 
-        uint32_t chart_count = lv_chart_get_point_count(speed_chart);
-
-        /*
-         * Clear the chart.
-         */
-        for (uint32_t i = 0; i < chart_count; i++) {
-            lv_chart_set_value_by_id(
-                speed_chart,
-                speed_series,
-                i,
-                LV_CHART_POINT_NONE
-            );
-        }
-
-        /*
-         * Restore retained history in chronological order.
-         */
-        uint32_t count =
-            std::min((uint32_t)point_count, chart_count);
-
-        for (uint32_t i = 0; i < count; i++) {
-            lv_chart_set_value_by_id(
-                speed_chart,
-                speed_series,
-                i,
-                (lv_coord_t)points[i].value
-            );
-        }
-
-        /*
-         * Determine a useful Y-axis range from the retained history.
-         */
         float max_speed = 5.0f;
 
         for (int i = 0; i < point_count; i++) {
@@ -286,25 +325,32 @@ void speed_process_deferred_chart_updates()
 
         max_speed *= 1.2f;
 
-        lv_chart_set_range(
-            speed_chart,
-            LV_CHART_AXIS_PRIMARY_Y,
-            0,
-            (int)max_speed
-        );
-
-        speed_chart_loaded = true;
-
         /*
-         * Any sample collected while the chart was being loaded is
-         * already represented by the retained history.
+         * Read the current chart range.
+         *
+         * Rebuild when the calculated range changes.
          */
-        pending_chart_add_point = false;
-        pending_chart_range_update = false;
+        static int current_speed_chart_max = 20;
+
+        int new_chart_max = (int)max_speed;
+
+        if (new_chart_max != current_speed_chart_max) {
+            current_speed_chart_max = new_chart_max;
+
+            rebuild_speed_chart_from_history();
+
+            /*
+             * Rebuild already includes the newest history sample.
+             */
+            pending_chart_add_point = false;
+
+            esp_lv_adapter_unlock();
+            return;
+        }
     }
 
     /*
-     * Add new live data.
+     * Normal live update when the scale hasn't changed.
      */
     if (pending_chart_add_point) {
         pending_chart_add_point = false;
@@ -314,40 +360,6 @@ void speed_process_deferred_chart_updates()
             speed_series,
             (lv_coord_t)pending_speed_val
         );
-    }
-
-    /*
-     * Update the range when new history has arrived.
-     *
-     * This intentionally does not call lv_chart_refresh().
-     * Changing the range through the public LVGL API is sufficient.
-     */
-    if (pending_chart_range_update) {
-        pending_chart_range_update = false;
-
-        ChartDataPoint points[600];
-        int point_count = 0;
-
-        speed_history->get_points(points, point_count, 600);
-
-        if (point_count > 1) {
-            float max_speed = 5.0f;
-
-            for (int i = 0; i < point_count; i++) {
-                if (points[i].value > max_speed) {
-                    max_speed = points[i].value;
-                }
-            }
-
-            max_speed *= 1.2f;
-
-            lv_chart_set_range(
-                speed_chart,
-                LV_CHART_AXIS_PRIMARY_Y,
-                0,
-                (int)max_speed
-            );
-        }
     }
 
     esp_lv_adapter_unlock();
