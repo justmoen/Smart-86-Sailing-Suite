@@ -15,16 +15,14 @@
 void start_application()
 {
     // -------------------------------------------------------------------------
-    // Signal K path configuration
+    // Load application configuration.
     // -------------------------------------------------------------------------
 
     load_signalk_path_config();
 
 
     // -------------------------------------------------------------------------
-    // Chart histories
-    //
-    // Initialize these before entering the runtime loop.
+    // Initialize chart histories.
     // -------------------------------------------------------------------------
 
     depth_history =
@@ -32,7 +30,6 @@ void start_application()
             "depth",
             get_signalk_path_config().depth_chart_duration,
             300);
-
 
     speed_history =
         new ChartDataHistory(
@@ -42,36 +39,29 @@ void start_application()
 
 
     // -------------------------------------------------------------------------
-    // Web configuration server
+    // Start the web configuration server and UI immediately.
     //
-    // This must be available independently of Signal K discovery.
+    // Do not delay startup here. Signal K discovery happens in its own
+    // FreeRTOS task.
     // -------------------------------------------------------------------------
 
     signalk_path_config_web_begin();
-
-
-    // -------------------------------------------------------------------------
-    // UI
-    // -------------------------------------------------------------------------
 
     ui_manager_init();
 
 
     // -------------------------------------------------------------------------
-    // Signal K connection manager
+    // Start Signal K discovery/connection manager.
     //
-    // Discovery now runs in its own FreeRTOS task.
-    //
-    // DO NOT add a blocking delay or getVesselInfo() call here.
+    // Discovery, mDNS, DNS, and vessel HTTP requests all run outside the
+    // main application loop.
     // -------------------------------------------------------------------------
 
     start_signalk_connection_task();
 
 
     // -------------------------------------------------------------------------
-    // Enter the normal application loop.
-    //
-    // The web UI remains responsive while Signal K discovery is running.
+    // Enter the main application loop.
     // -------------------------------------------------------------------------
 
     run_main_loop();

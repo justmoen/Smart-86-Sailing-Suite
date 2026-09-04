@@ -6,16 +6,12 @@
 
 #include <string>
 #include <Preferences.h>
-
 #include <lwip/dns.h>
 #include <lwip/ip_addr.h>
 
-
 Preferences preferences;
 
-
-static const char *TAG =
-    "MDNS";
+static const char *TAG = "MDNS";
 
 /* keys */
 const char* SK_TCP_HOST_PREF = "signalk_host";
@@ -30,7 +26,6 @@ const char* SK_MANUAL_PORT_PREF = "sk_man_port";
 // This function may block.
 //
 // It is ONLY called from the Signal K discovery FreeRTOS task.
-// It must never be called from the main application/web-server loop.
 // -----------------------------------------------------------------------------
 
 static bool resolve_hostname(
@@ -43,9 +38,7 @@ static bool resolve_hostname(
         "Attempting hostname resolution: '%s'",
         hostname);
 
-
     ip_addr_t addr;
-
 
     esp_err_t err =
         dns_gethostbyname(
@@ -54,9 +47,7 @@ static bool resolve_hostname(
             NULL,
             NULL);
 
-
     if (err != ERR_OK) {
-
         ESP_LOGW(
             TAG,
             "DNS lookup failed for '%s' (err=%d)",
@@ -66,9 +57,7 @@ static bool resolve_hostname(
         return false;
     }
 
-
     if (addr.type != IPADDR_TYPE_V4) {
-
         ESP_LOGW(
             TAG,
             "Resolved non-IPv4 address for '%s'",
@@ -77,24 +66,17 @@ static bool resolve_hostname(
         return false;
     }
 
-
     char ip_str[16];
-
 
     ip4addr_ntoa_r(
         ip_2_ip4(&addr),
         ip_str,
         sizeof(ip_str));
 
+    ip_out = ip_str;
 
-    ip_out =
-        ip_str;
-
-
-    // Signal K default HTTP/WS port.
-    port_out =
-        3000;
-
+    // Signal K default HTTP/WebSocket port.
+    port_out = 3000;
 
     ESP_LOGI(
         TAG,
@@ -102,7 +84,6 @@ static bool resolve_hostname(
         hostname,
         ip_str,
         port_out);
-
 
     return true;
 }
@@ -122,16 +103,13 @@ static bool mdns_lookup(
     std::string &ip_out,
     int &port_out)
 {
-    mdns_result_t *results =
-        NULL;
-
+    mdns_result_t *results = NULL;
 
     ESP_LOGI(
         TAG,
         "Querying mDNS: %s.%s",
         service,
         proto);
-
 
     esp_err_t err =
         mdns_query_ptr(
@@ -141,9 +119,7 @@ static bool mdns_lookup(
             20,
             &results);
 
-
     if (err != ESP_OK) {
-
         ESP_LOGW(
             TAG,
             "mDNS query failed for %s.%s (err=%d)",
@@ -154,9 +130,7 @@ static bool mdns_lookup(
         return false;
     }
 
-
     if (results == NULL) {
-
         ESP_LOGI(
             TAG,
             "No mDNS results for %s.%s",
@@ -165,7 +139,6 @@ static bool mdns_lookup(
 
         return false;
     }
-
 
     for (
         mdns_result_t *r = results;
@@ -181,17 +154,13 @@ static bool mdns_lookup(
                 continue;
             }
 
-
             char ip_str[16];
-
 
             snprintf(
                 ip_str,
                 sizeof(ip_str),
                 IPSTR,
-                IP2STR(
-                    &a->addr.u_addr.ip4));
-
+                IP2STR(&a->addr.u_addr.ip4));
 
             ESP_LOGI(
                 TAG,
@@ -199,22 +168,14 @@ static bool mdns_lookup(
                 ip_str,
                 r->port);
 
+            ip_out = ip_str;
+            port_out = r->port;
 
-            ip_out =
-                ip_str;
-
-            port_out =
-                r->port;
-
-
-            mdns_query_results_free(
-                results);
-
+            mdns_query_results_free(results);
 
             return true;
         }
     }
-
 
     ESP_LOGI(
         TAG,
@@ -222,12 +183,61 @@ static bool mdns_lookup(
         service,
         proto);
 
-
-    mdns_query_results_free(
-        results);
-
+    mdns_query_results_free(results);
 
     return false;
+}
+
+
+// -----------------------------------------------------------------------------
+// STORE DISCOVERED SIGNAL K SERVER
+//
+// Uses a LOCAL Preferences object.
+//
+// Do not use the global `preferences` object here. The discovery task is
+// independent of the main application and should not depend on the state of
+// that global Preferences instance.
+// -----------------------------------------------------------------------------
+
+static bool store_signalk_server(
+    const char *host,
+    int port)
+{
+    Preferences prefs;
+
+    if (!prefs.begin("signalk", false)) {
+        ESP_LOGE(
+            TAG,
+            "FAILED to open Signal K Preferences for writing");
+
+        return false;
+    }
+
+    prefs.putString(
+        SK_TCP_HOST_PREF,
+        host);
+
+    prefs.putInt(
+        SK_TCP_PORT_PREF,
+        port);
+
+    prefs.putString(
+        SK_HTTP_HOST_PREF,
+        host);
+
+    prefs.putInt(
+        SK_HTTP_PORT_PREF,
+        port);
+
+    prefs.end();
+
+    ESP_LOGI(
+        TAG,
+        "Stored Signal K server: %s:%d",
+        host,
+        port);
+
+    return true;
 }
 
 
@@ -245,9 +255,7 @@ static bool mdns_lookup(
 
 bool discover_n_config(void)
 {
-    static bool mdns_started =
-        false;
-
+    static bool mdns_started = false;
 
     // -------------------------------------------------------------------------
     // Check for manually configured Signal K host first.
@@ -255,11 +263,7 @@ bool discover_n_config(void)
 
     Preferences prefs;
 
-
-    if (!prefs.begin(
-            "signalk",
-            true)) {
-
+    if (!prefs.begin("signalk", true)) {
         ESP_LOGE(
             TAG,
             "FAILED to open Signal K Preferences");
@@ -267,14 +271,19 @@ bool discover_n_config(void)
         return false;
     }
 
+    String host = "";
 
-    String host =
-        prefs.getString(
-            SK_MANUAL_HOST_PREF,
-            "");
+    // Current/manual key.
+    if (prefs.isKey(SK_MANUAL_HOST_PREF)) {
+        host =
+            prefs.getString(
+                SK_MANUAL_HOST_PREF,
+                "");
+    }
 
-
-    if (host.length() == 0) {
+    // Legacy key.
+    if (host.length() == 0 &&
+        prefs.isKey("signalk_manual_host")) {
 
         host =
             prefs.getString(
@@ -282,17 +291,19 @@ bool discover_n_config(void)
                 "");
     }
 
-
     if (host.length() > 0) {
 
-        int manualPort =
-            prefs.getInt(
-                SK_MANUAL_PORT_PREF,
-                3000);
+        int manualPort = 3000;
 
+        if (prefs.isKey(SK_MANUAL_PORT_PREF)) {
+            manualPort =
+                prefs.getInt(
+                    SK_MANUAL_PORT_PREF,
+                    3000);
+        }
 
-        if (
-            manualPort == 3000 &&
+        // Legacy port key.
+        if (manualPort == 3000 &&
             prefs.isKey("signalk_manual_port")) {
 
             manualPort =
@@ -301,44 +312,7 @@ bool discover_n_config(void)
                     3000);
         }
 
-
         prefs.end();
-
-
-        if (!preferences.begin(
-                "signalk",
-                false)) {
-
-            ESP_LOGE(
-                TAG,
-                "FAILED to open Signal K Preferences for manual configuration");
-
-            return false;
-        }
-
-
-        preferences.putString(
-            SK_TCP_HOST_PREF,
-            host.c_str());
-
-
-        preferences.putInt(
-            SK_TCP_PORT_PREF,
-            manualPort);
-
-
-        preferences.putString(
-            SK_HTTP_HOST_PREF,
-            host.c_str());
-
-
-        preferences.putInt(
-            SK_HTTP_PORT_PREF,
-            manualPort);
-
-
-        preferences.end();
-
 
         ESP_LOGI(
             TAG,
@@ -346,10 +320,10 @@ bool discover_n_config(void)
             host.c_str(),
             manualPort);
 
-
-        return true;
+        return store_signalk_server(
+            host.c_str(),
+            manualPort);
     }
-
 
     prefs.end();
 
@@ -363,9 +337,7 @@ bool discover_n_config(void)
         esp_err_t err =
             mdns_init();
 
-
         if (err != ESP_OK) {
-
             ESP_LOGE(
                 TAG,
                 "mDNS initialization failed: %d",
@@ -374,43 +346,33 @@ bool discover_n_config(void)
             return false;
         }
 
-
         ESP_LOGI(
             TAG,
             "mDNS initialized");
 
-
         mdns_hostname_set(
             "esp32-browser");
-
 
         mdns_instance_name_set(
             "esp32-device");
 
-
-        mdns_started =
-            true;
+        mdns_started = true;
     }
 
 
     // -------------------------------------------------------------------------
     // Signal K DNS-SD service discovery.
     //
-    // Signal K defines service discovery through mDNS/DNS-SD. We try WebSocket
-    // first because that is what the application actually consumes.
+    // Try WebSocket first because that is what the application actually uses.
     // -------------------------------------------------------------------------
 
     std::string ip;
-
-    int port =
-        3000;
-
+    int port = 3000;
 
     const char *service_names[] = {
         "_signalk-ws",
         "_signalk-http"
     };
-
 
     for (
         const char *service :
@@ -423,50 +385,22 @@ bool discover_n_config(void)
                 ip,
                 port)) {
 
-            if (!preferences.begin(
-                    "signalk",
-                    false)) {
+            if (
+                store_signalk_server(
+                    ip.c_str(),
+                    port)) {
 
-                ESP_LOGE(
+                ESP_LOGI(
                     TAG,
-                    "FAILED to open Signal K Preferences after mDNS discovery");
+                    "Signal K discovered via mDNS: %s:%d (%s)",
+                    ip.c_str(),
+                    port,
+                    service);
 
-                return false;
+                return true;
             }
 
-
-            preferences.putString(
-                SK_TCP_HOST_PREF,
-                ip.c_str());
-
-
-            preferences.putInt(
-                SK_TCP_PORT_PREF,
-                port);
-
-
-            preferences.putString(
-                SK_HTTP_HOST_PREF,
-                ip.c_str());
-
-
-            preferences.putInt(
-                SK_HTTP_PORT_PREF,
-                port);
-
-
-            preferences.end();
-
-
-            ESP_LOGI(
-                TAG,
-                "Signal K discovered via mDNS: %s:%d (%s)",
-                ip.c_str(),
-                port,
-                service);
-
-
-            return true;
+            return false;
         }
     }
 
@@ -474,13 +408,8 @@ bool discover_n_config(void)
     // -------------------------------------------------------------------------
     // Legacy hostname fallback.
     //
-    // This remains available for installations that don't advertise the
-    // Signal K DNS-SD service.
-    //
-    // IMPORTANT:
-    //
-    // This code is running in the background discovery task, so a DNS timeout
-    // cannot prevent the web UI from being serviced.
+    // This may block, but we are already running in the discovery task.
+    // Therefore it cannot block the web UI.
     // -------------------------------------------------------------------------
 
     ESP_LOGI(
@@ -503,56 +432,27 @@ bool discover_n_config(void)
             ip,
             port)) {
 
-        if (!preferences.begin(
-                "signalk",
-                false)) {
+        if (
+            store_signalk_server(
+                ip.c_str(),
+                port)) {
 
-            ESP_LOGE(
+            ESP_LOGI(
                 TAG,
-                "FAILED to open Signal K Preferences after hostname discovery");
+                "Signal K discovered via hostname: %s:%d",
+                ip.c_str(),
+                port);
 
-            return false;
+            return true;
         }
 
-
-        preferences.putString(
-            SK_TCP_HOST_PREF,
-            ip.c_str());
-
-
-        preferences.putInt(
-            SK_TCP_PORT_PREF,
-            port);
-
-
-        preferences.putString(
-            SK_HTTP_HOST_PREF,
-            ip.c_str());
-
-
-        preferences.putInt(
-            SK_HTTP_PORT_PREF,
-            port);
-
-
-        preferences.end();
-
-
-        ESP_LOGI(
-            TAG,
-            "Signal K discovered via hostname: %s:%d",
-            ip.c_str(),
-            port);
-
-
-        return true;
+        return false;
     }
 
 
     ESP_LOGI(
         TAG,
         "Signal K was not discovered");
-
 
     return false;
 }
@@ -564,7 +464,9 @@ bool discover_n_config(void)
 
 void erase_mdns_lookups(void)
 {
-    if (!preferences.begin(
+    Preferences prefs;
+
+    if (!prefs.begin(
             "signalk",
             false)) {
 
@@ -575,41 +477,31 @@ void erase_mdns_lookups(void)
         return;
     }
 
-
-    preferences.remove(
+    prefs.remove(
         "signalk_host");
 
-
-    preferences.remove(
+    prefs.remove(
         "signalk_port");
 
-
-    preferences.remove(
+    prefs.remove(
         SK_MANUAL_HOST_PREF);
 
-
-    preferences.remove(
+    prefs.remove(
         SK_MANUAL_PORT_PREF);
 
-
-    preferences.remove(
+    prefs.remove(
         "signalk_manual_host");
 
-
-    preferences.remove(
+    prefs.remove(
         "signalk_manual_port");
 
-
-    preferences.remove(
+    prefs.remove(
         SK_HTTP_HOST_PREF);
 
-
-    preferences.remove(
+    prefs.remove(
         SK_HTTP_PORT_PREF);
 
-
-    preferences.end();
-
+    prefs.end();
 
     ESP_LOGI(
         TAG,

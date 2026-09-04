@@ -7,6 +7,7 @@
 #include "net_signalk_http.h"
 
 #include <Preferences.h>
+
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
@@ -14,7 +15,6 @@ static const char *TAG = "SK_MANAGER";
 
 static TaskHandle_t discovery_task_handle = nullptr;
 
-static volatile bool discovery_finished = false;
 static volatile bool discovery_found = false;
 
 static bool websocket_started = false;
@@ -40,41 +40,28 @@ static void signalKDiscoveryTask(void *parameter)
         TAG,
         "Signal K discovery task started");
 
-
-    // -------------------------------------------------------------------------
-    // Keep trying until Signal K is discovered.
-    //
-    // A failed discovery attempt does NOT block the main application.
-    // -------------------------------------------------------------------------
-
     while (!discovery_found) {
 
         ESP_LOGI(
             TAG,
             "Starting Signal K discovery attempt");
 
-
         bool found =
             discover_n_config();
 
-
         if (found) {
+
+            discovery_found =
+                true;
 
             ESP_LOGI(
                 TAG,
                 "Signal K discovered successfully");
 
-            discovery_found =
-                true;
-
-            discovery_finished =
-                true;
-
             break;
         }
 
-
-        ESP_LOGW(
+        ESP_LOGI(
             TAG,
             "Signal K discovery attempt failed");
 
@@ -82,23 +69,16 @@ static void signalKDiscoveryTask(void *parameter)
             TAG,
             "Retrying Signal K discovery in 10 seconds");
 
-
         vTaskDelay(
             pdMS_TO_TICKS(10000));
     }
 
-
-    discovery_finished =
-        true;
-
     discovery_task_handle =
         nullptr;
-
 
     ESP_LOGI(
         TAG,
         "Signal K discovery task finished");
-
 
     vTaskDelete(
         nullptr);
@@ -108,8 +88,9 @@ static void signalKDiscoveryTask(void *parameter)
 // -----------------------------------------------------------------------------
 // VESSEL INFORMATION TASK
 //
-// getVesselInfo() performs several HTTP requests. Keep those requests away
-// from the main application loop as well.
+// getVesselInfo() performs several synchronous HTTP requests.
+//
+// Keep those requests away from the main application loop as well.
 // -----------------------------------------------------------------------------
 
 static void vesselInfoTask(void *parameter)
@@ -120,19 +101,15 @@ static void vesselInfoTask(void *parameter)
         TAG,
         "Vessel information task started");
 
-
-    // Give the WebSocket/network stack a moment to initialize.
+    // Allow the WebSocket/network stack to initialize.
     vTaskDelay(
         pdMS_TO_TICKS(1000));
 
-
     getVesselInfo();
-
 
     ESP_LOGI(
         TAG,
         "Vessel information task finished");
-
 
     vTaskDelete(
         nullptr);
@@ -151,11 +128,11 @@ void start_signalk_connection_task()
 
 
     // -------------------------------------------------------------------------
-    // Start the discovery task exactly once.
+    // Start discovery exactly once.
     // -------------------------------------------------------------------------
 
     if (discovery_task_handle == nullptr &&
-        !discovery_finished) {
+        !discovery_found) {
 
         BaseType_t result =
             xTaskCreate(
@@ -166,19 +143,17 @@ void start_signalk_connection_task()
                 1,
                 &discovery_task_handle);
 
-
         if (result != pdPASS) {
+
+            discovery_task_handle =
+                nullptr;
 
             ESP_LOGE(
                 TAG,
                 "FAILED to create Signal K discovery task");
 
-            discovery_task_handle =
-                nullptr;
-
             return;
         }
-
 
         ESP_LOGI(
             TAG,
@@ -191,10 +166,9 @@ void start_signalk_connection_task()
     //
     // IMPORTANT:
     //
-    // This callback does NOT perform discovery.
+    // This callback does NOT perform mDNS, DNS, HTTP, or discovery.
     //
-    // It only checks whether the background task has completed and, if so,
-    // starts the WebSocket connection.
+    // It simply observes the result of the background discovery task.
     // -------------------------------------------------------------------------
 
     app.onRepeat(
@@ -204,14 +178,15 @@ void start_signalk_connection_task()
             // -----------------------------------------------------------------
             // Start WebSocket after discovery succeeds.
             //
-            // This section is intentionally short and non-blocking.
+            // Reading the stored host is very short. No network operation is
+            // performed here.
             // -----------------------------------------------------------------
 
-            if (discovery_found &&
+            if (
+                discovery_found &&
                 !websocket_started) {
 
                 Preferences prefs;
-
 
                 if (!prefs.begin(
                         "signalk",
@@ -224,7 +199,6 @@ void start_signalk_connection_task()
                     return;
                 }
 
-
                 String host =
                     prefs.getString(
                         SK_TCP_HOST_PREF,
@@ -235,9 +209,7 @@ void start_signalk_connection_task()
                         SK_TCP_PORT_PREF,
                         3000);
 
-
                 prefs.end();
-
 
                 if (host.length() == 0) {
 
@@ -248,22 +220,18 @@ void start_signalk_connection_task()
                     return;
                 }
 
-
                 ESP_LOGI(
                     TAG,
                     "Starting WS after discovery: %s:%d",
                     host.c_str(),
                     port);
 
-
                 signalk_ws_begin(
                     host.c_str(),
                     port);
 
-
                 websocket_started =
                     true;
-
 
                 ESP_LOGI(
                     TAG,
@@ -272,18 +240,15 @@ void start_signalk_connection_task()
 
 
             // -----------------------------------------------------------------
-            // Fetch vessel information once, AFTER discovery.
+            // Fetch vessel information once, after discovery.
             //
-            // getVesselInfo() itself runs in another task because it performs
-            // several HTTP requests.
+            // This is deliberately another FreeRTOS task because getVesselInfo()
+            // performs multiple synchronous HTTP requests.
             // -----------------------------------------------------------------
 
-            if (websocket_started &&
+            if (
+                websocket_started &&
                 !vessel_info_started) {
-
-                vessel_info_started =
-                    true;
-
 
                 BaseType_t result =
                     xTaskCreate(
@@ -294,15 +259,20 @@ void start_signalk_connection_task()
                         1,
                         nullptr);
 
+                if (result == pdPASS) {
 
-                if (result != pdPASS) {
+                    vessel_info_started =
+                        true;
+
+                    ESP_LOGI(
+                        TAG,
+                        "Vessel information task created");
+
+                } else {
 
                     ESP_LOGE(
                         TAG,
                         "FAILED to create vessel information task");
-
-                    vessel_info_started =
-                        false;
                 }
             }
         });
