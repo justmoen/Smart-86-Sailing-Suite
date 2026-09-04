@@ -43,26 +43,9 @@ static String history_pass_key(int index)
     return "HPS" + String(index);
 }
 
-
 // -----------------------------------------------------------------------------
 // DEBUG HELPERS
 // -----------------------------------------------------------------------------
-
-static void log_credentials(
-    const char *context,
-    const String &ssid,
-    const String &password)
-{
-    ESP_LOGI(
-        TAG,
-        "[%s] SSID='%s' PASSWORD='%s' SSID_LEN=%u PASS_LEN=%u",
-        context,
-        ssid.c_str(),
-        password.c_str(),
-        (unsigned)ssid.length(),
-        (unsigned)password.length());
-}
-
 
 static void log_preferences_state(
     const char *context)
@@ -86,14 +69,6 @@ static void log_preferences_state(
     int count =
         prefs.getInt(KEY_HCNT, 0);
 
-    ESP_LOGI(
-        TAG,
-        "[%s] NVS CURRENT: SSID='%s' PASSWORD='%s' COUNT=%d",
-        context,
-        stored_ssid.c_str(),
-        stored_pass.c_str(),
-        count);
-
     count = constrain(count, 0, 5);
 
     for (int i = 0; i < count; ++i) {
@@ -113,15 +88,6 @@ static void log_preferences_state(
             prefs.getString(
                 pass_key.c_str(),
                 "");
-
-        ESP_LOGI(
-            TAG,
-            "[%s] NVS HISTORY[%d]: "
-            "SSID='%s' PASSWORD='%s'",
-            context,
-            i,
-            hist_ssid.c_str(),
-            hist_pass.c_str());
     }
 
     prefs.end();
@@ -149,10 +115,6 @@ static void save_current_wifi_credentials(
         TAG,
         "save_current_wifi_credentials()");
 
-    log_credentials(
-        "SAVE REQUEST",
-        ssid,
-        password);
 
     if (ssid.length() == 0) {
 
@@ -246,12 +208,6 @@ static void save_current_wifi_credentials(
                 KEY_PASS,
                 "");
 
-        ESP_LOGI(
-            TAG,
-            "IMMEDIATE VERIFY: SSID='%s' PASSWORD='%s'",
-            verify_ssid.c_str(),
-            verify_pass.c_str());
-
         if (verify_ssid != ssid) {
 
             ESP_LOGE(
@@ -305,12 +261,6 @@ static void save_wifi_history_entry(
     const String &ssid,
     const String &pass)
 {
-    ESP_LOGI(
-        TAG,
-        "save_wifi_history_entry(): SSID='%s' PASSWORD='%s'",
-        ssid.c_str(),
-        pass.c_str());
-
     if (ssid.length() == 0) {
 
         ESP_LOGW(
@@ -445,15 +395,6 @@ static void save_wifi_history_entry(
                     source_pass_key.c_str(),
                     "");
 
-            ESP_LOGI(
-                TAG,
-                "Moving history[%d] -> history[%d]: "
-                "SSID='%s' PASSWORD='%s'",
-                i,
-                i - 1,
-                next_ssid.c_str(),
-                next_pass.c_str());
-
             prefs.putString(
                 destination_ssid_key.c_str(),
                 next_ssid);
@@ -478,14 +419,6 @@ static void save_wifi_history_entry(
 
     String key_pass =
         history_pass_key(slot);
-
-    ESP_LOGI(
-        TAG,
-        "Adding new history[%d]: SSID='%s' PASSWORD='%s'",
-        slot,
-        ssid.c_str(),
-        pass.c_str());
-
 
     size_t ssid_result =
         prefs.putString(
@@ -627,13 +560,6 @@ static int load_wifi_history(
             prefs.getString(
                 key_pass.c_str(),
                 "");
-
-        ESP_LOGI(
-            TAG,
-            "HISTORY[%d]: SSID='%s' PASSWORD='%s'",
-            i,
-            ssids[i].c_str(),
-            passwords[i].c_str());
     }
 
     prefs.end();
@@ -762,13 +688,6 @@ boolean restoreConfig()
         }
     }
 
-
-    log_credentials(
-        "RESTORED",
-        wifi_ssid,
-        wifi_password);
-
-
     WiFi.setMinSecurity(
         WIFI_AUTH_WEP);
 
@@ -833,14 +752,6 @@ boolean restoreConfig()
             continue;
         }
 
-        ESP_LOGI(
-            TAG,
-            "Starting Wi-Fi candidate[%d]: "
-            "SSID='%s' PASSWORD='%s'",
-            i,
-            ssids[i].c_str(),
-            passwords[i].c_str());
-
         wifi_ssid =
             ssids[i];
 
@@ -856,13 +767,6 @@ boolean restoreConfig()
     ESP_LOGI(
         TAG,
         "restoreConfig() complete");
-
-    ESP_LOGI(
-        TAG,
-        "Final active credentials: "
-        "SSID='%s' PASSWORD='%s'",
-        wifi_ssid.c_str(),
-        wifi_password.c_str());
 
     ESP_LOGI(
         TAG,
@@ -979,11 +883,6 @@ void wifi_connected(
     ESP_LOGI(
         TAG,
         "wifi_connected()");
-
-    log_credentials(
-        "CONNECTED CREDENTIALS",
-        wifi_ssid,
-        wifi_password);
 
     if (wifi_ssid.length() > 0) {
 
