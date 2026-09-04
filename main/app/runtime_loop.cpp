@@ -79,10 +79,13 @@ static void process_charts()
 
 
     /*
-     * Process deferred chart updates.
-     */
+    * Record incoming chart data and update the visible chart.
+    *
+    * The chart functions acquire the LVGL adapter lock before
+    * touching LVGL. History collection itself is independent
+    * of screen visibility.
+    */
     depth_process_deferred_chart_updates();
-
     speed_process_deferred_chart_updates();
 }
 

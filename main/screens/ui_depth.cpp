@@ -8,6 +8,7 @@
 #include "chart_data_history.h"
 #include "signalk_path_config.h"
 #include "ui_manager.h"
+#include "esp_lv_adapter.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -219,9 +220,10 @@ void depth_process_deferred_chart_updates()
     }
 
     /*
-     * History continues regardless of screen visibility.
+     * Only touch the LVGL chart when Depth is the active screen.
      *
-     * Do not touch LVGL unless Depth is the active screen.
+     * History collection continues in the background regardless of
+     * screen visibility.
      */
     if (!ui_manager_is_current_screen(&depthScreen)) {
         return;
@@ -231,43 +233,38 @@ void depth_process_deferred_chart_updates()
         return;
     }
 
+    /*
+     * All LVGL access from the application task must be protected
+     * by the LVGL adapter lock.
+     */
+    if (esp_lv_adapter_lock(-1) != ESP_OK) {
+        return;
+    }
 
-    // -------------------------------------------------------------------------
-    // First time Depth becomes visible:
-    // populate it from the continuously collected history.
-    // -------------------------------------------------------------------------
-
+    /*
+     * Load retained history into the chart once when the screen
+     * becomes active.
+     *
+     * Depth is plotted inverted: deeper water appears lower on
+     * the display.
+     */
     if (!depth_chart_loaded) {
-
         ChartDataPoint points[600];
         int point_count = 0;
 
-        depth_history->get_points(
-            points,
-            point_count,
-            600
-        );
+        depth_history->get_points(points, point_count, 600);
 
-        // Determine range from history.
+        /*
+         * Determine the chart scale from retained history.
+         */
         float max_depth = 0.0f;
 
-        for (
-            int i = 0;
-            i < point_count;
-            i++
-        ) {
-            max_depth =
-                std::max(
-                    max_depth,
-                    points[i].value
-                );
+        for (int i = 0; i < point_count; i++) {
+            max_depth = std::max(max_depth, points[i].value);
         }
 
         depth_chart_bottom =
-            std::max(
-                20.0f,
-                max_depth * 1.05f
-            );
+            std::max(20.0f, max_depth * 1.05f);
 
         lv_chart_set_range(
             depth_chart,
@@ -276,84 +273,60 @@ void depth_process_deferred_chart_updates()
             (int)depth_chart_bottom
         );
 
-
         uint32_t chart_count =
-            lv_chart_get_point_count(
-                depth_chart
-            );
+            lv_chart_get_point_count(depth_chart);
 
-        int32_t *y_points =
-            lv_chart_get_y_array(
-                depth_chart,
-                depth_series
-            );
-
-        if (y_points) {
-
-            for (
-                uint32_t i = 0;
-                i < chart_count;
-                i++
-            ) {
-                y_points[i] =
-                    LV_CHART_POINT_NONE;
-            }
-
-            uint32_t count =
-                std::min(
-                    (uint32_t)point_count,
-                    chart_count
-                );
-
-            for (
-                uint32_t i = 0;
-                i < count;
-                i++
-            ) {
-                float display_value =
-                    depth_chart_bottom -
-                    points[i].value;
-
-                y_points[i] =
-                    (int32_t)display_value;
-            }
-
-            lv_chart_set_x_start_point(
+        /*
+         * Clear the chart using the public LVGL API.
+         */
+        for (uint32_t i = 0; i < chart_count; i++) {
+            lv_chart_set_value_by_id(
                 depth_chart,
                 depth_series,
-                0
-            );
-
-            lv_chart_refresh(
-                depth_chart
+                i,
+                LV_CHART_POINT_NONE
             );
         }
 
-        depth_chart_loaded =
-            true;
+        /*
+         * Restore retained history in chronological order.
+         *
+         * Depth is inverted so that shallow water is higher on
+         * the display and deeper water is lower.
+         */
+        uint32_t count =
+            std::min((uint32_t)point_count, chart_count);
 
-        pending_chart_add_point =
-            false;
+        for (uint32_t i = 0; i < count; i++) {
+            float display_value =
+                depth_chart_bottom - points[i].value;
 
-        pending_chart_range_update =
-            false;
+            lv_chart_set_value_by_id(
+                depth_chart,
+                depth_series,
+                i,
+                (lv_coord_t)display_value
+            );
+        }
 
-        return;
+        depth_chart_loaded = true;
+
+        /*
+         * Any sample collected while the chart was being loaded is
+         * already represented by the retained history.
+         */
+        pending_chart_add_point = false;
+        pending_chart_range_update = false;
     }
 
-
-    // -------------------------------------------------------------------------
-    // Live chart update.
-    // -------------------------------------------------------------------------
-
+    /*
+     * Add new live data.
+     */
     if (pending_chart_add_point) {
-
-        pending_chart_add_point =
-            false;
+        pending_chart_add_point = false;
 
         float chart_value =
-            depth_chart_bottom -
-            pending_depth_val;
+            depth_chart_bottom - pending_depth_val;
 
         lv_chart_set_next_value(
             depth_chart,
@@ -362,46 +335,29 @@ void depth_process_deferred_chart_updates()
         );
     }
 
-
-    // -------------------------------------------------------------------------
-    // Range update only when a new history sample was accepted.
-    // -------------------------------------------------------------------------
-
+    /*
+     * Update the range when new history has arrived.
+     *
+     * Deliberately no lv_chart_refresh().
+     */
     if (pending_chart_range_update) {
-
-        pending_chart_range_update =
-            false;
+        pending_chart_range_update = false;
 
         ChartDataPoint points[600];
         int point_count = 0;
 
-        depth_history->get_points(
-            points,
-            point_count,
-            600
-        );
+        depth_history->get_points(points, point_count, 600);
 
         if (point_count > 1) {
-
             float max_depth = 0.0f;
 
-            for (
-                int i = 0;
-                i < point_count;
-                i++
-            ) {
+            for (int i = 0; i < point_count; i++) {
                 max_depth =
-                    std::max(
-                        max_depth,
-                        points[i].value
-                    );
+                    std::max(max_depth, points[i].value);
             }
 
             depth_chart_bottom =
-                std::max(
-                    20.0f,
-                    max_depth * 1.05f
-                );
+                std::max(20.0f, max_depth * 1.05f);
 
             lv_chart_set_range(
                 depth_chart,
@@ -411,6 +367,8 @@ void depth_process_deferred_chart_updates()
             );
         }
     }
+
+    esp_lv_adapter_unlock();
 }
 
 /* -------------------------------------------------- */
