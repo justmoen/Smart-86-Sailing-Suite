@@ -390,6 +390,11 @@ void ui_manager_update()
     ui_unlock();
 }
 
+bool ui_manager_is_current_screen(lv_updatable_screen_t *screen)
+{
+    return screen != nullptr &&
+           current_screen == screen;
+}
 
 /* --------------------------------------------------------------------------
  * Process deferred screen creation

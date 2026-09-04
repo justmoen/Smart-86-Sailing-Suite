@@ -12,6 +12,9 @@ static String signalk_http_host_cached = "";
 static int signalk_http_port_cached = 0;
 static bool http_config_loaded = false;
 
+const char* PROGMEM SK_HTTP_HOST_PREF = "sk_http_host";
+const char* PROGMEM SK_HTTP_PORT_PREF = "sk_http_port";
+
 static void load_http_config() {
   if (!http_config_loaded) {
     Preferences prefs;

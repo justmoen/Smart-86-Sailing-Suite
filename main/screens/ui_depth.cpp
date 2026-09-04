@@ -7,6 +7,7 @@
 #include <TinyGPSPlus.h>
 #include "chart_data_history.h"
 #include "signalk_path_config.h"
+#include "ui_manager.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,22 +36,48 @@ ChartDataHistory *depth_history = nullptr;
 
 // Deferred chart update tracking
 static float pending_depth_val = 0;
-
 static bool pending_chart_add_point = false;
-static int pending_chart_range_update = 0;
+static bool pending_chart_range_update = false;
+static bool depth_chart_loaded = false;
+static float depth_chart_bottom = 20.0f;
 
 void depth_queue_chart_data(void)
 {
-    BestDepth bd = get_best_depth();
-    if (depth_history && bd.valid) {
-        const auto& config = get_signalk_path_config();
-        float depth_val = bd.m;
-        if ((int)config.distance_unit == 1) {  // Feet
-            depth_val *= _GPS_FEET_PER_METER;
-        }
-        pending_depth_val = depth_val;
-        pending_chart_add_point = true;
-        pending_chart_range_update++;
+    if (!depth_history) {
+        return;
+    }
+
+    BestDepth bd =
+        get_best_depth();
+
+    if (!bd.valid) {
+        return;
+    }
+
+    const auto& config =
+        get_signalk_path_config();
+
+    float depth_val =
+        bd.m;
+
+    if ((int)config.distance_unit == 1) {
+        depth_val *=
+            _GPS_FEET_PER_METER;
+    }
+
+    /*
+     * History collection is independent of screen visibility.
+     */
+    if (depth_history->add_point(depth_val)) {
+
+        pending_depth_val =
+            depth_val;
+
+        pending_chart_add_point =
+            true;
+
+        pending_chart_range_update =
+            true;
     }
 }
 
@@ -97,7 +124,20 @@ static void lv_depth_display(lv_updatable_screen_t *scr)
     lv_chart_set_point_count(depth_chart, depth_point_count);
     lv_chart_set_range(depth_chart, LV_CHART_AXIS_PRIMARY_Y, 0, 25);
     lv_chart_set_div_line_count(depth_chart, 5, 8);  // More Y ticks
-    lv_chart_add_series(depth_chart, lv_palette_main(LV_PALETTE_BLUE), LV_CHART_AXIS_PRIMARY_Y);
+    lv_chart_set_update_mode(
+        depth_chart,
+        LV_CHART_UPDATE_MODE_SHIFT
+    );
+
+    depth_series =
+        lv_chart_add_series(
+            depth_chart,
+            lv_palette_main(LV_PALETTE_BLUE),
+            LV_CHART_AXIS_PRIMARY_Y
+        );
+
+    depth_chart_loaded = false;
+    depth_chart_bottom = 20.0f;
     
     // Y-axis label "Depth (m)"
     lv_obj_t * y_label = lv_label_create(depth_chart);
@@ -174,55 +214,201 @@ static void depth_update_cb(lv_updatable_screen_t *scr)
 
 void depth_process_deferred_chart_updates()
 {
-    if (!depth_history || !depth_chart) return;
-    
-    // Add pending point to chart
-    static uint32_t last_chart_add = 0;
-    if (pending_chart_add_point && (millis() - last_chart_add > 2000)) {
-        pending_chart_add_point = false;
-        last_chart_add = millis();
-        
-        // Create series once on first data point
-        if (depth_series == nullptr) {
-            depth_series = lv_chart_add_series(depth_chart, lv_palette_main(LV_PALETTE_BLUE), LV_CHART_AXIS_PRIMARY_Y);
-        }
-        
-        // Record in history
-        depth_history->add_point(pending_depth_val);  // Positive for history
-        
-        // Add point to chart if series exists - invert for visual (shallow high Y)
-        static float cur_chart_bottom = 25.0f;
-        if (depth_series != nullptr) {
-            lv_chart_set_next_value(depth_chart, depth_series, (lv_coord_t)(cur_chart_bottom - pending_depth_val));
-        }
+    if (!depth_history || !depth_chart) {
+        return;
     }
-    
-    // Update range if needed (every ~1000ms based on counter)
-    if (pending_chart_range_update >= 50) {  // 50 * 20ms = ~1000ms
-        pending_chart_range_update = 0;
-        
+
+    /*
+     * History continues regardless of screen visibility.
+     *
+     * Do not touch LVGL unless Depth is the active screen.
+     */
+    if (!ui_manager_is_current_screen(&depthScreen)) {
+        return;
+    }
+
+    if (!depth_series) {
+        return;
+    }
+
+
+    // -------------------------------------------------------------------------
+    // First time Depth becomes visible:
+    // populate it from the continuously collected history.
+    // -------------------------------------------------------------------------
+
+    if (!depth_chart_loaded) {
+
         ChartDataPoint points[600];
         int point_count = 0;
-        depth_history->get_points(points, point_count, 600);
-        
+
+        depth_history->get_points(
+            points,
+            point_count,
+            600
+        );
+
+        // Determine range from history.
+        float max_depth = 0.0f;
+
+        for (
+            int i = 0;
+            i < point_count;
+            i++
+        ) {
+            max_depth =
+                std::max(
+                    max_depth,
+                    points[i].value
+                );
+        }
+
+        depth_chart_bottom =
+            std::max(
+                20.0f,
+                max_depth * 1.05f
+            );
+
+        lv_chart_set_range(
+            depth_chart,
+            LV_CHART_AXIS_PRIMARY_Y,
+            0,
+            (int)depth_chart_bottom
+        );
+
+
+        uint32_t chart_count =
+            lv_chart_get_point_count(
+                depth_chart
+            );
+
+        int32_t *y_points =
+            lv_chart_get_y_array(
+                depth_chart,
+                depth_series
+            );
+
+        if (y_points) {
+
+            for (
+                uint32_t i = 0;
+                i < chart_count;
+                i++
+            ) {
+                y_points[i] =
+                    LV_CHART_POINT_NONE;
+            }
+
+            uint32_t count =
+                std::min(
+                    (uint32_t)point_count,
+                    chart_count
+                );
+
+            for (
+                uint32_t i = 0;
+                i < count;
+                i++
+            ) {
+                float display_value =
+                    depth_chart_bottom -
+                    points[i].value;
+
+                y_points[i] =
+                    (int32_t)display_value;
+            }
+
+            lv_chart_set_x_start_point(
+                depth_chart,
+                depth_series,
+                0
+            );
+
+            lv_chart_refresh(
+                depth_chart
+            );
+        }
+
+        depth_chart_loaded =
+            true;
+
+        pending_chart_add_point =
+            false;
+
+        pending_chart_range_update =
+            false;
+
+        return;
+    }
+
+
+    // -------------------------------------------------------------------------
+    // Live chart update.
+    // -------------------------------------------------------------------------
+
+    if (pending_chart_add_point) {
+
+        pending_chart_add_point =
+            false;
+
+        float chart_value =
+            depth_chart_bottom -
+            pending_depth_val;
+
+        lv_chart_set_next_value(
+            depth_chart,
+            depth_series,
+            (lv_coord_t)chart_value
+        );
+    }
+
+
+    // -------------------------------------------------------------------------
+    // Range update only when a new history sample was accepted.
+    // -------------------------------------------------------------------------
+
+    if (pending_chart_range_update) {
+
+        pending_chart_range_update =
+            false;
+
+        ChartDataPoint points[600];
+        int point_count = 0;
+
+        depth_history->get_points(
+            points,
+            point_count,
+            600
+        );
+
         if (point_count > 1) {
-            // Depth chart: max depth bottom, 0 surface top, 10% margin above max depth
-            // Negative depths: find min (greatest magnitude depth)
+
             float max_depth = 0.0f;
-            for (int i = 0; i < point_count; i++) {
-                max_depth = std::max(max_depth, points[i].value);
+
+            for (
+                int i = 0;
+                i < point_count;
+                i++
+            ) {
+                max_depth =
+                    std::max(
+                        max_depth,
+                        points[i].value
+                    );
             }
-            
-            static float chart_bottom = 20.0f;
-            if (max_depth > chart_bottom) {
-                chart_bottom = max_depth * 1.05f;  // +5% margin
-            } else {
-                chart_bottom *= 0.95f;  // Shrink 5%
-            }
-            if (chart_bottom < 20.0f) chart_bottom = 20.0f;
-            
-            lv_chart_set_range(depth_chart, LV_CHART_AXIS_PRIMARY_Y, 0, (int)chart_bottom);
-            Serial.printf("Depth: max=%.1f bottom=%.1f range=0-%d\n", max_depth, chart_bottom, (int)chart_bottom);
+
+            depth_chart_bottom =
+                std::max(
+                    20.0f,
+                    max_depth * 1.05f
+                );
+
+            lv_chart_set_range(
+                depth_chart,
+                LV_CHART_AXIS_PRIMARY_Y,
+                0,
+                (int)depth_chart_bottom
+            );
         }
     }
 }

@@ -17,6 +17,9 @@ void ui_manager_show(lv_updatable_screen_t *screen);
 void ui_manager_next();
 void ui_manager_prev();
 void ui_manager_reinit_screens();
+
+bool ui_manager_is_current_screen(lv_updatable_screen_t *screen);
+
 struct EngineScreenState;
 
 #ifdef __cplusplus

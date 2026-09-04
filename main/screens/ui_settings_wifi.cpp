@@ -6,6 +6,7 @@
 #include "esp_log.h"
 
 static const char *TAG = "WIFI_CONFIG";
+static lv_obj_t *list_wifi;
 
 String wifi_ssid;      // Store the name of the wireless network.
 String wifi_password;  // Store the password of the wireless network.

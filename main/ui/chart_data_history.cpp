@@ -35,29 +35,25 @@ ChartDataHistory::ChartDataHistory(const char* key, int default_duration_min, in
     load_from_nv();
 }
 
-void ChartDataHistory::add_point(float value) {
+bool ChartDataHistory::add_point(float value) {
     uint32_t now = millis();
-    
+
     if (now - last_sample_ms < point_interval_ms) {
-#ifdef CONFIG_LOG_DEFAULT_LEVEL_INFO
-        static uint32_t last_log = 0;
-        if (millis() - last_log > 30000) {
-            Serial.printf("Chart %s throttle skip (need %ums, have %ums)\n", namespace_key.c_str(), point_interval_ms, now - last_sample_ms);
-            last_log = millis();
-        }
-#endif
-        return;
+        return false;
     }
-    
+
     last_sample_ms = now;
-    
+
     data[write_index].value = value;
     data[write_index].timestamp_ms = now - start_time_ms;
-    
+
     write_index = (write_index + 1) % CHART_MAX_POINTS;
+
     if (total_points < CHART_MAX_POINTS) {
         total_points++;
     }
+
+    return true;
 }
 
 void ChartDataHistory::get_points(ChartDataPoint* out_buffer, int& out_count, int max_points) {

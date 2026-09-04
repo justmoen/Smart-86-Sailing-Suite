@@ -8,11 +8,11 @@
 extern "C" {
 #endif
 
-static const char* PROGMEM SK_HTTP_HOST_PREF = "sk_http_host";
-static const char* PROGMEM SK_HTTP_PORT_PREF = "sk_http_port";
-
 extern String signalk_http_host;
 extern int signalk_http_port;
+
+extern const char* PROGMEM SK_HTTP_HOST_PREF;
+extern const char* PROGMEM SK_HTTP_PORT_PREF;
 
 void set_vessel_nav_state(String& val);
 void getVesselInfo();

@@ -27,7 +27,7 @@ private:
 public:
     ChartDataHistory(const char* key, int default_duration_min = 10, int point_count = 100);
     
-    void add_point(float value);
+    bool add_point(float value);
     
     void get_points(ChartDataPoint* out_buffer, int& out_count, int max_points);
     

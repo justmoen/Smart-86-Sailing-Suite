@@ -17,7 +17,6 @@ extern boolean settingMode;
 extern "C" {
 #endif
 
-  static lv_obj_t *list_wifi;
   boolean restoreConfig();
   void wifi_connected(void (*on_connected)());
   void lv_connect_wifi_win(int i);
