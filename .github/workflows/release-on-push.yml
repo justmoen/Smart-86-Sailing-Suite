@@ -15,6 +15,7 @@ concurrency:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -22,27 +23,133 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      # The action handles mounting your workspace, exporting the correct chip, and building
       - name: Build ESP32-P4 firmware
         uses: espressif/esp-idf-ci-action@v1
         with:
           esp_idf_version: v5.5.5
-          target: esp32p4         # 🚀 Tells the action container to export esp32p4
+          target: esp32p4
           command: |
-            # 1. Completely clear out temporary environment leftovers
-            rm -rf build sdkconfig
-            
-            # 2. Re-establish the baseline target architectural profile 
+            set -e
+
+            echo "============================================================"
+            echo "ESP-IDF"
+            echo "============================================================"
+            idf.py --version
+
+            echo ""
+            echo "============================================================"
+            echo "CLEAN BUILD CONFIGURATION"
+            echo "============================================================"
+
+            rm -rf build sdkconfig sdkconfig.old
+
+            echo ""
+            echo "Setting ESP32-P4 target..."
             idf.py set-target esp32p4
-            
-            # 3. Force-append your precise v1.3 text parameters into the active configuration
-            cat sdkconfig.defaults >> sdkconfig
-            
-            # 4. CRITICAL: Force the compiler to re-evaluate eFuse/PMU flags for v1.x silicon
+
+            echo ""
+            echo "============================================================"
+            echo "CONFIGURATION"
+            echo "============================================================"
+
+            echo "ESP-IDF target:"
+            grep -n "^CONFIG_IDF_TARGET=" sdkconfig || true
+
+            echo ""
+            echo "ESP32-P4 revision:"
+            grep -n "^CONFIG_ESP32P4_" sdkconfig || true
+            grep -n "^CONFIG_ESP_REV_" sdkconfig || true
+
+            echo ""
+            echo "PSRAM:"
+            grep -n "^CONFIG_SPIRAM" sdkconfig || true
+
+            echo ""
+            echo "ESP-Hosted:"
+            grep -n "CONFIG_ESP_HOSTED" sdkconfig || true
+            grep -n "CONFIG_ESP_WIFI_REMOTE" sdkconfig || true
+
+            echo ""
+            echo "mbedTLS PSK:"
+            grep -n "CONFIG_MBEDTLS_PSK" sdkconfig || true
+            grep -n "CONFIG_MBEDTLS_KEY_EXCHANGE" sdkconfig || true
+
+            echo ""
+            echo "Flash:"
+            grep -n "^CONFIG_ESPTOOLPY_FLASH" sdkconfig || true
+
+            echo ""
+            echo "============================================================"
+            echo "MANAGED COMPONENTS"
+            echo "============================================================"
+
+            if [ -f managed_components/espressif__esp_hosted/idf_component.yml ]; then
+              echo "ESP-Hosted:"
+              grep -n "^version:" \
+                managed_components/espressif__esp_hosted/idf_component.yml || true
+            fi
+
+            if [ -f managed_components/espressif__esp_wifi_remote/idf_component.yml ]; then
+              echo "ESP-WiFi-Remote:"
+              grep -n "^version:" \
+                managed_components/espressif__esp_wifi_remote/idf_component.yml || true
+            fi
+
+            if [ -f managed_components/espressif__arduino-esp32/idf_component.yml ]; then
+              echo "Arduino:"
+              grep -n "^version:" \
+                managed_components/espressif__arduino-esp32/idf_component.yml || true
+            fi
+
+            echo ""
+            echo "============================================================"
+            echo "RECONFIGURE"
+            echo "============================================================"
+
             idf.py reconfigure
-            
-            # 5. Compile the final binary conforming to your v1.3 hardware parameters
+
+            echo ""
+            echo "============================================================"
+            echo "FINAL CONFIGURATION"
+            echo "============================================================"
+
+            echo "ESP-IDF target:"
+            grep -n "^CONFIG_IDF_TARGET=" sdkconfig || true
+
+            echo ""
+            echo "ESP32-P4 revision:"
+            grep -n "^CONFIG_ESP32P4_" sdkconfig || true
+            grep -n "^CONFIG_ESP_REV_" sdkconfig || true
+
+            echo ""
+            echo "PSRAM:"
+            grep -n "^CONFIG_SPIRAM" sdkconfig || true
+
+            echo ""
+            echo "ESP-Hosted:"
+            grep -n "CONFIG_ESP_HOSTED" sdkconfig || true
+            grep -n "CONFIG_ESP_WIFI_REMOTE" sdkconfig || true
+
+            echo ""
+            echo "mbedTLS:"
+            grep -n "CONFIG_MBEDTLS_PSK" sdkconfig || true
+            grep -n "CONFIG_MBEDTLS_KEY_EXCHANGE" sdkconfig || true
+
+            echo ""
+            echo "============================================================"
+            echo "BUILD"
+            echo "============================================================"
+
             idf.py build
+
+            echo ""
+            echo "============================================================"
+            echo "BUILD COMPLETE"
+            echo "============================================================"
+
+            ls -lh build/sailing_suite.bin
+
+            sha256sum build/sailing_suite.bin
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2

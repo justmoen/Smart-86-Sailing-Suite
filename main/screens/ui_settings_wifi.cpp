@@ -14,6 +14,13 @@ String wifi_ssid;
 String wifi_password;
 boolean settingMode;
 
+static lv_timer_t *wifi_scan_timer = NULL;
+
+static bool wifi_scan_in_progress = false;
+static uint32_t wifi_next_scan_ms = 0;
+
+static constexpr uint32_t WIFI_SCAN_REFRESH_MS = 10000;
+static constexpr uint32_t WIFI_SCAN_POLL_MS = 500;
 
 // -----------------------------------------------------------------------------
 // NVS
@@ -25,7 +32,6 @@ boolean settingMode;
 
 static constexpr const char *KEY_SSID = "SSID";
 static constexpr const char *KEY_PASS = "PASS";
-
 
 // -----------------------------------------------------------------------------
 // DEBUG
@@ -391,6 +397,13 @@ void btnResetWiFiSettings_event(
     lv_event_t *event)
 {
     (void)event;
+
+    if (wifi_scan_timer != NULL) {
+        lv_timer_delete(wifi_scan_timer);
+        wifi_scan_timer = NULL;
+    }
+
+    wifi_scan_in_progress = false;
 
     ESP_LOGW(
         TAG,
@@ -1005,6 +1018,18 @@ static void event_handler_wifi(
         (int)(intptr_t)
         lv_event_get_user_data(e);
 
+    // -------------------------------------------------------------------------
+    // The user has selected a network.
+    //
+    // Stop all future scans BEFORE accessing the selected SSID.
+    // -------------------------------------------------------------------------
+
+    if (wifi_scan_timer != NULL) {
+        lv_timer_delete(wifi_scan_timer);
+        wifi_scan_timer = NULL;
+    }
+
+    wifi_scan_in_progress = false;
 
     // -------------------------------------------------------------------------
     // Capture the SSID immediately.
@@ -1014,7 +1039,6 @@ static void event_handler_wifi(
 
     wifi_selected_ssid =
         WiFi.SSID(n);
-
 
     ESP_LOGI(
         TAG,
@@ -1030,17 +1054,14 @@ static void event_handler_wifi(
         "  SSID='%s'",
         wifi_selected_ssid.c_str());
 
-
 #ifdef ENABLE_SCREEN_SERVER
 
     screenServer0();
 
 #endif
 
-
     lv_connect_wifi_win(n);
 }
-
 
 // -----------------------------------------------------------------------------
 // WIFI LIST
@@ -1173,6 +1194,7 @@ void lv_list_wifi(
     }
 }
 
+static void wifi_scan_timer_cb(lv_timer_t *timer);
 
 // -----------------------------------------------------------------------------
 // SETUP MODE
@@ -1187,7 +1209,6 @@ static void setupMode(
         TAG,
         "Entering Wi-Fi setup mode");
 
-
     WiFi.mode(
         WIFI_STA);
 
@@ -1195,47 +1216,63 @@ static void setupMode(
 
     delay(100);
 
-
     // -------------------------------------------------------------------------
-    // ONE scan for the setup screen.
+    // Start the initial scan asynchronously.
     //
-    // Do not call restoreConfig() here.
-    // Do not call WiFi.scanDelete() here.
-    //
-    // The scan results must remain available while the user selects a network.
+    // The previous implementation used WiFi.scanNetworks(), which blocks until
+    // the scan completes.  This version starts the scan and lets the LVGL task
+    // continue running.
     // -------------------------------------------------------------------------
 
-    int n =
-        WiFi.scanNetworks();
+    wifi_selected_ssid = "";
 
+    wifi_scan_in_progress = true;
 
     ESP_LOGI(
         TAG,
-        "Wi-Fi scan found %d networks",
-        n);
+        "Starting initial Wi-Fi scan");
 
+    int16_t result =
+        WiFi.scanNetworks(true);
 
-    for (int i = 0;
-         i < n;
-         ++i) {
+    if (result == WIFI_SCAN_FAILED) {
+
+        ESP_LOGW(
+            TAG,
+            "Initial Wi-Fi scan failed");
+
+        wifi_scan_in_progress = false;
+
+        wifi_next_scan_ms =
+            millis() + 1000;
+    } else {
 
         ESP_LOGI(
             TAG,
-            "SCAN[%d]: SSID='%s' RSSI=%d",
-            i,
-            WiFi.SSID(i).c_str(),
-            WiFi.RSSI(i));
+            "Initial Wi-Fi scan started");
     }
 
-
     // -------------------------------------------------------------------------
-    // Display the scan results.
+    // Poll the asynchronous scan frequently.
+    //
+    // The actual Wi-Fi scan is NOT repeated every 500 ms.  The timer only
+    // checks whether the current scan has finished.  A new scan starts only
+    // every WIFI_SCAN_REFRESH_MS.
     // -------------------------------------------------------------------------
 
-    lv_list_wifi(
-        lv_screen_active(),
-        n);
+    if (wifi_scan_timer != NULL) {
 
+        lv_timer_delete(
+            wifi_scan_timer);
+
+        wifi_scan_timer = NULL;
+    }
+
+    wifi_scan_timer =
+        lv_timer_create(
+            wifi_scan_timer_cb,
+            WIFI_SCAN_POLL_MS,
+            NULL);
 
     // -------------------------------------------------------------------------
     // When Wi-Fi connects, clean up and restart.
@@ -1254,6 +1291,15 @@ static void setupMode(
                 TAG,
                 "Wi-Fi STA_CONNECTED event");
 
+            if (wifi_scan_timer != NULL) {
+
+                lv_timer_delete(
+                    wifi_scan_timer);
+
+                wifi_scan_timer = NULL;
+            }
+
+            wifi_scan_in_progress = false;
 
             if (list_wifi != NULL) {
 
@@ -1263,7 +1309,6 @@ static void setupMode(
                 list_wifi = NULL;
             }
 
-
             delay(2000);
 
             ESP.restart();
@@ -1272,6 +1317,171 @@ static void setupMode(
         WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED);
 }
 
+// -----------------------------------------------------------------------------
+// WIFI SCAN STATUS
+//
+// The scan is asynchronous so that the Wi-Fi scan does not block the LVGL
+// task.  The timer checks for completion and periodically starts another scan.
+// -----------------------------------------------------------------------------
+
+static void wifi_scan_timer_cb(
+    lv_timer_t *timer)
+{
+    (void)timer;
+
+    // -------------------------------------------------------------------------
+    // Once a network has been selected, scanning is finished permanently.
+    // -------------------------------------------------------------------------
+
+    if (!settingMode ||
+        wifi_selected_ssid.length() > 0) {
+
+        if (wifi_scan_timer != NULL) {
+            lv_timer_delete(wifi_scan_timer);
+            wifi_scan_timer = NULL;
+        }
+
+        wifi_scan_in_progress = false;
+
+        return;
+    }
+
+    // -------------------------------------------------------------------------
+    // If a scan is currently running, check whether it has completed.
+    // -------------------------------------------------------------------------
+
+    if (wifi_scan_in_progress) {
+
+        int16_t status =
+            WiFi.scanComplete();
+
+        if (status == WIFI_SCAN_RUNNING) {
+            return;
+        }
+
+        if (status == WIFI_SCAN_FAILED) {
+
+            ESP_LOGW(
+                TAG,
+                "Wi-Fi refresh scan failed");
+
+            wifi_scan_in_progress = false;
+
+            // Try again on the next refresh interval.
+            wifi_next_scan_ms =
+                millis() + WIFI_SCAN_REFRESH_MS;
+
+            return;
+        }
+
+        // ---------------------------------------------------------------------
+        // Scan completed successfully.
+        // ---------------------------------------------------------------------
+
+        int num_networks =
+            status;
+
+        ESP_LOGI(
+            TAG,
+            "Wi-Fi refresh scan completed: %d networks",
+            num_networks);
+
+        for (int i = 0;
+             i < num_networks;
+             ++i) {
+
+            ESP_LOGI(
+                TAG,
+                "REFRESH[%d]: SSID='%s' RSSI=%d",
+                i,
+                WiFi.SSID(i).c_str(),
+                WiFi.RSSI(i));
+        }
+
+        wifi_scan_in_progress = false;
+
+        // ---------------------------------------------------------------------
+        // Rebuild the visible list using the new scan results.
+        //
+        // Keep the scan results alive after this. The list button callbacks
+        // use WiFi.SSID(index) when the user selects a network.
+        // ---------------------------------------------------------------------
+
+        if (list_wifi != NULL) {
+
+            lv_obj_delete(
+                list_wifi);
+
+            list_wifi = NULL;
+        }
+
+        lv_list_wifi(
+            lv_screen_active(),
+            num_networks);
+
+        // ---------------------------------------------------------------------
+        // The next scan happens after the refresh interval.
+        // ---------------------------------------------------------------------
+
+        wifi_next_scan_ms =
+            millis() + WIFI_SCAN_REFRESH_MS;
+
+        return;
+    }
+
+    // -------------------------------------------------------------------------
+    // No scan is running. Start the next scan when its interval expires.
+    // -------------------------------------------------------------------------
+
+    if ((int32_t)(
+            millis() -
+            wifi_next_scan_ms) < 0) {
+
+        return;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "Starting periodic Wi-Fi scan");
+
+    // -------------------------------------------------------------------------
+    // WiFi.scanNetworks(true) is asynchronous.
+    //
+    // It also discards the previous scan result. Therefore remove the old
+    // clickable list before starting the new scan.
+    // -------------------------------------------------------------------------
+
+    if (list_wifi != NULL) {
+
+        lv_obj_delete(
+            list_wifi);
+
+        list_wifi = NULL;
+    }
+
+    wifi_scan_in_progress = true;
+
+    int16_t result =
+        WiFi.scanNetworks(true);
+
+    if (result == WIFI_SCAN_FAILED) {
+
+        ESP_LOGW(
+            TAG,
+            "Failed to start Wi-Fi refresh scan");
+
+        wifi_scan_in_progress = false;
+
+        wifi_next_scan_ms =
+            millis() + WIFI_SCAN_REFRESH_MS;
+
+        return;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "Periodic Wi-Fi scan started");
+}
 
 // -----------------------------------------------------------------------------
 // CHECK CONNECTION

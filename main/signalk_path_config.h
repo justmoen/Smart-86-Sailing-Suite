@@ -32,8 +32,7 @@ struct signalk_path_config_t {
   String navigation_course_rhumbline_next_point_distance;
   String navigation_course_rhumbline_next_point_velocity_made_good;
   String navigation_state;
-  String navigation_attitude_roll;
-  String navigation_attitude_pitch;
+  String navigation_attitude;
 
   // Environment paths
   String environment_wind_angle_apparent;

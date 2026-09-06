@@ -75,16 +75,32 @@ static fluid_type_e string_to_fluid_type(const String& fluid_lower) {
             shipDataModel.navigation.heading_mag.deg = value.as<float>() * 180.0 / PI;
             shipDataModel.navigation.heading_mag.age = millis();
           }
-        } else if (path == config.navigation_position) {
-          if (!value["longitude"].isNull() && !value["latitude"].isNull()) {
-            if (value["longitude"].is<float>() && value["latitude"].is<float>()) {
-              shipDataModel.navigation.position.lat.deg = value["latitude"].as<float>();
-              shipDataModel.navigation.position.lat.age = millis();
-              shipDataModel.navigation.position.lon.deg = value["longitude"].as<float>();
-              shipDataModel.navigation.position.lon.age = millis();
+        } else if (path == config.navigation_attitude) {
+          if (value.is<JsonObject>()) {
+            JsonObject attitude = value.as<JsonObject>();
+            const uint32_t now = millis();
+
+            if (!attitude["roll"].isNull()) {
+              shipDataModel.navigation.attitude.heel.deg =
+                attitude["roll"].as<float>() * 180.0f / PI;
+              shipDataModel.navigation.attitude.heel.age = now;
             }
+
+            if (!attitude["pitch"].isNull()) {
+              shipDataModel.navigation.attitude.pitch.deg =
+                attitude["pitch"].as<float>() * 180.0f / PI;
+              shipDataModel.navigation.attitude.pitch.age = now;
+            }
+
+            if (!attitude["yaw"].isNull()) {
+              shipDataModel.navigation.attitude.yaw.deg =
+                attitude["yaw"].as<float>() * 180.0f / PI;
+              shipDataModel.navigation.attitude.yaw.age = now;
+            }
+
+            found = true;
           }
-        } else if (path == config.navigation_speed_over_ground) {
+      } else if (path == config.navigation_speed_over_ground) {
           if (value.is<float>()) {
             shipDataModel.navigation.speed_over_ground.kn = value.as<float>() / _GPS_MPS_PER_KNOT;
             shipDataModel.navigation.speed_over_ground.age = millis();
@@ -127,15 +143,14 @@ static fluid_type_e string_to_fluid_type(const String& fluid_lower) {
               set_vessel_nav_state(val);
             }
           }
-        } else if (path == config.navigation_attitude_roll) {
-          if (value.is<float>()) {
+        } else if (path == config.navigation_attitude) {
+          if (value.is<JsonString>()) {
             shipDataModel.navigation.attitude.heel.deg = value.as<float>() * 180.0 / PI;
             shipDataModel.navigation.attitude.heel.age = millis();
-          }
-        } else if (path == config.navigation_attitude_pitch) {
-          if (value.is<float>()) {
             shipDataModel.navigation.attitude.pitch.deg = value.as<float>() * 180.0 / PI;
             shipDataModel.navigation.attitude.pitch.age = millis();
+            shipDataModel.navigation.attitude.yaw.deg = value.as<float>() * 180.0 / PI;
+            shipDataModel.navigation.attitude.yaw.age = millis();
           }
         } else if (path == config.environment_wind_angle_apparent) {
           if (value.is<float>()) {

@@ -44,7 +44,7 @@ static void apply_template_value(String& html, const char* token, const String& 
 }
 
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "v0.7.27"
+#define FIRMWARE_VERSION "v0.7.28"
 #endif
 
 constexpr const char* kPrefsNamespace = "sk-config";
@@ -710,8 +710,7 @@ void load_config_from_preferences() {
     config.navigation_course_rhumbline_next_point_distance = load_string_pref("nav_dist", "navigation.courseRhumbline.nextPoint.distance");
     config.navigation_course_rhumbline_next_point_velocity_made_good = load_string_pref("nav_vmg", "navigation.courseRhumbline.nextPoint.velocityMadeGood");
     config.navigation_state = load_string_pref("nav_state", "navigation.state");
-    config.navigation_attitude_roll = load_string_pref("nav_roll", "navigation.attitude.roll");
-    config.navigation_attitude_pitch = load_string_pref("nav_pitch", "navigation.attitude.pitch");
+    config.navigation_attitude = load_string_pref("nav_attitude", "navigation.attitude");
 
     config.environment_wind_angle_apparent = load_string_pref("env_waa", "environment.wind.angleApparent");
     config.environment_wind_angle_true_ground = load_string_pref("env_watg", "environment.wind.angleTrueGround");
@@ -825,8 +824,7 @@ void save_all_config_to_preferences() {
     save_string_pref("nav_dist", config.navigation_course_rhumbline_next_point_distance);
     save_string_pref("nav_vmg", config.navigation_course_rhumbline_next_point_velocity_made_good);
     save_string_pref("nav_state", config.navigation_state);
-    save_string_pref("nav_roll", config.navigation_attitude_roll);
-    save_string_pref("nav_pitch", config.navigation_attitude_pitch);
+    save_string_pref("nav_attitude", config.navigation_attitude);
 
     save_string_pref("env_waa", config.environment_wind_angle_apparent);
     save_string_pref("env_watg", config.environment_wind_angle_true_ground);
@@ -925,8 +923,7 @@ void export_config_to_json(JsonDocument& doc) {
     nav["courseRhumblineDistance"] = config.navigation_course_rhumbline_next_point_distance;
     nav["courseRhumblineVMG"] = config.navigation_course_rhumbline_next_point_velocity_made_good;
     nav["state"] = config.navigation_state;
-    nav["attitudeRoll"] = config.navigation_attitude_roll;
-    nav["attitudePitch"] = config.navigation_attitude_pitch;
+    nav["attitude"] = config.navigation_attitude;
 
     // Environment
     JsonObject env = doc["environment"].to<JsonObject>();
@@ -1259,8 +1256,7 @@ void handle_show_signalk_config_page() {
     apply_template_value(html, "NAVIGATION_COURSE_RHUMBLINE_NEXT_POINT_DISTANCE", html_escape(config.navigation_course_rhumbline_next_point_distance));
     apply_template_value(html, "NAVIGATION_COURSE_RHUMBLINE_NEXT_POINT_VELOCITY_MADE_GOOD", html_escape(config.navigation_course_rhumbline_next_point_velocity_made_good));
     apply_template_value(html, "NAVIGATION_STATE", html_escape(config.navigation_state));
-    apply_template_value(html, "NAVIGATION_ATTITUDE_ROLL", html_escape(config.navigation_attitude_roll));
-    apply_template_value(html, "NAVIGATION_ATTITUDE_PITCH", html_escape(config.navigation_attitude_pitch));
+    apply_template_value(html, "NAVIGATION_ATTITUDE", html_escape(config.navigation_attitude));
     apply_template_value(html, "ENVIRONMENT_WIND_ANGLE_APPARENT", html_escape(config.environment_wind_angle_apparent));
     apply_template_value(html, "ENVIRONMENT_WIND_ANGLE_TRUE_GROUND", html_escape(config.environment_wind_angle_true_ground));
     apply_template_value(html, "ENVIRONMENT_WIND_ANGLE_TRUE_WATER", html_escape(config.environment_wind_angle_true_water));
@@ -1431,8 +1427,7 @@ void handle_save_config() {
     if (!doc["nav_dist"].isNull()) config.navigation_course_rhumbline_next_point_distance = doc["nav_dist"].as<String>();
     if (!doc["nav_vmg"].isNull()) config.navigation_course_rhumbline_next_point_velocity_made_good = doc["nav_vmg"].as<String>();
     if (!doc["nav_state"].isNull()) config.navigation_state = doc["nav_state"].as<String>();
-    if (!doc["nav_roll"].isNull()) config.navigation_attitude_roll = doc["nav_roll"].as<String>();
-    if (!doc["nav_pitch"].isNull()) config.navigation_attitude_pitch = doc["nav_pitch"].as<String>();
+    if (!doc["nav_attitude"].isNull()) config.navigation_attitude = doc["nav_attitude"].as<String>();
 
     if (!doc["env_waa"].isNull()) config.environment_wind_angle_apparent = doc["env_waa"].as<String>();
     if (!doc["env_watg"].isNull()) config.environment_wind_angle_true_ground = doc["env_watg"].as<String>();
