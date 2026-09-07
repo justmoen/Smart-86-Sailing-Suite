@@ -44,7 +44,7 @@ static void apply_template_value(String& html, const char* token, const String& 
 }
 
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "v0.7.29"
+#define FIRMWARE_VERSION "v0.7.30"
 #endif
 
 constexpr const char* kPrefsNamespace = "sk-config";

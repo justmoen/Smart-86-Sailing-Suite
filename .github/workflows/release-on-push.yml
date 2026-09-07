@@ -23,60 +23,142 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Verify build configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "REPOSITORY"
+          echo "============================================================"
+
+          git rev-parse HEAD
+          git status --short
+
+          echo ""
+          echo "============================================================"
+          echo "SDKCONFIG"
+          echo "============================================================"
+
+          if [ ! -f sdkconfig ]; then
+            echo "ERROR: sdkconfig is not present in the repository."
+            echo ""
+            echo "This release workflow intentionally does NOT generate a fresh"
+            echo "sdkconfig, because doing so can produce a firmware binary that"
+            echo "differs from the locally built firmware."
+            echo ""
+            echo "Commit the known-good sdkconfig, or convert the project to use"
+            echo "a complete sdkconfig.defaults as the canonical configuration."
+            exit 1
+          fi
+
+          echo "Using repository sdkconfig:"
+          ls -lh sdkconfig
+
+          echo ""
+          echo "ESP-IDF target:"
+          grep -n '^CONFIG_IDF_TARGET=' sdkconfig
+
+          if ! grep -q '^CONFIG_IDF_TARGET="esp32p4"$' sdkconfig; then
+            echo "ERROR: sdkconfig is not configured for esp32p4."
+            exit 1
+          fi
+
+          echo ""
+          echo "ESP-IDF version:"
+          grep -n '^CONFIG_IDF_INIT_VERSION=' sdkconfig || true
+
+          echo ""
+          echo "ESP32-P4 revision:"
+          grep -n '^CONFIG_ESP32P4_' sdkconfig || true
+          grep -n '^CONFIG_ESP_REV_' sdkconfig || true
+
+          echo ""
+          echo "PSRAM:"
+          grep -n '^CONFIG_SPIRAM' sdkconfig || true
+
+          echo ""
+          echo "Required internal-memory settings:"
+          grep -n '^CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=' sdkconfig
+          grep -n '^CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=' sdkconfig
+
+          expected_always_internal='CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=0'
+          expected_reserve_internal='CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=131072'
+
+          if ! grep -qx "$expected_always_internal" sdkconfig; then
+            echo "ERROR: unexpected CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL."
+            echo "Expected: $expected_always_internal"
+            exit 1
+          fi
+
+          if ! grep -qx "$expected_reserve_internal" sdkconfig; then
+            echo "ERROR: unexpected CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL."
+            echo "Expected: $expected_reserve_internal"
+            exit 1
+          fi
+
+          echo ""
+          echo "ESP-Hosted:"
+          grep -n '^CONFIG_ESP_HOSTED' sdkconfig || true
+          grep -n '^CONFIG_ESP_WIFI_REMOTE' sdkconfig || true
+
+          echo ""
+          echo "mbedTLS PSK / key exchange:"
+          grep -n '^CONFIG_MBEDTLS_PSK' sdkconfig || true
+          grep -n '^CONFIG_MBEDTLS_KEY_EXCHANGE' sdkconfig || true
+
+          echo ""
+          echo "Flash:"
+          grep -n '^CONFIG_ESPTOOLPY_FLASH' sdkconfig || true
+
       - name: Build ESP32-P4 firmware
         uses: espressif/esp-idf-ci-action@v1
         with:
           esp_idf_version: v5.5.5
           target: esp32p4
           command: |
-            set -e
+            set -euo pipefail
 
             echo "============================================================"
             echo "ESP-IDF"
             echo "============================================================"
+
             idf.py --version
 
             echo ""
             echo "============================================================"
-            echo "CLEAN BUILD CONFIGURATION"
+            echo "BUILD CONFIGURATION"
             echo "============================================================"
 
-            rm -rf build sdkconfig sdkconfig.old
+            if [ ! -f sdkconfig ]; then
+              echo "ERROR: sdkconfig disappeared before build."
+              exit 1
+            fi
+
+            echo "sdkconfig:"
+            ls -lh sdkconfig
 
             echo ""
-            echo "Setting ESP32-P4 target..."
-            idf.py set-target esp32p4
-
-            echo ""
-            echo "============================================================"
-            echo "CONFIGURATION"
-            echo "============================================================"
-
             echo "ESP-IDF target:"
-            grep -n "^CONFIG_IDF_TARGET=" sdkconfig || true
+            grep -n '^CONFIG_IDF_TARGET=' sdkconfig
 
             echo ""
-            echo "ESP32-P4 revision:"
-            grep -n "^CONFIG_ESP32P4_" sdkconfig || true
-            grep -n "^CONFIG_ESP_REV_" sdkconfig || true
+            echo "ESP-IDF version:"
+            grep -n '^CONFIG_IDF_INIT_VERSION=' sdkconfig || true
 
             echo ""
             echo "PSRAM:"
-            grep -n "^CONFIG_SPIRAM" sdkconfig || true
+            grep -n '^CONFIG_SPIRAM' sdkconfig || true
+
+            echo ""
+            echo "Internal memory allocation:"
+            grep -n '^CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=' sdkconfig
+            grep -n '^CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=' sdkconfig
 
             echo ""
             echo "ESP-Hosted:"
-            grep -n "CONFIG_ESP_HOSTED" sdkconfig || true
-            grep -n "CONFIG_ESP_WIFI_REMOTE" sdkconfig || true
-
-            echo ""
-            echo "mbedTLS PSK:"
-            grep -n "CONFIG_MBEDTLS_PSK" sdkconfig || true
-            grep -n "CONFIG_MBEDTLS_KEY_EXCHANGE" sdkconfig || true
-
-            echo ""
-            echo "Flash:"
-            grep -n "^CONFIG_ESPTOOLPY_FLASH" sdkconfig || true
+            grep -n '^CONFIG_ESP_HOSTED' sdkconfig || true
+            grep -n '^CONFIG_ESP_WIFI_REMOTE' sdkconfig || true
 
             echo ""
             echo "============================================================"
@@ -85,21 +167,34 @@ jobs:
 
             if [ -f managed_components/espressif__esp_hosted/idf_component.yml ]; then
               echo "ESP-Hosted:"
-              grep -n "^version:" \
+              grep -n '^version:' \
                 managed_components/espressif__esp_hosted/idf_component.yml || true
             fi
 
             if [ -f managed_components/espressif__esp_wifi_remote/idf_component.yml ]; then
               echo "ESP-WiFi-Remote:"
-              grep -n "^version:" \
+              grep -n '^version:' \
                 managed_components/espressif__esp_wifi_remote/idf_component.yml || true
             fi
 
             if [ -f managed_components/espressif__arduino-esp32/idf_component.yml ]; then
               echo "Arduino:"
-              grep -n "^version:" \
+              grep -n '^version:' \
                 managed_components/espressif__arduino-esp32/idf_component.yml || true
             fi
+
+            echo ""
+            echo "============================================================"
+            echo "CLEAN BUILD DIRECTORY ONLY"
+            echo "============================================================"
+
+            # Do NOT delete sdkconfig.
+            #
+            # The checked-in sdkconfig is intentionally used as the source
+            # of configuration so the release build matches the known-good
+            # local configuration.
+
+            rm -rf build sdkconfig.old
 
             echo ""
             echo "============================================================"
@@ -110,30 +205,34 @@ jobs:
 
             echo ""
             echo "============================================================"
-            echo "FINAL CONFIGURATION"
+            echo "VERIFY FINAL CONFIGURATION"
             echo "============================================================"
 
-            echo "ESP-IDF target:"
-            grep -n "^CONFIG_IDF_TARGET=" sdkconfig || true
-
-            echo ""
-            echo "ESP32-P4 revision:"
-            grep -n "^CONFIG_ESP32P4_" sdkconfig || true
-            grep -n "^CONFIG_ESP_REV_" sdkconfig || true
+            grep -n '^CONFIG_IDF_TARGET=' sdkconfig
 
             echo ""
             echo "PSRAM:"
-            grep -n "^CONFIG_SPIRAM" sdkconfig || true
+            grep -n '^CONFIG_SPIRAM' sdkconfig || true
+
+            echo ""
+            echo "Internal memory allocation:"
+            grep -n '^CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=' sdkconfig
+            grep -n '^CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=' sdkconfig
+
+            if ! grep -qx 'CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=0' sdkconfig; then
+              echo "ERROR: ESP-IDF reconfigure changed CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL."
+              exit 1
+            fi
+
+            if ! grep -qx 'CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=131072' sdkconfig; then
+              echo "ERROR: ESP-IDF reconfigure changed CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL."
+              exit 1
+            fi
 
             echo ""
             echo "ESP-Hosted:"
-            grep -n "CONFIG_ESP_HOSTED" sdkconfig || true
-            grep -n "CONFIG_ESP_WIFI_REMOTE" sdkconfig || true
-
-            echo ""
-            echo "mbedTLS:"
-            grep -n "CONFIG_MBEDTLS_PSK" sdkconfig || true
-            grep -n "CONFIG_MBEDTLS_KEY_EXCHANGE" sdkconfig || true
+            grep -n '^CONFIG_ESP_HOSTED' sdkconfig || true
+            grep -n '^CONFIG_ESP_WIFI_REMOTE' sdkconfig || true
 
             echo ""
             echo "============================================================"
@@ -147,9 +246,50 @@ jobs:
             echo "BUILD COMPLETE"
             echo "============================================================"
 
+            if [ ! -f build/sailing_suite.bin ]; then
+              echo "ERROR: build/sailing_suite.bin was not created."
+              echo ""
+              echo "Available binary files:"
+              find build -maxdepth 2 -type f \
+                \\( -name '*.bin' -o -name '*.elf' \\) \
+                -print
+              exit 1
+            fi
+
             ls -lh build/sailing_suite.bin
 
+            echo ""
+            echo "SHA256:"
             sha256sum build/sailing_suite.bin
+
+            echo ""
+            echo "Firmware image information:"
+            file build/sailing_suite.bin || true
+
+            echo ""
+            echo "Git commit:"
+            git rev-parse HEAD
+
+            echo ""
+            echo "Release tag:"
+            echo "${GITHUB_REF_NAME}"
+
+      - name: Save build metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          {
+            echo "Release tag: ${GITHUB_REF_NAME}"
+            echo "Git commit: $(git rev-parse HEAD)"
+            echo "ESP-IDF: v5.5.5"
+            echo ""
+            echo "Firmware SHA256:"
+            sha256sum build/sailing_suite.bin
+            echo ""
+            echo "Firmware size:"
+            stat -c '%s bytes' build/sailing_suite.bin
+          } | tee build/release-build-info.txt
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
@@ -161,3 +301,4 @@ jobs:
           prerelease: false
           files: |
             build/sailing_suite.bin
+            build/release-build-info.txt
