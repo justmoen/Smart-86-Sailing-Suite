@@ -11,8 +11,6 @@
 extern "C" {
 #endif
 
-static unsigned long last_touched;
-
 void apply_screen_style(lv_obj_t *scr);
 void apply_meter_style(lv_obj_t *meter);
 

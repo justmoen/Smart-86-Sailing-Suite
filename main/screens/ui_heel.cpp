@@ -4,7 +4,6 @@
 #include <StreamString.h>
 #include "ui_heel.h"
 #include "ui_init.h"
-#include <esp_log.h>
 
 #include <cmath>
 #include <cstdio>
@@ -42,16 +41,18 @@ extern "C" {
 /* Configuration                                     */
 /* -------------------------------------------------- */
 
-#define HEEL_DISPLAY_SIZE       680
+#define HEEL_DISPLAY_SIZE       700
 
 #define HEEL_CENTER_X           340
-#define HEEL_CENTER_Y           250
+#define HEEL_CENTER_Y           340
 
-#define HEEL_TICK_OUTER         300
-#define HEEL_TICK_INNER         282
-#define HEEL_MAJOR_INNER        265
+#define HEEL_TICK_OUTER         320
+#define HEEL_TICK_INNER         300
+#define HEEL_MAJOR_INNER        280
 
-#define HEEL_NEEDLE_LENGTH      255
+#define HEEL_SCALE_LABEL_OUTER      345
+
+#define HEEL_NEEDLE_LENGTH      290
 
 #define HEEL_TICK_COUNT         19
 #define HEEL_MAJOR_EVERY        3
@@ -133,12 +134,12 @@ static lv_point_precise_t heel_point(
     lv_point_precise_t p;
 
     p.x =
-        HEEL_CENTER_X +
-        cosf(radians) * radius;
+        (lv_coord_t)(HEEL_CENTER_X +
+        cosf(radians) * radius);
 
     p.y =
-        HEEL_CENTER_Y +
-        sinf(radians) * radius;
+        (lv_coord_t)(HEEL_CENTER_Y +
+        sinf(radians) * radius);
 
     return p;
 }
@@ -165,7 +166,7 @@ static void set_heel_value(float value)
         value = -45.0f;
     }
 
-    lv_point_precise_t points[2];
+    static lv_point_precise_t points[2];
 
     /*
      * Needle starts at the center.
@@ -207,87 +208,55 @@ static void set_heel_value(float value)
 
 static void create_heel_scale(lv_obj_t *parent)
 {
-    /*
-     * 19 ticks over -45 .. +45:
-     *
-     * -45, -40, -35, ... 0 ... +35, +40, +45
+    /* 
+     * We need 19 lines. Each line requires 2 points, plus 
+     * an LV_COORD_MIN marker between segments to break the drawing path.
+     * Formula: 19 segments * 3 slots = 57 entries (minus 1 for the final tail trailing slot)
      */
-    for (int i = 0;
-         i < HEEL_TICK_COUNT;
-         ++i) {
+    constexpr size_t total_points = (HEEL_TICK_COUNT * 3) - 1;
+    static lv_point_precise_t scale_points[total_points];
 
-        const float angle =
-            -45.0f +
-            ((float)i * 5.0f);
+    size_t pt_idx = 0;
 
-        const bool major =
-            ((i % HEEL_MAJOR_EVERY) == 0);
+    for (int i = 0; i < HEEL_TICK_COUNT; ++i) {
+        const float angle = -45.0f + ((float)i * 5.0f);
+        const bool major = ((i % HEEL_MAJOR_EVERY) == 0);
+        const float inner = major ? HEEL_MAJOR_INNER : HEEL_TICK_INNER;
 
-        const float inner =
-            major
-                ? HEEL_MAJOR_INNER
-                : HEEL_TICK_INNER;
+        // Start point of the segment
+        scale_points[pt_idx] = heel_point(angle, HEEL_TICK_OUTER);
+        pt_idx++;
 
-        lv_point_precise_t points[2];
+        // End point of the segment
+        scale_points[pt_idx] = heel_point(angle, inner);
+        pt_idx++;
 
-        points[0] =
-            heel_point(
-                angle,
-                HEEL_TICK_OUTER);
-
-        points[1] =
-            heel_point(
-                angle,
-                inner);
-
-        lv_obj_t *tick =
-            lv_line_create(parent);
-
-        /*
-         * Points are already in parent coordinates.
-         */
-        lv_line_set_points(
-            tick,
-            points,
-            2);
-
-        /*
-         * Keep the original tick appearance.
-         */
-        lv_obj_set_style_line_color(
-            tick,
-            major
-                ? lv_color_white()
-                : lv_palette_lighten(
-                      LV_PALETTE_GREY,
-                      2),
-            LV_PART_MAIN);
-
-        lv_obj_set_style_line_width(
-            tick,
-            major ? 3 : 2,
-            LV_PART_MAIN);
-
-        lv_obj_set_style_line_rounded(
-            tick,
-            true,
-            LV_PART_MAIN);
-
-        /*
-         * Important LVGL 9 positioning:
-         * the points already contain the absolute position
-         * relative to heel_scale.
-         */
-        lv_obj_set_pos(
-            tick,
-            0,
-            0);
-
-        lv_obj_clear_flag(
-            tick,
-            LV_OBJ_FLAG_CLICKABLE);
+        // Insert break token between segments, skipping the final element boundary
+        if (i < HEEL_TICK_COUNT - 1) {
+            scale_points[pt_idx].x = LV_COORD_MIN;
+            scale_points[pt_idx].y = LV_COORD_MIN;
+            pt_idx++;
+        }
     }
+
+    /* 
+     * Create ONE unified scale wireframe element spanning the canvas 
+     */
+    lv_obj_t *scale_wireframe = lv_line_create(parent);
+    
+    // Pass the static array pointer safely
+    lv_line_set_points(scale_wireframe, scale_points, total_points);
+
+    // Style the default global line baseline
+    lv_obj_set_style_line_color(scale_wireframe, lv_palette_lighten(LV_PALETTE_GREY, 2), LV_PART_MAIN);
+    lv_obj_set_style_line_width(scale_wireframe, 2, LV_PART_MAIN);
+    lv_obj_set_style_line_rounded(scale_wireframe, true, LV_PART_MAIN);
+
+    // Cover full layout coordinates 
+    lv_obj_set_pos(scale_wireframe, 0, 0);
+    lv_obj_clear_flag(scale_wireframe, LV_OBJ_FLAG_CLICKABLE);
 }
+
 
 
 /* -------------------------------------------------- */
@@ -303,7 +272,7 @@ static void create_heel_labels(lv_obj_t *parent)
         { "-45", -45.0f },
         { "-30", -30.0f },
         { "-15", -15.0f },
-        { "0",     0.0f },
+        { " 0",   0.0f },
         { "15",   15.0f },
         { "30",   30.0f },
         { "45",   45.0f }
@@ -316,7 +285,7 @@ static void create_heel_labels(lv_obj_t *parent)
         const lv_point_precise_t p =
             heel_point(
                 labels[i].angle,
-                235);
+                HEEL_SCALE_LABEL_OUTER);
 
         lv_obj_t *label =
             lv_label_create(parent);
@@ -327,7 +296,7 @@ static void create_heel_labels(lv_obj_t *parent)
 
         lv_obj_set_style_text_font(
             label,
-            &lv_font_montserrat_26,
+            &lv_font_montserrat_30,
             LV_PART_MAIN);
 
         lv_obj_set_style_text_color(
@@ -672,7 +641,7 @@ static void lv_heel_display(
 
     lv_label_set_text_static(
         heel_set_label,
-        "Set:\n--" LV_SYMBOL_DEGREES "t");
+        "Set:\n--" LV_SYMBOL_DEGREES "");
 
 
     /* ------------------------------------------------
@@ -686,7 +655,7 @@ static void lv_heel_display(
         heel_main_label,
         LV_ALIGN_CENTER,
         0,
-        -60);
+        -80);
 
     lv_obj_set_style_text_font(
         heel_main_label,
@@ -809,7 +778,7 @@ static void heel_update_cb(
 
         lv_label_set_text_fmt(
             heel_set_label,
-            "Set:\n%.0f" LV_SYMBOL_DEGREES "t",
+            "Set:\n%.0f" LV_SYMBOL_DEGREES "",
             shipDataModel
                 .navigation
                 .set_true
@@ -819,7 +788,7 @@ static void heel_update_cb(
 
         lv_label_set_text_static(
             heel_set_label,
-            "Set:\n--" LV_SYMBOL_DEGREES "t");
+            "Set:\n--" LV_SYMBOL_DEGREES "");
     }
 
 
