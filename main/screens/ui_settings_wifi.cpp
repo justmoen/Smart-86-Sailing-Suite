@@ -12,15 +12,49 @@ static String wifi_selected_ssid;
 
 String wifi_ssid;
 String wifi_password;
-boolean settingMode;
+boolean settingMode = false;
 
 static lv_timer_t *wifi_scan_timer = NULL;
 
 static bool wifi_scan_in_progress = false;
+
+// -----------------------------------------------------------------------------
+// TRUE while we are actively trying to connect to the saved network after
+// discovering it during a scan.
+// -----------------------------------------------------------------------------
+
+static bool wifi_saved_connection_attempt = false;
+
+// -----------------------------------------------------------------------------
+// Time at which the current automatic saved-network connection attempt should
+// be considered failed.
+//
+// This prevents the scan system from becoming permanently stuck if an AP is
+// visible but authentication/association fails.
+// -----------------------------------------------------------------------------
+
+static uint32_t wifi_connection_attempt_deadline_ms = 0;
+
 static uint32_t wifi_next_scan_ms = 0;
+
+// -----------------------------------------------------------------------------
+// After a scan completes, wait this long before starting another scan.
+//
+// The timer itself runs much faster.  It only polls the asynchronous scan.
+// -----------------------------------------------------------------------------
 
 static constexpr uint32_t WIFI_SCAN_REFRESH_MS = 10000;
 static constexpr uint32_t WIFI_SCAN_POLL_MS = 500;
+
+// -----------------------------------------------------------------------------
+// Automatic saved-network connection attempt timeout.
+//
+// This is intentionally approximately the same duration used by the original
+// boot-time connection check.
+// -----------------------------------------------------------------------------
+
+static constexpr uint32_t WIFI_CONNECTION_ATTEMPT_TIMEOUT_MS = 10000;
+
 
 // -----------------------------------------------------------------------------
 // NVS
@@ -33,27 +67,35 @@ static constexpr uint32_t WIFI_SCAN_POLL_MS = 500;
 static constexpr const char *KEY_SSID = "SSID";
 static constexpr const char *KEY_PASS = "PASS";
 
+
 // -----------------------------------------------------------------------------
 // DEBUG
 // -----------------------------------------------------------------------------
 
-static void log_preferences_state(const char *context)
+static void log_preferences_state(
+    const char *context)
 {
     Preferences prefs;
 
     if (!prefs.begin("wifi-config", true)) {
+
         ESP_LOGE(
             TAG,
             "[%s] FAILED to open Preferences namespace",
             context);
+
         return;
     }
 
     String stored_ssid =
-        prefs.getString(KEY_SSID, "");
+        prefs.getString(
+            KEY_SSID,
+            "");
 
     String stored_pass =
-        prefs.getString(KEY_PASS, "");
+        prefs.getString(
+            KEY_PASS,
+            "");
 
     ESP_LOGI(
         TAG,
@@ -275,6 +317,26 @@ static bool load_wifi_credentials(
 
 
 // -----------------------------------------------------------------------------
+// SIGNAL STRENGTH
+// -----------------------------------------------------------------------------
+
+static inline int8_t dBm_to_percents(
+    int8_t dBm)
+{
+    int quality;
+
+    if (dBm <= -100)
+        quality = 0;
+    else if (dBm >= -50)
+        quality = 100;
+    else
+        quality = 2 * (dBm + 100);
+
+    return quality;
+}
+
+
+// -----------------------------------------------------------------------------
 // RESTORE CONFIGURATION
 //
 // There is only one saved network.
@@ -284,12 +346,29 @@ static bool load_wifi_credentials(
 // This function does NOT scan.
 //
 // The caller simply attempts the saved credentials. If the connection fails,
-// setupMode() performs a scan and lets the user choose a new network.
+// setupMode() performs a scan.
+//
+// Later scans will automatically retry the saved SSID whenever it becomes
+// visible.
 // -----------------------------------------------------------------------------
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+// -----------------------------------------------------------------------------
+// FORWARD DECLARATIONS
+//
+// These declarations intentionally live inside the extern "C" block because
+// the corresponding definitions below also have C linkage.
+// -----------------------------------------------------------------------------
+
+static void wifi_scan_timer_cb(
+    lv_timer_t *timer);
+
+static bool try_saved_network_from_scan(
+    int num_networks);
+
 
 boolean restoreConfig()
 {
@@ -351,7 +430,7 @@ boolean restoreConfig()
     ESP_LOGI(
         TAG,
         "Saved Wi-Fi network:");
-    
+
     ESP_LOGI(
         TAG,
         "  SSID='%s'",
@@ -374,7 +453,6 @@ boolean restoreConfig()
     ESP_LOGI(
         TAG,
         "WiFi.begin() called");
-
 
     ESP_LOGI(
         TAG,
@@ -399,11 +477,17 @@ void btnResetWiFiSettings_event(
     (void)event;
 
     if (wifi_scan_timer != NULL) {
-        lv_timer_delete(wifi_scan_timer);
+
+        lv_timer_delete(
+            wifi_scan_timer);
+
         wifi_scan_timer = NULL;
     }
 
     wifi_scan_in_progress = false;
+    wifi_saved_connection_attempt = false;
+    wifi_connection_attempt_deadline_ms = 0;
+
 
     ESP_LOGW(
         TAG,
@@ -496,30 +580,11 @@ void wifi_connected(
     }
 
     if (on_connected != NULL) {
+
         (*on_connected)();
     }
 
     settingMode = false;
-}
-
-
-// -----------------------------------------------------------------------------
-// SIGNAL STRENGTH
-// -----------------------------------------------------------------------------
-
-static inline int8_t dBm_to_percents(
-    int8_t dBm)
-{
-    int quality;
-
-    if (dBm <= -100)
-        quality = 0;
-    else if (dBm >= -50)
-        quality = 100;
-    else
-        quality = 2 * (dBm + 100);
-
-    return quality;
 }
 
 
@@ -534,7 +599,9 @@ static void lv_win_close_event_cb(
         (lv_obj_t *)lv_event_get_user_data(e);
 
     if (win != NULL) {
-        lv_obj_delete(win);
+
+        lv_obj_delete(
+            win);
     }
 }
 
@@ -556,7 +623,9 @@ static void event_msgbox_cb(
         (lv_obj_t *)lv_event_get_user_data(e);
 
     if (mbox != NULL) {
-        lv_msgbox_close(mbox);
+
+        lv_msgbox_close(
+            mbox);
     }
 
     delay(100);
@@ -647,7 +716,8 @@ static void lv_msgbox(
         LV_EVENT_CLICKED,
         mbox);
 
-    lv_obj_center(mbox);
+    lv_obj_center(
+        mbox);
 }
 
 
@@ -695,7 +765,8 @@ static void ta_password_event_cb(
             wifi_selected_ssid;
 
         String pass =
-            lv_textarea_get_text(ta);
+            lv_textarea_get_text(
+                ta);
 
 
         ESP_LOGI(
@@ -812,7 +883,8 @@ void lv_password_textarea(
 
 
     lv_obj_t *pwd_ta =
-        lv_textarea_create(cont);
+        lv_textarea_create(
+            cont);
 
     lv_obj_set_style_text_font(
         pwd_ta,
@@ -986,7 +1058,8 @@ void lv_connect_wifi_win(
 
 
     lv_obj_t *cont =
-        lv_win_get_content(win);
+        lv_win_get_content(
+            win);
 
     lv_obj_set_style_bg_color(
         cont,
@@ -1025,11 +1098,17 @@ static void event_handler_wifi(
     // -------------------------------------------------------------------------
 
     if (wifi_scan_timer != NULL) {
-        lv_timer_delete(wifi_scan_timer);
+
+        lv_timer_delete(
+            wifi_scan_timer);
+
         wifi_scan_timer = NULL;
     }
 
     wifi_scan_in_progress = false;
+    wifi_saved_connection_attempt = false;
+    wifi_connection_attempt_deadline_ms = 0;
+
 
     // -------------------------------------------------------------------------
     // Capture the SSID immediately.
@@ -1060,8 +1139,10 @@ static void event_handler_wifi(
 
 #endif
 
-    lv_connect_wifi_win(n);
+    lv_connect_wifi_win(
+        n);
 }
+
 
 // -----------------------------------------------------------------------------
 // WIFI LIST
@@ -1072,7 +1153,8 @@ void lv_list_wifi(
     int num)
 {
     list_wifi =
-        lv_list_create(parent);
+        lv_list_create(
+            parent);
 
     lv_obj_set_size(
         list_wifi,
@@ -1194,7 +1276,6 @@ void lv_list_wifi(
     }
 }
 
-static void wifi_scan_timer_cb(lv_timer_t *timer);
 
 // -----------------------------------------------------------------------------
 // SETUP MODE
@@ -1216,15 +1297,20 @@ static void setupMode(
 
     delay(100);
 
+
     // -------------------------------------------------------------------------
-    // Start the initial scan asynchronously.
-    //
-    // The previous implementation used WiFi.scanNetworks(), which blocks until
-    // the scan completes.  This version starts the scan and lets the LVGL task
-    // continue running.
+    // Reset automatic retry state.
     // -------------------------------------------------------------------------
 
     wifi_selected_ssid = "";
+
+    wifi_saved_connection_attempt = false;
+    wifi_connection_attempt_deadline_ms = 0;
+
+
+    // -------------------------------------------------------------------------
+    // Start the initial scan asynchronously.
+    // -------------------------------------------------------------------------
 
     wifi_scan_in_progress = true;
 
@@ -1233,7 +1319,8 @@ static void setupMode(
         "Starting initial Wi-Fi scan");
 
     int16_t result =
-        WiFi.scanNetworks(true);
+        WiFi.scanNetworks(
+            true);
 
     if (result == WIFI_SCAN_FAILED) {
 
@@ -1245,6 +1332,7 @@ static void setupMode(
 
         wifi_next_scan_ms =
             millis() + 1000;
+
     } else {
 
         ESP_LOGI(
@@ -1252,12 +1340,12 @@ static void setupMode(
             "Initial Wi-Fi scan started");
     }
 
+
     // -------------------------------------------------------------------------
     // Poll the asynchronous scan frequently.
     //
-    // The actual Wi-Fi scan is NOT repeated every 500 ms.  The timer only
-    // checks whether the current scan has finished.  A new scan starts only
-    // every WIFI_SCAN_REFRESH_MS.
+    // The actual Wi-Fi scan is NOT repeated every 500 ms. The timer only checks
+    // whether the current scan has finished.
     // -------------------------------------------------------------------------
 
     if (wifi_scan_timer != NULL) {
@@ -1273,6 +1361,7 @@ static void setupMode(
             wifi_scan_timer_cb,
             WIFI_SCAN_POLL_MS,
             NULL);
+
 
     // -------------------------------------------------------------------------
     // When Wi-Fi connects, clean up and restart.
@@ -1291,6 +1380,11 @@ static void setupMode(
                 TAG,
                 "Wi-Fi STA_CONNECTED event");
 
+            wifi_saved_connection_attempt = false;
+            wifi_connection_attempt_deadline_ms = 0;
+            wifi_scan_in_progress = false;
+
+
             if (wifi_scan_timer != NULL) {
 
                 lv_timer_delete(
@@ -1299,7 +1393,6 @@ static void setupMode(
                 wifi_scan_timer = NULL;
             }
 
-            wifi_scan_in_progress = false;
 
             if (list_wifi != NULL) {
 
@@ -1309,6 +1402,7 @@ static void setupMode(
                 list_wifi = NULL;
             }
 
+
             delay(2000);
 
             ESP.restart();
@@ -1317,11 +1411,193 @@ static void setupMode(
         WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED);
 }
 
+
+// -----------------------------------------------------------------------------
+// TRY SAVED NETWORK FROM SCAN
+//
+// This is the important new behavior.
+//
+// If the saved SSID appears during a scan, immediately attempt to connect using
+// the stored credentials.
+//
+// RSSI is intentionally NOT used as a threshold.
+//
+// If the AP is visible at -85 dBm, we try it.
+// If it is visible at -52 dBm, we try it.
+// If it is visible at -46 dBm, we try it.
+//
+// The fact that the SSID exists in the scan is sufficient.
+// -----------------------------------------------------------------------------
+
+static bool try_saved_network_from_scan(
+    int num_networks)
+{
+    // -------------------------------------------------------------------------
+    // Do not attempt another connection if one is already underway.
+    // -------------------------------------------------------------------------
+
+    if (wifi_saved_connection_attempt) {
+
+        ESP_LOGI(
+            TAG,
+            "Saved Wi-Fi connection attempt already in progress");
+
+        return true;
+    }
+
+
+    String saved_ssid;
+    String saved_password;
+
+
+    if (!load_wifi_credentials(
+            saved_ssid,
+            saved_password)) {
+
+        ESP_LOGI(
+            TAG,
+            "No saved Wi-Fi network to retry");
+
+        return false;
+    }
+
+
+    // -------------------------------------------------------------------------
+    // Search the current scan results for the stored SSID.
+    // -------------------------------------------------------------------------
+
+    for (int i = 0;
+         i < num_networks;
+         ++i) {
+
+        String scanned_ssid =
+            WiFi.SSID(i);
+
+
+        if (scanned_ssid != saved_ssid) {
+
+            continue;
+        }
+
+
+        int rssi =
+            WiFi.RSSI(i);
+
+
+        ESP_LOGI(
+            TAG,
+            "==================================================");
+
+        ESP_LOGI(
+            TAG,
+            "SAVED WIFI NETWORK FOUND DURING SCAN");
+
+        ESP_LOGI(
+            TAG,
+            "  SSID='%s'",
+            scanned_ssid.c_str());
+
+        ESP_LOGI(
+            TAG,
+            "  RSSI=%d dBm",
+            rssi);
+
+        ESP_LOGI(
+            TAG,
+            "  Signal=%d%%",
+            dBm_to_percents(rssi));
+
+        ESP_LOGI(
+            TAG,
+            "  Scan index=%d",
+            i);
+
+        ESP_LOGI(
+            TAG,
+            "Attempting saved credentials NOW");
+
+        ESP_LOGI(
+            TAG,
+            "==================================================");
+
+
+        // ---------------------------------------------------------------------
+        // We have consumed the scan results.
+        //
+        // Do not continue scanning while association is being attempted.
+        // ---------------------------------------------------------------------
+
+        wifi_scan_in_progress = false;
+
+
+        // ---------------------------------------------------------------------
+        // Delete the scan results before starting the connection.
+        // ---------------------------------------------------------------------
+
+        WiFi.scanDelete();
+
+
+        // ---------------------------------------------------------------------
+        // Make absolutely sure we are in station mode.
+        // ---------------------------------------------------------------------
+
+        WiFi.mode(
+            WIFI_STA);
+
+        WiFi.setAutoReconnect(
+            true);
+
+
+        // ---------------------------------------------------------------------
+        // Disconnect any stale station state.
+        // ---------------------------------------------------------------------
+
+        WiFi.disconnect();
+
+        delay(100);
+
+
+        // ---------------------------------------------------------------------
+        // Start the saved-network connection attempt.
+        // ---------------------------------------------------------------------
+
+        wifi_saved_connection_attempt = true;
+
+        wifi_connection_attempt_deadline_ms =
+            millis() +
+            WIFI_CONNECTION_ATTEMPT_TIMEOUT_MS;
+
+
+        WiFi.begin(
+            saved_ssid.c_str(),
+            saved_password.c_str());
+
+
+        ESP_LOGI(
+            TAG,
+            "WiFi.begin() retry issued for saved SSID");
+
+
+        return true;
+    }
+
+
+    return false;
+}
+
+
 // -----------------------------------------------------------------------------
 // WIFI SCAN STATUS
 //
 // The scan is asynchronous so that the Wi-Fi scan does not block the LVGL
-// task.  The timer checks for completion and periodically starts another scan.
+// task.
+//
+// The timer:
+//
+//   - monitors an active scan
+//   - automatically retries the saved network when found
+//   - waits for automatic connection attempts
+//   - starts another scan every WIFI_SCAN_REFRESH_MS
 // -----------------------------------------------------------------------------
 
 static void wifi_scan_timer_cb(
@@ -1329,22 +1605,172 @@ static void wifi_scan_timer_cb(
 {
     (void)timer;
 
+
     // -------------------------------------------------------------------------
-    // Once a network has been selected, scanning is finished permanently.
+    // We are not in setup mode anymore.
     // -------------------------------------------------------------------------
 
-    if (!settingMode ||
-        wifi_selected_ssid.length() > 0) {
+    if (!settingMode) {
 
         if (wifi_scan_timer != NULL) {
-            lv_timer_delete(wifi_scan_timer);
+
+            lv_timer_delete(
+                wifi_scan_timer);
+
             wifi_scan_timer = NULL;
         }
 
         wifi_scan_in_progress = false;
+        wifi_saved_connection_attempt = false;
 
         return;
     }
+
+
+    // -------------------------------------------------------------------------
+    // AUTOMATIC SAVED NETWORK CONNECTION
+    //
+    // If a scan found the saved network and WiFi.begin() was issued, wait for
+    // the connection to complete.
+    // -------------------------------------------------------------------------
+
+    if (wifi_saved_connection_attempt) {
+
+        wl_status_t status =
+            WiFi.status();
+
+
+        // ---------------------------------------------------------------------
+        // Successful connection.
+        // ---------------------------------------------------------------------
+
+        if (status == WL_CONNECTED) {
+
+            ESP_LOGI(
+                TAG,
+                "==================================================");
+
+            ESP_LOGI(
+                TAG,
+                "SAVED WIFI NETWORK CONNECTED");
+
+            ESP_LOGI(
+                TAG,
+                "SSID='%s'",
+                WiFi.SSID().c_str());
+
+            ESP_LOGI(
+                TAG,
+                "IP='%s'",
+                WiFi.localIP().toString().c_str());
+
+            ESP_LOGI(
+                TAG,
+                "==================================================");
+
+
+            wifi_saved_connection_attempt = false;
+            wifi_connection_attempt_deadline_ms = 0;
+            wifi_scan_in_progress = false;
+
+
+            if (wifi_scan_timer != NULL) {
+
+                lv_timer_delete(
+                    wifi_scan_timer);
+
+                wifi_scan_timer = NULL;
+            }
+
+
+            if (list_wifi != NULL) {
+
+                lv_obj_delete(
+                    list_wifi);
+
+                list_wifi = NULL;
+            }
+
+
+            delay(2000);
+
+            ESP.restart();
+
+            return;
+        }
+
+
+        // ---------------------------------------------------------------------
+        // Check whether the automatic connection attempt has timed out.
+        //
+        // This is important. A failed association must NOT permanently prevent
+        // future scans.
+        // ---------------------------------------------------------------------
+
+        if ((int32_t)(
+                millis() -
+                wifi_connection_attempt_deadline_ms) >= 0) {
+
+            ESP_LOGW(
+                TAG,
+                "==================================================");
+
+            ESP_LOGW(
+                TAG,
+                "SAVED WIFI AUTOMATIC CONNECTION TIMED OUT");
+
+            ESP_LOGW(
+                TAG,
+                "SSID='%s'",
+                wifi_ssid.c_str());
+
+            ESP_LOGW(
+                TAG,
+                "Wi-Fi status=%d",
+                status);
+
+            ESP_LOGW(
+                TAG,
+                "Returning to periodic scanning");
+
+            ESP_LOGW(
+                TAG,
+                "==================================================");
+
+
+            wifi_saved_connection_attempt = false;
+            wifi_connection_attempt_deadline_ms = 0;
+
+
+            // -----------------------------------------------------------------
+            // Disconnect the failed attempt.
+            // -----------------------------------------------------------------
+
+            WiFi.disconnect();
+
+            delay(100);
+
+
+            // -----------------------------------------------------------------
+            // Allow another scan to happen shortly.
+            // -----------------------------------------------------------------
+
+            wifi_next_scan_ms =
+                millis() + 1000;
+
+            return;
+        }
+
+
+        // ---------------------------------------------------------------------
+        // Connection is still being attempted.
+        //
+        // Do not start another scan while association is underway.
+        // ---------------------------------------------------------------------
+
+        return;
+    }
+
 
     // -------------------------------------------------------------------------
     // If a scan is currently running, check whether it has completed.
@@ -1355,9 +1781,12 @@ static void wifi_scan_timer_cb(
         int16_t status =
             WiFi.scanComplete();
 
+
         if (status == WIFI_SCAN_RUNNING) {
+
             return;
         }
+
 
         if (status == WIFI_SCAN_FAILED) {
 
@@ -1367,12 +1796,25 @@ static void wifi_scan_timer_cb(
 
             wifi_scan_in_progress = false;
 
-            // Try again on the next refresh interval.
+
+            // -----------------------------------------------------------------
+            // Delete failed/old scan results.
+            // -----------------------------------------------------------------
+
+            WiFi.scanDelete();
+
+
+            // -----------------------------------------------------------------
+            // Try again soon rather than waiting a full 10 seconds after an
+            // explicit scan failure.
+            // -----------------------------------------------------------------
+
             wifi_next_scan_ms =
-                millis() + WIFI_SCAN_REFRESH_MS;
+                millis() + 1000;
 
             return;
         }
+
 
         // ---------------------------------------------------------------------
         // Scan completed successfully.
@@ -1381,10 +1823,12 @@ static void wifi_scan_timer_cb(
         int num_networks =
             status;
 
+
         ESP_LOGI(
             TAG,
             "Wi-Fi refresh scan completed: %d networks",
             num_networks);
+
 
         for (int i = 0;
              i < num_networks;
@@ -1392,19 +1836,58 @@ static void wifi_scan_timer_cb(
 
             ESP_LOGI(
                 TAG,
-                "REFRESH[%d]: SSID='%s' RSSI=%d",
+                "REFRESH[%d]: SSID='%s' RSSI=%d Signal=%d%%",
                 i,
                 WiFi.SSID(i).c_str(),
-                WiFi.RSSI(i));
+                WiFi.RSSI(i),
+                dBm_to_percents(
+                    WiFi.RSSI(i)));
         }
+
 
         wifi_scan_in_progress = false;
 
+
         // ---------------------------------------------------------------------
-        // Rebuild the visible list using the new scan results.
+        // IMPORTANT:
         //
-        // Keep the scan results alive after this. The list button callbacks
-        // use WiFi.SSID(index) when the user selects a network.
+        // Before merely displaying the scan results, check whether our saved
+        // network is present.
+        //
+        // The saved network may have been unavailable during the original
+        // connection attempt and appeared later.
+        // ---------------------------------------------------------------------
+
+        if (try_saved_network_from_scan(
+                num_networks)) {
+
+            ESP_LOGI(
+                TAG,
+                "Saved network was found.");
+
+            ESP_LOGI(
+                TAG,
+                "Connection attempt has been restarted.");
+
+
+            // -----------------------------------------------------------------
+            // Do NOT immediately start another scan.
+            //
+            // The connection-attempt state above now controls the timer.
+            // -----------------------------------------------------------------
+
+            wifi_next_scan_ms =
+                millis() +
+                WIFI_SCAN_REFRESH_MS;
+
+            return;
+        }
+
+
+        // ---------------------------------------------------------------------
+        // Saved network was NOT found.
+        //
+        // Show the available networks to the user.
         // ---------------------------------------------------------------------
 
         if (list_wifi != NULL) {
@@ -1415,22 +1898,40 @@ static void wifi_scan_timer_cb(
             list_wifi = NULL;
         }
 
+
         lv_list_wifi(
             lv_screen_active(),
             num_networks);
+
+
+        // ---------------------------------------------------------------------
+        // We are done with the scan results.
+        //
+        // IMPORTANT:
+        //
+        // Do not call scanDelete() here because the LVGL list button callbacks
+        // use WiFi.SSID(index) until the user selects a network.
+        //
+        // The next scan will replace the results.
+        // ---------------------------------------------------------------------
+
 
         // ---------------------------------------------------------------------
         // The next scan happens after the refresh interval.
         // ---------------------------------------------------------------------
 
         wifi_next_scan_ms =
-            millis() + WIFI_SCAN_REFRESH_MS;
+            millis() +
+            WIFI_SCAN_REFRESH_MS;
 
         return;
     }
 
+
     // -------------------------------------------------------------------------
-    // No scan is running. Start the next scan when its interval expires.
+    // No scan is running.
+    //
+    // Start the next scan when its interval expires.
     // -------------------------------------------------------------------------
 
     if ((int32_t)(
@@ -1440,15 +1941,19 @@ static void wifi_scan_timer_cb(
         return;
     }
 
+
     ESP_LOGI(
         TAG,
         "Starting periodic Wi-Fi scan");
 
+
     // -------------------------------------------------------------------------
     // WiFi.scanNetworks(true) is asynchronous.
     //
-    // It also discards the previous scan result. Therefore remove the old
-    // clickable list before starting the new scan.
+    // It also discards/replaces the previous scan result when a new scan
+    // starts.
+    //
+    // Therefore remove the old clickable list before starting the new scan.
     // -------------------------------------------------------------------------
 
     if (list_wifi != NULL) {
@@ -1459,10 +1964,14 @@ static void wifi_scan_timer_cb(
         list_wifi = NULL;
     }
 
+
     wifi_scan_in_progress = true;
 
+
     int16_t result =
-        WiFi.scanNetworks(true);
+        WiFi.scanNetworks(
+            true);
+
 
     if (result == WIFI_SCAN_FAILED) {
 
@@ -1473,15 +1982,17 @@ static void wifi_scan_timer_cb(
         wifi_scan_in_progress = false;
 
         wifi_next_scan_ms =
-            millis() + WIFI_SCAN_REFRESH_MS;
+            millis() + 1000;
 
         return;
     }
+
 
     ESP_LOGI(
         TAG,
         "Periodic Wi-Fi scan started");
 }
+
 
 // -----------------------------------------------------------------------------
 // CHECK CONNECTION
@@ -1567,6 +2078,15 @@ void settingUpWiFi(
 
 
     // -------------------------------------------------------------------------
+    // Make sure the automatic scan/retry state starts clean.
+    // -------------------------------------------------------------------------
+
+    wifi_scan_in_progress = false;
+    wifi_saved_connection_attempt = false;
+    wifi_connection_attempt_deadline_ms = 0;
+
+
+    // -------------------------------------------------------------------------
     // Try the ONE saved network.
     // -------------------------------------------------------------------------
 
@@ -1575,6 +2095,7 @@ void settingUpWiFi(
         ESP_LOGI(
             TAG,
             "Saved Wi-Fi credentials found");
+
 
         if (checkConnection()) {
 
@@ -1598,7 +2119,8 @@ void settingUpWiFi(
     // -------------------------------------------------------------------------
     // No saved network, or saved network failed.
     //
-    // Let the user select a new network.
+    // Let the user select a new network OR allow the periodic scanner to
+    // rediscover the saved network automatically.
     // -------------------------------------------------------------------------
 
     ESP_LOGI(

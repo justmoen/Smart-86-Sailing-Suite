@@ -14,6 +14,15 @@ static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length)
 {
     switch(type) {
 
+        case WStype_DISCONNECTED:
+            // The payload often contains the text reason or status code
+            if (payload != nullptr && length > 0) {
+                ESP_LOGW("WS_EVENT", "Disconnected! Server Reason: %s", (char*)payload);
+            } else {
+                ESP_LOGW("WS_EVENT", "Disconnected with no clear payload reason.");
+            }
+            break;
+
         case WStype_CONNECTED:
             ESP_LOGI("WS", "Connected to SignalK");
             webSocket.sendTXT("{\"context\":\"*\",\"subscribe\":[{\"path\":\"*\"}]}");
@@ -33,8 +42,12 @@ static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length)
             break;
         }
 
-        case WStype_DISCONNECTED:
-            ESP_LOGW("WS", "Disconnected");
+        case WStype_PING:
+            ESP_LOGD("WS_EVENT", "Received Ping from Server");
+            break;
+            
+        case WStype_PONG:
+            ESP_LOGD("WS_EVENT", "Sent Pong to Server");
             break;
 
         case WStype_ERROR:
@@ -48,19 +61,20 @@ static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length)
 
 void signalk_ws_begin(const char* host, int port)
 {
-    // Do not force a subprotocol. SignalK accepts generic WebSocket connections
-    // without a negotiated protocol; advertising "arduino" can be rejected by the
-    // server and results in immediate reset/disconnects.
-    webSocket.begin(host, port, "/signalk/v1/stream&subscribe=self&period=1000", "");
+    // Fix the syntax format error (? instead of &) to avoid server rejection
+    webSocket.begin(host, port, "/signalk/v1/stream?subscribe=self&period=1000");
+    // Add custom connection headers so Signal K processes the request instantly
+    webSocket.setExtraHeaders("User-Agent: Smart-86-Sailing-Suite\r\nOrigin: http://192.168.1.71:8080");
     webSocket.onEvent(webSocketEvent);
 
-    // Newer SignalK versions enforce websocket ping/pong at the protocol level.
-    // Our client was not responding correctly to those heartbeat frames, which
-    // caused the socket to be dropped and immediately reconnected in a loop.
-    // We intentionally disable the client-side heartbeat to avoid tripping the
-    // server's native timeout while still allowing a clean reconnect path.
-    webSocket.setReconnectInterval(15000);
+    // REMOVE explicit active heartbeat tracking to prevent the 6-second timeout crash.
+    // The library automatically responds to incoming server Pings with Pongs 
+    // natively on the back-end as long as its loop is running smoothly.
+
+    // Lower the retry wait interval so it picks up quickly if the network drops
+    webSocket.setReconnectInterval(5000); 
 }
+
 
 void signalk_ws_loop()
 {

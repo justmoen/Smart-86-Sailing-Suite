@@ -11,7 +11,6 @@
 #include <net_signalk_http.h>
 #include <net_globals.h>
 
-
 void start_application()
 {
     // -------------------------------------------------------------------------
@@ -59,6 +58,10 @@ void start_application()
 
     start_signalk_connection_task();
 
+    // -------------------------------------------------------------------------
+    // NEW: Launch the Core 0 network engine to handle WebSocket/Web async polling
+    // -------------------------------------------------------------------------
+    start_network_processing();
 
     // -------------------------------------------------------------------------
     // Enter the main application loop.
