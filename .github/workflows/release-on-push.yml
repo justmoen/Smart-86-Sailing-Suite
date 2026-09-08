@@ -251,7 +251,7 @@ jobs:
               echo ""
               echo "Available binary files:"
               find build -maxdepth 2 -type f \
-                \\( -name '*.bin' -o -name '*.elf' \\) \
+                \( -name '*.bin' -o -name '*.elf' \) \
                 -print
               exit 1
             fi
