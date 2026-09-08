@@ -274,6 +274,9 @@ jobs:
             echo "Release tag:"
             echo "${{ github.ref_name }}"
 
+      - name: Fix directory permissions
+        run: sudo chown -R $USER:$USER build/
+        
       - name: Save build metadata
         shell: bash
         run: |
