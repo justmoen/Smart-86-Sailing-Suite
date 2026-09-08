@@ -272,7 +272,7 @@ jobs:
 
             echo ""
             echo "Release tag:"
-            echo "${GITHUB_REF_NAME}"
+            echo "${{ github.ref_name }}"
 
       - name: Save build metadata
         shell: bash
@@ -280,7 +280,7 @@ jobs:
           set -euo pipefail
 
           {
-            echo "Release tag: ${GITHUB_REF_NAME}"
+            echo "Release tag: ${{ github.ref_name }}"
             echo "Git commit: $(git rev-parse HEAD)"
             echo "ESP-IDF: v5.5.5"
             echo ""
