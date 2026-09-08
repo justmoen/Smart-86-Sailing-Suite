@@ -25,6 +25,12 @@ static bool wifi_scan_in_progress = false;
 
 static bool wifi_saved_connection_attempt = false;
 
+// TRUE after the saved credentials fail while the saved SSID remains visible.
+// This prevents an incorrect password from causing an automatic reconnect loop.
+// The flag is cleared when the saved SSID disappears from a later scan, or when
+// the user explicitly selects a network and supplies new credentials.
+static bool wifi_saved_network_failed = false;
+
 // -----------------------------------------------------------------------------
 // Time at which the current automatic saved-network connection attempt should
 // be considered failed.
@@ -487,6 +493,7 @@ void btnResetWiFiSettings_event(
     wifi_scan_in_progress = false;
     wifi_saved_connection_attempt = false;
     wifi_connection_attempt_deadline_ms = 0;
+    wifi_saved_network_failed = false;
 
 
     ESP_LOGW(
@@ -837,6 +844,9 @@ static void ta_password_event_cb(
         wifi_password =
             pass;
 
+        // The user explicitly supplied new credentials.
+        wifi_saved_network_failed = false;
+
 
         ESP_LOGI(
             TAG,
@@ -1091,6 +1101,15 @@ static void event_handler_wifi(
         (int)(intptr_t)
         lv_event_get_user_data(e);
 
+    if (wifi_scan_in_progress) {
+
+        ESP_LOGI(
+            TAG,
+            "Ignoring Wi-Fi selection while scan is in progress");
+
+        return;
+    }
+
     // -------------------------------------------------------------------------
     // The user has selected a network.
     //
@@ -1108,6 +1127,9 @@ static void event_handler_wifi(
     wifi_scan_in_progress = false;
     wifi_saved_connection_attempt = false;
     wifi_connection_attempt_deadline_ms = 0;
+
+    // Explicit user selection takes control from automatic retry logic.
+    wifi_saved_network_failed = false;
 
 
     // -------------------------------------------------------------------------
@@ -1306,6 +1328,7 @@ static void setupMode(
 
     wifi_saved_connection_attempt = false;
     wifi_connection_attempt_deadline_ms = 0;
+    wifi_saved_network_failed = false;
 
 
     // -------------------------------------------------------------------------
@@ -1383,6 +1406,7 @@ static void setupMode(
             wifi_saved_connection_attempt = false;
             wifi_connection_attempt_deadline_ms = 0;
             wifi_scan_in_progress = false;
+            wifi_saved_network_failed = false;
 
 
             if (wifi_scan_timer != NULL) {
@@ -1432,10 +1456,6 @@ static void setupMode(
 static bool try_saved_network_from_scan(
     int num_networks)
 {
-    // -------------------------------------------------------------------------
-    // Do not attempt another connection if one is already underway.
-    // -------------------------------------------------------------------------
-
     if (wifi_saved_connection_attempt) {
 
         ESP_LOGI(
@@ -1448,7 +1468,6 @@ static bool try_saved_network_from_scan(
 
     String saved_ssid;
     String saved_password;
-
 
     if (!load_wifi_credentials(
             saved_ssid,
@@ -1463,8 +1482,13 @@ static bool try_saved_network_from_scan(
 
 
     // -------------------------------------------------------------------------
-    // Search the current scan results for the stored SSID.
+    // Find the saved SSID in the completed scan. Multiple APs may have the
+    // same SSID, so use the strongest matching AP.
     // -------------------------------------------------------------------------
+
+    bool saved_network_visible = false;
+    int matching_index = -1;
+    int matching_rssi = -127;
 
     for (int i = 0;
          i < num_networks;
@@ -1473,118 +1497,142 @@ static bool try_saved_network_from_scan(
         String scanned_ssid =
             WiFi.SSID(i);
 
-
         if (scanned_ssid != saved_ssid) {
 
             continue;
         }
 
+        saved_network_visible = true;
 
         int rssi =
             WiFi.RSSI(i);
 
+        if (matching_index < 0 ||
+            rssi > matching_rssi) {
 
-        ESP_LOGI(
-            TAG,
-            "==================================================");
-
-        ESP_LOGI(
-            TAG,
-            "SAVED WIFI NETWORK FOUND DURING SCAN");
-
-        ESP_LOGI(
-            TAG,
-            "  SSID='%s'",
-            scanned_ssid.c_str());
-
-        ESP_LOGI(
-            TAG,
-            "  RSSI=%d dBm",
-            rssi);
-
-        ESP_LOGI(
-            TAG,
-            "  Signal=%d%%",
-            dBm_to_percents(rssi));
-
-        ESP_LOGI(
-            TAG,
-            "  Scan index=%d",
-            i);
-
-        ESP_LOGI(
-            TAG,
-            "Attempting saved credentials NOW");
-
-        ESP_LOGI(
-            TAG,
-            "==================================================");
-
-
-        // ---------------------------------------------------------------------
-        // We have consumed the scan results.
-        //
-        // Do not continue scanning while association is being attempted.
-        // ---------------------------------------------------------------------
-
-        wifi_scan_in_progress = false;
-
-
-        // ---------------------------------------------------------------------
-        // Delete the scan results before starting the connection.
-        // ---------------------------------------------------------------------
-
-        WiFi.scanDelete();
-
-
-        // ---------------------------------------------------------------------
-        // Make absolutely sure we are in station mode.
-        // ---------------------------------------------------------------------
-
-        WiFi.mode(
-            WIFI_STA);
-
-        WiFi.setAutoReconnect(
-            true);
-
-
-        // ---------------------------------------------------------------------
-        // Disconnect any stale station state.
-        // ---------------------------------------------------------------------
-
-        WiFi.disconnect();
-
-        delay(100);
-
-
-        // ---------------------------------------------------------------------
-        // Start the saved-network connection attempt.
-        // ---------------------------------------------------------------------
-
-        wifi_saved_connection_attempt = true;
-
-        wifi_connection_attempt_deadline_ms =
-            millis() +
-            WIFI_CONNECTION_ATTEMPT_TIMEOUT_MS;
-
-
-        WiFi.begin(
-            saved_ssid.c_str(),
-            saved_password.c_str());
-
-
-        ESP_LOGI(
-            TAG,
-            "WiFi.begin() retry issued for saved SSID");
-
-
-        return true;
+            matching_index = i;
+            matching_rssi = rssi;
+        }
     }
 
 
-    return false;
-}
+    // -------------------------------------------------------------------------
+    // If the saved SSID disappeared, clear the failure latch. A future
+    // appearance can then trigger another automatic attempt.
+    // -------------------------------------------------------------------------
 
+    if (!saved_network_visible) {
+
+        if (wifi_saved_network_failed) {
+
+            ESP_LOGI(
+                TAG,
+                "Saved SSID is no longer visible; clearing automatic-failure latch");
+        }
+
+        wifi_saved_network_failed = false;
+
+        return false;
+    }
+
+
+    // -------------------------------------------------------------------------
+    // The saved credentials already failed while this SSID remained visible.
+    // Do not repeatedly attempt the same bad password.
+    // -------------------------------------------------------------------------
+
+    if (wifi_saved_network_failed) {
+
+        ESP_LOGW(
+            TAG,
+            "Saved SSID '%s' is visible but previous automatic credentials failed",
+            saved_ssid.c_str());
+
+        ESP_LOGW(
+            TAG,
+            "Not retrying automatically; showing Wi-Fi list");
+
+        return false;
+    }
+
+
+    if (matching_index < 0) {
+
+        return false;
+    }
+
+
+    ESP_LOGI(
+        TAG,
+        "==================================================");
+
+    ESP_LOGI(
+        TAG,
+        "SAVED WIFI NETWORK FOUND DURING SCAN");
+
+    ESP_LOGI(
+        TAG,
+        "  SSID='%s'",
+        saved_ssid.c_str());
+
+    ESP_LOGI(
+        TAG,
+        "  RSSI=%d dBm",
+        matching_rssi);
+
+    ESP_LOGI(
+        TAG,
+        "  Signal=%d%%",
+        dBm_to_percents(matching_rssi));
+
+    ESP_LOGI(
+        TAG,
+        "  Scan index=%d",
+        matching_index);
+
+    ESP_LOGI(
+        TAG,
+        "Attempting saved credentials NOW");
+
+    ESP_LOGI(
+        TAG,
+        "==================================================");
+
+
+    // Keep the completed scan results. The timeout handler uses them to restore
+    // the list immediately if authentication fails.
+    wifi_scan_in_progress = false;
+
+
+    WiFi.mode(
+        WIFI_STA);
+
+    WiFi.setAutoReconnect(
+        true);
+
+    WiFi.disconnect();
+
+    delay(100);
+
+
+    wifi_saved_connection_attempt = true;
+
+    wifi_connection_attempt_deadline_ms =
+        millis() +
+        WIFI_CONNECTION_ATTEMPT_TIMEOUT_MS;
+
+
+    WiFi.begin(
+        saved_ssid.c_str(),
+        saved_password.c_str());
+
+
+    ESP_LOGI(
+        TAG,
+        "WiFi.begin() retry issued for saved SSID");
+
+    return true;
+}
 
 // -----------------------------------------------------------------------------
 // WIFI SCAN STATUS
@@ -1741,6 +1789,10 @@ static void wifi_scan_timer_cb(
             wifi_saved_connection_attempt = false;
             wifi_connection_attempt_deadline_ms = 0;
 
+            // Latch the failure while the saved SSID remains visible. This
+            // prevents repeated automatic attempts with the same bad password.
+            wifi_saved_network_failed = true;
+
 
             // -----------------------------------------------------------------
             // Disconnect the failed attempt.
@@ -1752,8 +1804,32 @@ static void wifi_scan_timer_cb(
 
 
             // -----------------------------------------------------------------
-            // Allow another scan to happen shortly.
+            // Restore the list immediately using the scan results retained by
+            // try_saved_network_from_scan().
             // -----------------------------------------------------------------
+
+            int num_networks =
+                WiFi.scanComplete();
+
+            if (num_networks >= 0) {
+
+                if (list_wifi != NULL) {
+
+                    lv_obj_delete(
+                        list_wifi);
+
+                    list_wifi = NULL;
+                }
+
+                lv_list_wifi(
+                    lv_screen_active(),
+                    num_networks);
+
+                ESP_LOGI(
+                    TAG,
+                    "Wi-Fi list restored after saved-network connection failure");
+            }
+
 
             wifi_next_scan_ms =
                 millis() + 1000;
@@ -1948,22 +2024,10 @@ static void wifi_scan_timer_cb(
 
 
     // -------------------------------------------------------------------------
-    // WiFi.scanNetworks(true) is asynchronous.
-    //
-    // It also discards/replaces the previous scan result when a new scan
-    // starts.
-    //
-    // Therefore remove the old clickable list before starting the new scan.
+    // WiFi.scanNetworks(true) is asynchronous. Keep the current list visible
+    // while the scan runs so the UI never intentionally goes blank. Selection
+    // is ignored while the scan is active because its indexes may be stale.
     // -------------------------------------------------------------------------
-
-    if (list_wifi != NULL) {
-
-        lv_obj_delete(
-            list_wifi);
-
-        list_wifi = NULL;
-    }
-
 
     wifi_scan_in_progress = true;
 
@@ -2084,6 +2148,7 @@ void settingUpWiFi(
     wifi_scan_in_progress = false;
     wifi_saved_connection_attempt = false;
     wifi_connection_attempt_deadline_ms = 0;
+    wifi_saved_network_failed = false;
 
 
     // -------------------------------------------------------------------------

@@ -2,6 +2,7 @@
 #include "ui_settings_wifi.h"
 #include "keepalive.h"
 #include <WiFi.h>
+#include "version.h"
 
 static void btnPowerOff_event(lv_event_t *event) {
     disconnect_clients();
@@ -19,7 +20,7 @@ static void lv_reboot_display(lv_updatable_screen_t *scr) {
     lv_obj_set_pos(labelIP, 10, 10);
     lv_obj_set_style_text_font(labelIP, &lv_font_montserrat_32, LV_PART_MAIN);
     lv_label_set_text(labelIP,
-                        (String(" Wi-Fi:  ") += String(wifi_ssid) += String("\n Local IP:  ") += WiFi.localIP().toString()).c_str());
+                        (String(" Wi-Fi:  ") += String(wifi_ssid) += String("\n Local IP:  ") += WiFi.localIP().toString() += String("\n Version:  ") += FIRMWARE_VERSION_STR).c_str());
 
     lv_obj_t *btn1 = lv_button_create(parent);
     lv_obj_t *label1 = lv_label_create(btn1);

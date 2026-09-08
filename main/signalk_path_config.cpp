@@ -14,6 +14,7 @@
 #include "net_signalk_http.h"
 #include "screen_config.h"
 #include "ui_manager.h"
+#include "version.h"
 
 extern const uint8_t _binary_web_admin_html_start[] asm("_binary_admin_html_start");
 extern const uint8_t _binary_web_firmware_html_start[] asm("_binary_firmware_html_start");
@@ -42,10 +43,6 @@ static void apply_template_value(String& html, const char* token, const String& 
     placeholder += "}}";
     html.replace(placeholder, value);
 }
-
-#ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "v0.7.30"
-#endif
 
 constexpr const char* kPrefsNamespace = "sk-config";
 constexpr const char* kGitHubRepo = "justmoen/Smart-86-Sailing-Suite";
@@ -263,7 +260,7 @@ static bool fetch_release_history(
 }
 
 static String get_current_firmware_version() {
-    return String(FIRMWARE_VERSION);
+    return String(FIRMWARE_VERSION_STR);
 }
 
 static String resolve_release_asset_url(

@@ -154,7 +154,7 @@ static void create_wind_scale_labels(lv_obj_t *parent)
     };
 
     static const WindLabel labels[] = {
-        { "0",    0.0f   },
+        { " 0",    0.0f   },
         { "30",   30.0f  },
         { "60",   60.0f  },
         { "90",   90.0f  },
