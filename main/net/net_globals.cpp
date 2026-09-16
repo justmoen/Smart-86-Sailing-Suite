@@ -44,8 +44,8 @@ void start_network_processing()
         "SK_Net_Loop",
         4096,
         NULL,
-        1, // Lower priority to 1 so the ESP-IDF Wi-Fi/TCP stack (Priority 18-20) remains completely unhindered
+        3,
         &SignalKNetTaskHandle,
-        0  // Pin strictly to CPU Core 0
+        0
     );
 }

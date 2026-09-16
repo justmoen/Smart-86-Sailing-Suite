@@ -3,7 +3,7 @@
 
 #define FIRMWARE_VERSION_MAJOR 0
 #define FIRMWARE_VERSION_MINOR 7
-#define FIRMWARE_VERSION_PATCH 31
+#define FIRMWARE_VERSION_PATCH 32
 
 // Combined string version for easy printing
-#define FIRMWARE_VERSION_STR   "0.7.31"
+#define FIRMWARE_VERSION_STR   "0.7.32"

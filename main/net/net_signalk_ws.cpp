@@ -23,10 +23,6 @@ static constexpr const char *TAG = "WS";
 // This is diagnostic only and can be increased later.
 static constexpr uint32_t WS_HEALTH_LOG_INTERVAL_MS = 30000;
 
-// Send an application-level WebSocket ping periodically.
-// This helps distinguish an idle/dead connection from a busy connection.
-static constexpr uint32_t WS_PING_INTERVAL_MS = 0;
-
 // If we haven't received any Signal K data for this long, report it.
 // We do NOT automatically disconnect based on this value.
 static constexpr uint32_t WS_RX_WARNING_INTERVAL_MS = 60000;
@@ -628,7 +624,7 @@ void signalk_ws_begin(
     // -------------------------------------------------------------------------
 
     String url =
-        "/signalk/v1/stream?subscribe=self&period=1000";
+        "/signalk/v1/stream?subscribe=self";
 
 
     ESP_LOGI(
@@ -738,32 +734,6 @@ void signalk_ws_loop()
                 (unsigned long)
                     elapsed_since(ws_last_rx_ms));
         }
-    }
-
-
-    // -------------------------------------------------------------------------
-    // Explicit WebSocket PING.
-    //
-    // This creates measurable traffic in both directions and helps keep some
-    // network infrastructure from treating the connection as idle.
-    // -------------------------------------------------------------------------
-
-    if (ws_connected &&
-        now - ws_last_ping_ms >=
-            WS_PING_INTERVAL_MS) {
-
-        ws_last_ping_ms =
-            now;
-
-
-        // ESP_LOGD(
-        //     TAG,
-        //     "Sending WebSocket PING");
-
-        // webSocket.sendPing();
-
-        ws_last_tx_ms =
-            now;
     }
 }
 
