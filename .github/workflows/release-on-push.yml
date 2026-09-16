@@ -82,8 +82,8 @@ jobs:
           grep -n '^CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=' sdkconfig
           grep -n '^CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=' sdkconfig
 
-          expected_always_internal='CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=0'
-          expected_reserve_internal='CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=131072'
+          expected_always_internal='CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384'
+          expected_reserve_internal='CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=32768'
 
           if ! grep -qx "$expected_always_internal" sdkconfig; then
             echo "ERROR: unexpected CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL."
@@ -219,12 +219,12 @@ jobs:
             grep -n '^CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=' sdkconfig
             grep -n '^CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=' sdkconfig
 
-            if ! grep -qx 'CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=0' sdkconfig; then
+            if ! grep -qx 'CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384' sdkconfig; then
               echo "ERROR: ESP-IDF reconfigure changed CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL."
               exit 1
             fi
 
-            if ! grep -qx 'CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=131072' sdkconfig; then
+            if ! grep -qx 'CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=32768' sdkconfig; then
               echo "ERROR: ESP-IDF reconfigure changed CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL."
               exit 1
             fi
@@ -233,6 +233,27 @@ jobs:
             echo "ESP-Hosted:"
             grep -n '^CONFIG_ESP_HOSTED' sdkconfig || true
             grep -n '^CONFIG_ESP_WIFI_REMOTE' sdkconfig || true
+
+            echo ""
+            echo "ESP-Hosted memory / SDIO alignment:"
+            grep -n '^CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM=' sdkconfig
+            grep -n '^CONFIG_ESP_HOSTED_DFLT_TASK_FROM_SPIRAM=' sdkconfig
+            grep -n '^CONFIG_CACHE_L2_CACHE_LINE_64B=' sdkconfig
+
+            if ! grep -qx 'CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM=y' sdkconfig; then
+              echo "ERROR: ESP-Hosted mempool is not configured for PSRAM."
+              exit 1
+            fi
+
+            if ! grep -qx 'CONFIG_ESP_HOSTED_DFLT_TASK_FROM_SPIRAM=y' sdkconfig; then
+              echo "ERROR: ESP-Hosted default tasks are not configured for PSRAM."
+              exit 1
+            fi
+
+            if ! grep -qx 'CONFIG_CACHE_L2_CACHE_LINE_64B=y' sdkconfig; then
+              echo "ERROR: ESP32-P4 L2 cache line is not configured for 64 bytes."
+              exit 1
+            fi
 
             echo ""
             echo "============================================================"
